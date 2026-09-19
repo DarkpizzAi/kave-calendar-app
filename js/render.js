@@ -14,13 +14,18 @@ import { escapeHtml } from "./util.js";
 import { PALETTES, applyPalette, themeBootRan, paletteAccents } from "./theme.js";
 import { status as syncStatus, checkToken } from "./sync.js";
 
+/* Named from the brainstorm, so the shell does not contradict it: the home
+   screen is NOT a month grid (the grid is somewhere you go), Insights is its
+   own tab where nothing is ever added automatically, and Travel is the
+   been/want-to-go loop. Settings last, as everywhere in this household. */
 export const VIEWS = {
-  today: "Today",
-  trips: "Trips",
+  home: "Home",
+  insights: "Insights",
+  travel: "Travel",
   settings: "Settings",
 };
 
-let current = "today";
+let current = "home";
 
 export function currentView() { return current; }
 
@@ -37,19 +42,27 @@ function stub(title, line) {
   return `<div class="stub"><b>${escapeHtml(title)}</b>${escapeHtml(line)}</div>`;
 }
 
-function renderToday() {
+function renderHome() {
   return `
-    <h2 class="view-title">Today</h2>
-    <p class="lede">Key dates, bookings and what is coming up.</p>
-    ${stub("Not built yet", "Compass has been brainstormed but not specced. This view arrives with its own spec.")}
+    <h2 class="view-title">Home</h2>
+    <p class="lede">This week and next, loose ends, what is coming, and where the other person is.</p>
+    ${stub("Not built yet", "Four panels, and deliberately not a month grid. Brainstormed, not specced.")}
   `;
 }
 
-function renderTrips() {
+function renderInsights() {
   return `
-    <h2 class="view-title">Trips</h2>
-    <p class="lede">Planned and past trips, and what each one cost.</p>
-    ${stub("Not built yet", "Trips, where we have been and where we want to go. Brainstormed; the shape of it is the next spec.")}
+    <h2 class="view-title">Insights</h2>
+    <p class="lede">What the nightly pass worked out, waiting for a yes or no.</p>
+    ${stub("Not built yet", "Proposals from mail, bank lines and voice notes. Nothing is ever added automatically.")}
+  `;
+}
+
+function renderTravel() {
+  return `
+    <h2 class="view-title">Travel</h2>
+    <p class="lede">Where we have been, and where we want to go.</p>
+    ${stub("Not built yet", "A wishlist entry gets dates and becomes a trip, the trip collects costs, then it drops into the been-list.")}
   `;
 }
 
@@ -109,7 +122,7 @@ function renderSettings() {
       <h3 class="section-title">About</h3>
       <div class="card">
         <p class="status-line">Compass <span id="swVersion">checking version...</span></p>
-        <p class="hint">The household calendar. Shell only: brainstormed, not specced, and the backend is not decided yet.</p>
+        <p class="hint">The household planner. Shell only: brainstormed, not specced. Data in the repo; an always-on mini PC runs the nightly pass.</p>
       </div>
     </section>
   `;
@@ -118,7 +131,7 @@ function renderSettings() {
 function renderNav() {
   return Object.entries(VIEWS).map(([id, label]) => `
     <button data-view="${escapeHtml(id)}" ${current === id ? 'aria-current="page"' : ""}>
-      <span class="nav-icon" aria-hidden="true">${id === "today" ? "&#9679;" : id === "trips" ? "&#9650;" : "&#9881;"}</span>
+      <span class="nav-icon" aria-hidden="true">${id === "home" ? "&#9679;" : id === "insights" ? "&#9670;" : id === "travel" ? "&#9650;" : "&#9881;"}</span>
       <span class="nav-label">${escapeHtml(label)}</span>
     </button>`).join("");
 }
@@ -126,8 +139,9 @@ function renderNav() {
 export function render() {
   const main = document.getElementById("view");
   main.innerHTML =
-    current === "today" ? renderToday() :
-    current === "trips" ? renderTrips() :
+    current === "home" ? renderHome() :
+    current === "insights" ? renderInsights() :
+    current === "travel" ? renderTravel() :
     renderSettings();
 
   document.getElementById("nav").innerHTML = renderNav();

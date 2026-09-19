@@ -1,32 +1,49 @@
 # Compass
 
-The household calendar on a phone: key dates, bookings, trips, and what a
-trip cost.
+The household planner: events, what they cost, trips, and the loose ends
+attached to them. Replaces Google Calendar and the yearly planning sheet.
 
-**This is a shell, not a finished app.** The Today and Trips views are
+**This is a shell, not a finished app.** Home, Insights and Travel are
 deliberate dashed stubs. Compass has been brainstormed - see
 `compass-planning-app-brainstorm.md` in the working folder, which covers the
 event model, three kinds of money, the two-person noise filter, the daily
-recap and a travel tab - but it has no spec and no data model yet, and the
-backend question above is open. What exists here is everything the household
+recap, a travel tab and a finance facts log - but it has no spec and no data
+model yet. What exists here is everything the household
 conventions already decided: the look, the module shape, the security
 posture, the service worker, and a Settings tab that actually works.
 
 **This repo is the static app shell only.** No data, no secrets. It is public
 so GitHub Pages can serve it for free.
 
-**The backend is NOT decided.** This shell was scaffolded on Spoon's
-GitHub-only pattern (a personal token in Settings, the Contents API, data in
-the private `DarkpizzAi/kave-hub` repo under `calendar/data/`) because that is
-the household's existing pattern. The Compass brainstorm says that pattern
-will not stretch: a daily recap email and inbox scanning need something
-running while the app is closed, and it says the backend should be decided
-before building.
+## Where things live
 
-`github.js` therefore carries no data paths, and Settings' token check is only
-a token check. Nothing here commits Compass to GitHub-as-backend, and the
-choice is still open. Whatever it becomes, nothing personal is ever committed
-to this repo.
+**The repo is the data store.** Events, cost lines, checklists, travel data,
+the insights queue, voice-note transcripts and the finance facts log all live
+in the private `DarkpizzAi/kave-hub` repo under `calendar/data/`, reached with
+a personal token pasted in Settings. That is the pattern this shell was built
+on and it stands.
+
+**An always-on mini PC runs what the app cannot.** Arriving early October
+2026, on 24/7, also a media server. It runs two separable scheduled jobs: a
+nightly pass that scans both inboxes, reads new bank extracts, transcribes
+voice notes and matches them against existing events; and a morning pass that
+sends each person's recap email. Two jobs, so a failure in one does not kill
+the other.
+
+It beats a scheduled GitHub Action or a small VPS for one specific reason:
+**Gmail and the bank extracts never leave the house.**
+
+**Standing principle: repo first, box second.** Only genuinely sensitive
+things live on the mini PC, and as little as possible - Gmail OAuth tokens,
+any bank credentials, raw audio pending transcription, and the scheduled jobs
+themselves. Everything else is in the repo, because anything on the box is
+invisible, unversioned and lost if the box dies.
+
+Known risk: the box is a single point of failure - asleep, rebooting,
+Windows updating. Survivable only because a last-scanned timestamp makes it
+visible in the app.
+
+Nothing personal is ever committed to *this* repo, which is the public shell.
 
 **Compass is the source of truth for trips**, including what they cost. A
 finance app will be built later and will read from Compass, not the other way
@@ -166,8 +183,8 @@ features.
 
 ## Status
 
-**Shell only.** Settings works: paste a token, check it against the hub repo,
+**Shell only.** Home, Insights and Travel are dashed stubs. Settings works: paste a token, check it against the hub repo,
 switch palette, read the running service-worker version, see whether the CSP
-preload was blocked. Today and Trips are stubs.
+preload was blocked. Home, Insights and Travel are stubs.
 
 Next: a spec for what Compass actually does.
