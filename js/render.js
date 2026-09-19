@@ -41,7 +41,7 @@ function renderToday() {
   return `
     <h2 class="view-title">Today</h2>
     <p class="lede">Key dates, bookings and what is coming up.</p>
-    ${stub("Not built yet", "Compass's data model has not been designed. This view arrives with its own spec.")}
+    ${stub("Not built yet", "Compass has been brainstormed but not specced. This view arrives with its own spec.")}
   `;
 }
 
@@ -49,7 +49,7 @@ function renderTrips() {
   return `
     <h2 class="view-title">Trips</h2>
     <p class="lede">Planned and past trips, and what each one cost.</p>
-    ${stub("Not built yet", "Compass is the source of truth for trips, including their cost. The shape of that is the next spec.")}
+    ${stub("Not built yet", "Trips, where we have been and where we want to go. Brainstormed; the shape of it is the next spec.")}
   `;
 }
 
@@ -109,7 +109,7 @@ function renderSettings() {
       <h3 class="section-title">About</h3>
       <div class="card">
         <p class="status-line">Compass <span id="swVersion">checking version...</span></p>
-        <p class="hint">The household calendar. Data lives in kave-hub under calendar/data/.</p>
+        <p class="hint">The household calendar. Shell only: brainstormed, not specced, and the backend is not decided yet.</p>
       </div>
     </section>
   `;

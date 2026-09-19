@@ -4,18 +4,29 @@ The household calendar on a phone: key dates, bookings, trips, and what a
 trip cost.
 
 **This is a shell, not a finished app.** The Today and Trips views are
-deliberate dashed stubs. Compass's data model has not been designed and needs
-its own brainstorm, spec and plan before any of it is built. What exists here
-is everything the household conventions already decided: the look, the module
-shape, the security posture, the service worker, and a Settings tab that
-actually works.
+deliberate dashed stubs. Compass has been brainstormed - see
+`compass-planning-app-brainstorm.md` in the working folder, which covers the
+event model, three kinds of money, the two-person noise filter, the daily
+recap and a travel tab - but it has no spec and no data model yet, and the
+backend question above is open. What exists here is everything the household
+conventions already decided: the look, the module shape, the security
+posture, the service worker, and a Settings tab that actually works.
 
 **This repo is the static app shell only.** No data, no secrets. It is public
 so GitHub Pages can serve it for free.
 
-The data lives in the separate **private** repo `DarkpizzAi/kave-hub`, under
-`calendar/data/`. It syncs through a personal GitHub token pasted in Settings.
-Nothing personal is ever committed here.
+**The backend is NOT decided.** This shell was scaffolded on Spoon's
+GitHub-only pattern (a personal token in Settings, the Contents API, data in
+the private `DarkpizzAi/kave-hub` repo under `calendar/data/`) because that is
+the household's existing pattern. The Compass brainstorm says that pattern
+will not stretch: a daily recap email and inbox scanning need something
+running while the app is closed, and it says the backend should be decided
+before building.
+
+`github.js` therefore carries no data paths, and Settings' token check is only
+a token check. Nothing here commits Compass to GitHub-as-backend, and the
+choice is still open. Whatever it becomes, nothing personal is ever committed
+to this repo.
 
 **Compass is the source of truth for trips**, including what they cost. A
 finance app will be built later and will read from Compass, not the other way
