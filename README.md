@@ -45,10 +45,25 @@ visible in the app.
 
 Nothing personal is ever committed to *this* repo, which is the public shell.
 
-**Compass is the source of truth for trips**, including what they cost. A
-finance app will be built later and will read from Compass, not the other way
-round. Isa's Spend Dashboard also infers trip costs from the bank ledger;
-those are a second, ageing opinion, and that is accepted deliberately.
+## What Compass owns
+
+**Compass is the confirmation gate.** Anything that passes through it is the
+source of truth: a proposal from the nightly sweep that someone reviewed and
+accepted, and anything entered by hand. Nothing downstream may contradict it.
+
+Everything else is not Compass's problem. The large unconfirmed remainder,
+the ordinary spend that never attaches to a plan or a trip, belongs to a
+finance app that does not exist yet. **That app will read the confirmed set
+from Compass**, not the other way round, and not by inferring the same number
+separately.
+
+So the split is confirmed versus unconfirmed, not travel versus not-travel.
+Travel is just where confirmation naturally happens, because a trip has a
+date window, a place and a ticket to confirm against.
+
+Isa's Spend Dashboard infers trip costs from the bank ledger today. Once the
+finance app exists it reads from Compass instead; until then that inference
+is knowingly a second, ageing opinion.
 
 ## Run locally
 

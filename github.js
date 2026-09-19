@@ -26,9 +26,10 @@ export const github = {
     // would prejudge it. getFile/putFile take a path argument; add the named
     // paths when the feature spec settles what they are.
     //
-    // Whatever they become, they live under calendar/data/ in kave-hub, and
-    // Compass is the source of truth for trips: a trip's cost is held here
-    // and handed to a finance app later, not derived from a ledger.
+    // Whatever they become, they live under calendar/data/ in kave-hub.
+    // Compass is the confirmation gate: what someone reviewed and accepted,
+    // or entered by hand, is authoritative and is handed to a finance app
+    // later. The unconfirmed remainder is that app's problem, not this one's.
   },
   // GitHub's suggested minimum seconds between polls, if it ever sends one
   pollInterval: 60,
