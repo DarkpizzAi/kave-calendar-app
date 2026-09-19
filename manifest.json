@@ -1,0 +1,17 @@
+{
+  "id": "/kave-compass-app/",
+  "name": "Compass",
+  "short_name": "Compass",
+  "description": "The household calendar: key dates, bookings, trips and what they cost.",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "portrait",
+  "_comment_colours": "theme_color is absent on purpose, the same measured reason as Spoon's: setting it pins the status bar to ONE colour in both light and dark, while leaving it out lets the bar follow the phone. Chrome ignores <meta name=theme-color> in an installed app, and color_scheme_dark is not implemented. background_color only tints the launch splash.",
+  "background_color": "#16181d",
+  "icons": [
+    { "src": "icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
+    { "src": "icon-512-maskable.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ]
+}
