@@ -61,9 +61,19 @@ So the split is confirmed versus unconfirmed, not travel versus not-travel.
 Travel is just where confirmation naturally happens, because a trip has a
 date window, a place and a ticket to confirm against.
 
-Isa's Spend Dashboard infers trip costs from the bank ledger today. Once the
-finance app exists it reads from Compass instead; until then that inference
-is knowingly a second, ageing opinion.
+**Compass is the trips dashboard.** That was a standing request of its own
+until 20/09/2026, when it was retired as superseded by this app: the Travel
+tab is that item, and there is no second surface to build.
+
+Deriving trips from bank transactions was tried before this app existed -
+grouping on the merchant's city and a contiguous date window - and abandoned.
+The failure modes are written up in the hub repo and are worth reading before
+designing anything that matches a charge to a plan, because they are this
+app's hard problem seen from the other end. The short version: **a ledger can
+corroborate a trip, it cannot originate one.** A merchant's registered
+address is not a location, suburbs split one trip into several, day trips
+nest inside longer ones, and a single-day candidate is usually a booking made
+from home.
 
 ## Run locally
 
