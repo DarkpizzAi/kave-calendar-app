@@ -54,7 +54,7 @@ const STUBS = {
   trips: ["The next departure, every trip, and the throwback.",
     "Phases, events, bookings and costs per trip. + creates a trip and can pull in existing events."],
   radar: ["What might happen, and what we are watching.",
-    "The bucket list and prices being watched. Tap an idea to make it an event or a trip."],
+    "Ideas, and prices being watched. Tap an idea to make it an event or a trip."],
 };
 
 function renderStub(id) {
