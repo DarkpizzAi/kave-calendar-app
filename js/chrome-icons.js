@@ -9,6 +9,7 @@ export const ICON = {
   x: svg('<path d="M18 6 6 18M6 6l12 12"/>'),
   chev: svg('<path d="m9 6 6 6-6 6"/>', "chev"),
   up: svg('<path d="m6 15 6-6 6 6"/>'),
+  check: svg('<path d="m5 12 5 5L20 7"/>'),
   plus: svg('<path d="M12 5v14M5 12h14"/>'),
   calendar: svg('<rect x="3" y="4" width="18" height="18" rx="3"/><path d="M16 2v4M8 2v4M3 10h18"/>'),
   insights: svg('<path d="M9 18h6M10 22h4M12 2a7 7 0 0 0-4 12.7V17h8v-2.3A7 7 0 0 0 12 2Z"/>'),

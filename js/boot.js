@@ -8,7 +8,7 @@
 "use strict";
 
 import { initTheme } from "./theme.js";
-import { render, isCalendar, dataSync } from "./render.js";
+import { render, isCalendar, dataSync, actions } from "./render.js";
 import { wire, showBanner } from "./wire.js";
 import { initPullToSync } from "./pull-to-sync.js";
 import { appData } from "./data.js";
@@ -33,12 +33,13 @@ async function syncNow() {
   Object.assign(dataSync, r.ok ? { state: "ok", message: "Synced" }
     : { state: kind === "offline" ? "offline" : "failed",
         message: kind === "offline" ? "Offline. Your edits are kept and sent when you are back online."
-          : kind === "unauthorized" ? "Sync failed: the token was rejected. Check it below."
+          : kind === "unauthorized" ? "Sync failed: the token was rejected. Check it in Advanced settings."
           : kind === "rateLimited" ? "Sync failed: rate limited by GitHub. It retries on its own."
           : "Sync failed: " + ((r.error && r.error.message) || "unknown error") }, { at: Date.now() });
   render();
 }
 
+actions.sync = syncNow;
 initSheet();
 initCalendar({ data, render, isCalendar, sync: syncNow });
 render();

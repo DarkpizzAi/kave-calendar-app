@@ -57,15 +57,21 @@ export function initTheme() {
    was there, including "nothing". Cached because it forces a style
    recalculation per palette and the answer cannot change at runtime. */
 let accentCache = null;
+let softs = {};
+/* Each palette's --accent-soft, read in the same pass as its accent. */
+export function paletteSofts() { paletteAccents(); return softs; }
+
 export function paletteAccents() {
   if (accentCache) return accentCache;
   const root = document.documentElement;
   const prev = root.getAttribute("data-palette");
   const out = {};
+  softs = {};
   for (const id of Object.keys(PALETTES)) {
     if (id === "cobalt") root.removeAttribute("data-palette");
     else root.setAttribute("data-palette", id);
     out[id] = getComputedStyle(root).getPropertyValue("--accent").trim();
+    softs[id] = getComputedStyle(root).getPropertyValue("--accent-soft").trim();
   }
   if (prev === null) root.removeAttribute("data-palette");
   else root.setAttribute("data-palette", prev);

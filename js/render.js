@@ -11,15 +11,20 @@
 
 import { store } from "./store.js";
 import { escapeHtml } from "./util.js";
-import { PALETTES, applyPalette, themeBootRan, paletteAccents } from "./theme.js";
+import { PALETTES, applyPalette, themeBootRan, paletteAccents, paletteSofts } from "./theme.js";
 import { status as syncStatus, checkToken } from "./sync.js";
 import { ICON } from "./chrome-icons.js";
 import { calendarHtml, afterCalendar, onScroll, backToToday } from "./calendar.js";
-import { refreshSheet } from "./sheet.js";
+import { refreshSheet, openLevel, registerLevel } from "./sheet.js";
+import { readPrefs, isShown, toggleCategory, defaultsSummary, categoriesSummary, VIEW_NAMES, DETAIL_NAMES, STYLE_NAMES } from "./prefs.js";
+import { CATEGORIES, iconFor } from "./icons.js";
+import { resetCalendarDefaults } from "./calendar.js";
 
 /* Sync of the events themselves, shown in Settings only (spec: the Calendar
    never shows sync state). Set by boot.js. */
 export const dataSync = { state: "idle", message: "", at: 0 };
+/* Set by boot.js: what "Sync now" runs. */
+export const actions = { sync: null };
 
 /* The five tabs from the brainstorm's tab map (kave-hub
    the Compass A spec in kave-hub). Calendar is home and
@@ -72,87 +77,93 @@ function renderStub(id) {
   `;
 }
 
+/* Settings, laid out like Spoon's (spec section 3, Settings): no cards, a
+   bold label per field, controls on the page. Calendar defaults and
+   Categories open the sheet; token and About sit in the Advanced fold. */
+let advancedOpen = false;
+const field = (label, control, hint) =>
+  `<div class="field"><p class="flabel">${label}</p>${control}${hint ? `<p class="fhint">${hint}</p>` : ""}</div>`;
+const choices = (attr, opts, current) => `<div class="choices" role="radiogroup">${opts.map(([v, l]) =>
+  `<button role="radio" aria-checked="${current === v}" class="${current === v ? "on" : ""}" data-${attr}="${escapeHtml(v)}">${escapeHtml(l)}</button>`).join("")}</div>`;
+const opener = (label, level, sum) =>
+  field(label, `<button class="opener" data-level="${level}"><span>${escapeHtml(sum)}</span>${ICON.chev}</button>`);
+
 function renderSettings() {
   const s = store.state.settings;
-  const tokenSet = !!s.token;
-
-  /* The hex comes from tokens.css via paletteAccents(), so it is a value this
-     app read rather than one it stored. It still goes through escapeHtml
-     before reaching a style attribute: the source is trusted today, and
-     "trusted today" is exactly how the next injection gets written. */
-  const accents = paletteAccents();
-  const swatches = Object.entries(PALETTES).map(([id, name]) => `
-    <button class="swatch" data-palette="${escapeHtml(id)}"
-            aria-pressed="${(PALETTES[s.palette] ? s.palette : "cobalt") === id}" title="${escapeHtml(name)}"
-            aria-label="${escapeHtml(name)}"
-            style="background:${escapeHtml(accents[id] || "")}"></button>`).join("");
-
-  const diag = themeBootRan()
-    ? `<p class="status-line good">Theme preload OK</p>`
-    : `<p class="status-line warn">Theme preload BLOCKED - recompute the CSP hash (see README)</p>`;
-
-  const sync = syncStatus.state === "idle"
-    ? `<p class="status-line">Not checked this session.</p>`
-    : `<p class="status-line ${syncStatus.state === "ok" ? "good" : (syncStatus.state === "checking" ? "" : "warn")}">${escapeHtml(syncStatus.message)}</p>`;
-
+  const prefs = readPrefs(s);
   const me = s.me;
-  const who = [["isa", "Isa"], ["hugo", "Hugo"]].map(([id, n]) =>
-    `<button class="${me === id ? "" : "ghost"}" data-me="${id}" aria-pressed="${me === id}">${n}</button>`).join("");
-  const ds = dataSync.state === "idle" ? "Not synced yet this session."
-    : dataSync.message + (dataSync.at ? ` (${new Date(dataSync.at).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })})` : "");
+  /* the hex comes from tokens.css via paletteAccents(): a value this app
+     read, still escaped before it reaches a style attribute */
+  const accents = paletteAccents(), softs = paletteSofts();
+  const current = PALETTES[s.palette] ? s.palette : "cobalt";
+  const theme = `<div class="choices">${Object.entries(PALETTES).map(([id, n]) =>
+    `<button class="${current === id ? "on" : ""}" aria-pressed="${current === id}" data-palette="${escapeHtml(id)}">`
+    + `<span class="pal" style="background:conic-gradient(${escapeHtml(accents[id] || "")} 0 180deg, ${escapeHtml(softs[id] || "")} 180deg 360deg)"></span>${escapeHtml(n)}</button>`).join("")}</div>`;
 
-  return `
-    <section class="section">
-      <h3 class="section-title">You</h3>
-      <div class="card">
-        <p class="field-label">Who am I</p>
-        <div class="row">${who}</div>
-        <p class="hint">Stamps every edit you make. Nothing is saved until it is set.</p>
-      </div>
-    </section>
+  const dot = dataSync.state === "ok" ? "ok" : dataSync.state === "failed" ? "error" : "";
+  const syncLine = dataSync.state === "idle" ? "Not synced yet this session." : dataSync.message;
+  const when = dataSync.at ? `${dataSync.state === "ok" ? "Last synced" : "Last tried"} at ${new Date(dataSync.at).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}.` : "";
+  const tok = syncStatus.state === "idle" ? "" : `<p class="token-status">${escapeHtml(syncStatus.message)}</p>`;
+  const diag = themeBootRan() ? "" : '<p class="token-status">Theme preload BLOCKED: recompute the CSP hash (see README)</p>';
 
-    <section class="section">
-      <h3 class="section-title">Sync</h3>
-      <div class="card">
-        <p class="status-line ${dataSync.state === "ok" ? "good" : dataSync.state === "failed" ? "warn" : ""}">${escapeHtml(ds)}</p>
+  return `<div class="fields">
+    ${field("Theme", theme, "Light and dark follow the phone.")}
+    ${opener("Calendar defaults", "set-defaults", defaultsSummary(prefs))}
+    ${me ? opener("Categories", "set-cats", categoriesSummary(prefs, me)) : ""}
+    ${field("Who am I", choices("me", [["isa", "Isa"], ["hugo", "Hugo"]], me), "Stamps every edit you make. Nothing is saved until it is set.")}
+    ${field("Sync", `<div class="sync-status"><p class="sync-line ${dot}"><i></i>${escapeHtml(syncLine)}</p>${when ? `<p class="sync-line muted">${escapeHtml(when)}</p>` : ""}</div>`
+      + `<button id="syncNow"${s.token ? "" : " disabled"}>Sync now</button>`)}
+    <div class="advanced-block">
+      <button class="adv-toggle" id="advToggle" aria-expanded="${advancedOpen}" aria-controls="advFields"><span class="caret">${advancedOpen ? "&#9662;" : "&#9656;"}</span> Advanced settings</button>
+      <div class="fields" id="advFields"${advancedOpen ? "" : " hidden"}>
+        ${field('<label for="tokenInput">GitHub token</label>', `<div class="token-row"><input id="tokenInput" type="password" placeholder="${s.token ? "Token saved" : "github_pat_..."}"`
+          + ` autocomplete="off" autocapitalize="off" spellcheck="false" enterkeyhint="done"><button id="clearToken"${s.token ? "" : " disabled"}>Clear</button></div>${tok}`,
+          "Stored on this device only, sent only to GitHub. Fine-grained, Contents: read and write on kave-hub.")}
+        ${field("About", `<p class="sync-line muted">Compass <span id="swVersion">checking version...</span></p>${diag}`,
+          "The household planner. Data in kave-hub; the mini PC runs the sweeps.")}
       </div>
-    </section>
-
-    <section class="section">
-      <h3 class="section-title">GitHub token</h3>
-      <div class="card">
-        <p class="field-label"><label for="tokenInput">Fine-grained token, Contents: read and write on kave-hub</label></p>
-        <input id="tokenInput" type="password" autocomplete="off" spellcheck="false"
-               placeholder="${tokenSet ? "Token saved" : "Paste token"}" />
-        <div class="row" style="margin-top: var(--sp-3)">
-          <button id="saveToken">Save</button>
-          <button id="checkToken" class="ghost">Check</button>
-          ${tokenSet ? `<button id="clearToken" class="danger">Clear</button>` : ""}
-        </div>
-        ${sync}
-        <p class="hint">Stored in this phone's localStorage in plain text. Clearing it here only removes this device's copy - revoke it on GitHub if it is ever exposed.</p>
-      </div>
-    </section>
-
-    <section class="section">
-      <h3 class="section-title">Display</h3>
-      <div class="card">
-        <p class="field-label">Palette</p>
-        <div class="palettes">${swatches}</div>
-        <p class="hint">Light and dark follow the phone. There is no in-app switch, on purpose.</p>
-        ${diag}
-      </div>
-    </section>
-
-    <section class="section">
-      <h3 class="section-title">About</h3>
-      <div class="card">
-        <p class="status-line">Compass <span id="swVersion">checking version...</span></p>
-        <p class="hint">The household planner. Data in kave-hub; the mini PC runs the sweeps.</p>
-      </div>
-    </section>
-  `;
+    </div>
+  </div>`;
 }
+
+/* The two Settings sheets, as levels of the one sheet. */
+const VIEW_LABEL = { weekly: "Weekly", monthly: "Monthly", yearly: "Yearly" };
+const PREF_KEYS = ["defaultView", "defaultDetail", "cardStyle"];
+registerLevel("set-defaults", {
+  title: () => "Calendar defaults",
+  body() {
+    const p = readPrefs(store.state.settings);
+    return `<div class="fields">${field("Default view", choices("pref-view", VIEW_NAMES, p.defaultView), "Where the Calendar opens.")}`
+      + field("Default detail level", choices("pref-detail", DETAIL_NAMES, p.defaultDetail), "Full: both of you. Partial: the other person greyed. Minimal: yours and shared only.")
+      + field("Card style", choices("pref-style", STYLE_NAMES, p.cardStyle), "How events look in Weekly's day cards.") + "</div>";
+  },
+  onAction(b) {
+    const d = b.dataset;
+    const pick = d.prefView != null ? ["defaultView", d.prefView] : d.prefDetail != null ? ["defaultDetail", d.prefDetail]
+      : d.prefStyle != null ? ["cardStyle", d.prefStyle] : null;
+    if (!pick || !PREF_KEYS.includes(pick[0])) return;
+    store.setSetting(pick[0], pick[1]);
+    resetCalendarDefaults();
+  },
+});
+registerLevel("set-cats", {
+  title: () => "Categories",
+  body() {
+    const s = store.state.settings, p = readPrefs(s), me = s.me;
+    const head = `<div class="grid-h"><span></span>${VIEW_NAMES.map(([, l]) => `<span>${l[0]}<span class="full">${l.slice(1)}</span></span>`).join("")}</div>`;
+    const rowsHtml = CATEGORIES.map((c) => `<div class="grid-r"><span class="gl"><span class="gi">${escapeHtml(iconFor({ type: c.type }, { owner: me }, me))}</span>${escapeHtml(c.label)}</span>`
+      + VIEW_NAMES.map(([v]) => {
+        const on = isShown(p, me, v, c.type);
+        return `<button class="tick${on ? " on" : ""}" role="checkbox" aria-checked="${on}" aria-label="${escapeHtml(c.label)} in ${VIEW_LABEL[v]}" data-tick-view="${v}" data-tick-type="${escapeHtml(c.type)}">${on ? ICON.check : ""}</button>`;
+      }).join("") + "</div>").join("");
+    return `<p class="fhint">What ${me === "hugo" ? "Hugo" : "Isa"} sees in each view. Each of you picks your own; hiding a category deletes nothing.</p><div class="grid">${head}${rowsHtml}</div>`;
+  },
+  onAction(b) {
+    const v = b.dataset.tickView, t = b.dataset.tickType, s = store.state.settings;
+    if (!v || !t || !s.me) return;
+    store.setSetting("hiddenCategories", toggleCategory(readPrefs(s), s.me, v, t).hiddenCategories);
+  },
+});
 
 function renderNav() {
   return Object.entries(VIEWS).map(([id, label]) => `
@@ -189,8 +200,9 @@ export function render() {
   document.getElementById("fabs").innerHTML = current === "calendar" && !blocked
     ? `<button class="fab to-today" data-fab="today" aria-label="Back to today">${ICON.up}</button>`
       + `<button class="fab add" data-fab="add" aria-label="Add an event">${ICON.plus}</button>` : "";
-  if (current === "calendar" && !blocked) { afterCalendar(main, before); firstDraw = false; refreshSheet(); }
+  if (current === "calendar" && !blocked) { afterCalendar(main, before); firstDraw = false; }
   else onScroll();
+  refreshSheet();
   bindView();
 }
 
@@ -202,30 +214,28 @@ function bindView() {
   document.querySelectorAll("#view [data-me]").forEach((b) => {
     b.addEventListener("click", () => store.setSetting("me", b.dataset.me));
   });
-
-  document.querySelectorAll(".swatch").forEach((b) => {
-    b.addEventListener("click", () => {
-      const p = b.dataset.palette;
-      applyPalette(p);
-      store.setSetting("palette", p);
-    });
+  document.querySelectorAll("#view [data-palette]").forEach((b) => {
+    b.addEventListener("click", () => { applyPalette(b.dataset.palette); store.setSetting("palette", b.dataset.palette); });
+  });
+  document.querySelectorAll("#view [data-level]").forEach((b) => {
+    b.addEventListener("click", () => openLevel({ kind: b.dataset.level }));
   });
 
-  const save = document.getElementById("saveToken");
-  if (save) {
-    save.addEventListener("click", () => {
-      const input = document.getElementById("tokenInput");
-      const v = input.value.trim();
-      if (!v) return;
-      store.setSetting("token", v);
-      input.value = "";
-      checkToken().then(render);
-    });
-  }
+  const sync = document.getElementById("syncNow");
+  if (sync) sync.addEventListener("click", () => { if (actions.sync) actions.sync(); });
 
-  const check = document.getElementById("checkToken");
-  if (check) check.addEventListener("click", () => { render(); checkToken().then(render); });
+  const adv = document.getElementById("advToggle");
+  if (adv) adv.addEventListener("click", () => { advancedOpen = !advancedOpen; render(); });
 
+  /* Spoon's token field saves on change: paste, then leave the field */
+  const input = document.getElementById("tokenInput");
+  if (input) input.addEventListener("change", () => {
+    const v = input.value.trim();
+    if (!v) return;
+    store.setSetting("token", v);
+    checkToken().then(render);
+    if (actions.sync) actions.sync();
+  });
   const clear = document.getElementById("clearToken");
   if (clear) clear.addEventListener("click", () => store.setSetting("token", ""));
 

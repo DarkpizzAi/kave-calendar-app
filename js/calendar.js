@@ -17,6 +17,7 @@ import { indexByDay, weekRows, tappable, zoomWeekTarget, zoomMonthTarget, isAway
   shouldLoadMore, nextCount, iconsOf, searchEvents, shortDate } from "./cal-model.js";
 import { openLevel, sheetOpen } from "./sheet.js";
 import { ICON } from "./chrome-icons.js";
+import { readPrefs, byCategories } from "./prefs.js";
 
 const MONTHS = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
 const DOW = ["MON", "TUE", "WED", "THU", "FRI", "SAT", "SUN"];
@@ -46,7 +47,8 @@ function buildFrame() {
   const { me, style } = prefs();
   const today = todayKey();
   const thisYear = today.slice(0, 4);
-  const shown = applyDetail(ctx.data.events(), me, S.detail);
+  /* the detail level first, then the viewer's categories for this view */
+  const shown = applyDetail(byCategories(ctx.data.events(), readPrefs(store.state.settings), me, S.view), me, S.detail);
   const grey = new Set(shown.filter((x) => x.grey).map((x) => x.event.id));
   const events = shown.map((x) => x.event);
   const idx = indexByDay(events);
@@ -301,6 +303,9 @@ export function backToToday() {
 /* Things the sheet needs to draw its levels, from the same frame. */
 export const frameNow = () => frame;
 export const detailGrey = (e) => !!frame && frame.grey.has(e.id);
+
+/* Settings changed a default: the Calendar opens on it next time it draws. */
+export function resetCalendarDefaults() { S.view = null; S.detail = null; }
 
 export function closeMenus() {
   if (S.menu) { S.menu = false; ctx.render(); return true; }

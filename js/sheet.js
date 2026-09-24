@@ -35,11 +35,17 @@ function afterAnim(el, fn, ms = 450) {
 let stack = [];
 let root = null;
 
+/* Other screens add their own levels (Settings: Calendar defaults,
+   Categories): { title(level), body(level), onAction(button) }. */
+const custom = {};
+export function registerLevel(kind, def) { custom[kind] = def; }
+
 export const sheetOpen = () => stack.length > 0;
 
 function findEvent(id) { const f = frameNow(); return f && f.events.find((e) => e.id === id); }
 
 function title(l) {
+  if (custom[l.kind]) return custom[l.kind].title(l);
   if (l.kind === "week") return `Week ${isoWeek(l.m)}`;
   if (l.kind === "day") return longDay(l.d);
   const e = findEvent(l.id); return e ? e.title : "";
@@ -94,6 +100,7 @@ function eventBody(e, f) {
 }
 
 function body(l) {
+  if (custom[l.kind]) return custom[l.kind].body(l);
   const f = frameNow();
   if (!f) return "";
   if (l.kind === "week") return weekBody(l.m, f);
@@ -130,7 +137,13 @@ function draw(anim) {
   fresh.innerHTML = body(l);
   const old = stage.querySelector(".sbody:not(.leaving)");
   stage.querySelectorAll(".sbody.leaving").forEach((n) => n.remove());
-  if (!old || !anim || reduced()) { stage.replaceChildren(fresh); return; }
+  if (!old || !anim || reduced()) {
+    /* a redraw in place (a tick, new data) keeps where the reader was */
+    const keep = old && !anim ? old.scrollTop : 0;
+    stage.replaceChildren(fresh);
+    fresh.scrollTop = keep;
+    return;
+  }
   /* both layers stay until the animation ends, so the old one visibly leaves */
   old.classList.add("leaving", anim === "deeper" ? "out-up" : "out-down");
   fresh.classList.add(anim === "deeper" ? "in-up" : "in-down");
@@ -178,7 +191,12 @@ export function initSheet() {
   });
   root.addEventListener("click", (e) => {
     const b = e.target.closest("[data-sact]");
-    if (!b) return;
+    if (!b) {
+      /* a registered level's own buttons go to its handler */
+      const l = stack[stack.length - 1], btn = e.target.closest("button");
+      if (btn && l && custom[l.kind] && custom[l.kind].onAction) { custom[l.kind].onAction(btn); draw(""); }
+      return;
+    }
     const a = b.dataset.sact;
     if (a === "close") closeAll();
     else if (a === "day") openLevel({ kind: "day", d: b.dataset.d });

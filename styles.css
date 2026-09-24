@@ -74,51 +74,74 @@ main { padding: var(--sp-4); }
 }
 .stub b { display: block; color: var(--text); font-size: var(--fs-body); margin-bottom: var(--sp-1); }
 
-/* ---------- settings ---------- */
-.section { margin-bottom: var(--sp-5); }
-.section-title { font-size: var(--fs-lede); margin-bottom: var(--sp-2); }
-.field-label { font-size: var(--fs-ui); color: var(--text-dim); margin: 0 0 var(--sp-1); }
-.card {
-  background: var(--card);
-  border: 1px solid var(--border);
-  border-radius: var(--r-card);
-  padding: var(--sp-4);
-}
+/* ---------- settings: laid out like Spoon's. No cards and no section
+   headings: a bold label per field, its controls straight on the page. ---------- */
 input[type="password"], input[type="text"] {
   width: 100%;
   font: inherit; font-size: var(--fs-body);
   background: var(--surface-2);
   color: var(--text);
-  border: 1px solid var(--rule-strong);
+  border: none;
   border-radius: var(--r-control);
-  padding: 10px var(--sp-3);
+  padding: 10px 12px;
+  min-height: var(--touch-min);
 }
+/* Spoon's button: surface-2, the control radius; a chosen one takes the accent */
 button {
-  font: inherit; font-size: var(--fs-ui); font-weight: 600;
-  background: var(--accent); color: var(--accent-text);
-  border: none; border-radius: var(--r-pill);
-  padding: 10px var(--sp-4);
+  font: inherit;
+  background: var(--surface-2); color: var(--text);
+  border: none; border-radius: var(--r-control);
+  padding: 10px 14px;
   min-height: var(--touch-min);
   cursor: pointer;
-  transition: background var(--motion-fast) var(--ease-standard);
 }
-button.ghost { background: var(--surface-2); color: var(--text); }
-button.danger { background: transparent; color: var(--text); }
+button:active { transform: translateY(1px); }
+button:disabled { opacity: .5; cursor: default; }
 .row { display: flex; gap: var(--sp-2); align-items: center; flex-wrap: wrap; }
 .hint { color: var(--text-dim); font-size: var(--fs-ui); margin: var(--sp-2) 0 0; }
-.status-line { display: flex; align-items: center; gap: var(--sp-2); font-size: var(--fs-ui); }
-.status-line.warn { color: var(--text); font-weight: 600; }
-.status-line.good { color: var(--good-tx); }
 
-/* palette chooser */
-.palettes { display: flex; gap: var(--sp-2); flex-wrap: wrap; }
-.swatch {
-  width: var(--touch-min); height: var(--touch-min);
-  border-radius: var(--r-round);
-  border: 2px solid var(--rule-strong);
-  padding: 0; min-height: 0;
+.fields { max-width: 720px; display: flex; flex-direction: column; gap: var(--sp-5); }
+.field { display: flex; flex-direction: column; align-items: flex-start; gap: var(--sp-2); }
+.flabel { margin: 0; font-size: var(--fs-ui); font-weight: 600; }
+.flabel label { font: inherit; }
+.fhint { margin: 0; color: var(--text-dim); font-size: var(--fs-ui); }
+.choices { display: flex; flex-wrap: wrap; gap: var(--sp-2); }
+.choices button { display: inline-flex; align-items: center; gap: var(--sp-2); }
+.choices button.on { background: var(--accent); color: var(--accent-text); }
+.pal { width: 20px; height: 20px; border-radius: var(--r-round); border: 1px solid var(--rule-strong); flex: none; }
+.choices button.on .pal { border-color: var(--accent-text); }
+.opener { display: inline-flex; align-items: center; justify-content: space-between; gap: var(--sp-2); min-width: min(320px, 100%); text-align: left; }
+.opener .chev { width: 16px; height: 16px; color: var(--text-dim); flex: none; }
+/* sync, as in Spoon */
+.sync-status { display: flex; flex-direction: column; gap: var(--sp-1); }
+.sync-line { margin: 0; display: flex; align-items: center; gap: var(--sp-2); font-size: var(--fs-body); }
+.sync-line i { width: 8px; height: 8px; border-radius: var(--r-round); flex: none; background: var(--text-dim); }
+.sync-line.ok i { background: var(--accent); }
+.sync-line.error i { background: var(--text); }
+.sync-line.muted { color: var(--text-dim); }
+.token-row { display: flex; gap: var(--sp-2); width: 75%; min-width: 240px; }
+.token-row input { flex: 1; min-width: 0; }
+.token-status { font-size: var(--fs-ui); margin: 0; font-weight: 600; }
+/* Spoon's Advanced settings: a fold under a rule, so it reads as a divider */
+.advanced-block { padding-top: var(--sp-4); border-top: 1px solid var(--rule); display: flex; flex-direction: column; gap: var(--sp-4); }
+.adv-toggle { align-self: flex-start; background: none; padding-left: 0; font-size: var(--fs-body); font-weight: 500; }
+.adv-toggle .caret { color: var(--text-dim); }
+/* the Categories grid, straight on the sheet */
+.grid { display: flex; flex-direction: column; }
+.grid-h, .grid-r { display: grid; grid-template-columns: minmax(0, 1fr) repeat(3, 52px); align-items: center; column-gap: var(--sp-1); }
+.grid-h { position: sticky; top: calc(-1 * var(--sp-4)); background: var(--surface); padding: var(--sp-2) 0; font-size: var(--fs-micro); font-weight: 500; letter-spacing: var(--tracking-label); color: var(--text-dim); text-transform: uppercase; text-align: center; z-index: 1; }
+.grid-h .full { display: none; }
+.grid-r { padding: 6px 0; border-top: 1px solid var(--rule); }
+.gl { display: flex; align-items: center; gap: var(--sp-2); min-width: 0; font-size: var(--fs-ui); }
+.gi { font-size: 18px; line-height: 1; width: 22px; text-align: center; flex: none; }
+.tick { justify-self: center; width: 36px; height: 36px; min-height: 0; border-radius: var(--r-round); border: 1.5px solid var(--rule-strong); background: none; display: grid; place-items: center; padding: 0; }
+.tick.on { background: var(--accent); border-color: var(--accent); color: var(--accent-text); }
+.tick svg { width: 18px; height: 18px; stroke-width: 2.5; }
+@media (min-width: 900px) {
+  .grid-h .full { display: inline; }
+  .grid-h, .grid-r { grid-template-columns: minmax(0, 1fr) repeat(3, 88px); }
 }
-.swatch[aria-pressed="true"] { border-color: var(--text); }
+@media (prefers-reduced-motion: reduce) { button:active { transform: none; } }
 
 /* ---------- bottom nav: exactly Spoon's. Page background, no top rule, a
    soft-accent pill behind the active tab's 24px icon, its label bold. ---------- */
