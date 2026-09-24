@@ -10,8 +10,12 @@ export const STATUSES = ["idea", "planned", "booked", "done", "cancelled"];
 export const PEOPLE = ["isa", "hugo"];
 export const OWNERS = ["isa", "hugo", "shared"];
 
+/* An optional time of day, "HH:MM" (round 2). */
+export const isTime = (t) => /^([01]\d|2[0-3]):[0-5]\d$/.test(t);
+
 export function validateEvent(e) {
   const errors = [];
+  for (const k of ["startTime", "endTime"]) if (e[k] && !isTime(e[k])) errors.push(k + " must be HH:MM");
   if (!e.title || !String(e.title).trim()) errors.push("title is required");
   if (!isValidDate(e.start)) errors.push("date is not valid");
   else if (precision(e.start) !== "day") errors.push("an event needs an exact day; without one it is an idea");
@@ -44,6 +48,7 @@ export function newEvent(fields, { me, now }) {
     title: String(fields.title || "").trim(),
     owner: fields.owner || me,
     start: fields.start, end: fields.end || null,
+    startTime: fields.startTime || "", endTime: fields.endTime || "",
     status: fields.status || "planned",
     activities: fields.activities || [],
     city: fields.city || "", venue: fields.venue || "",

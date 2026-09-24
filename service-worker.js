@@ -53,6 +53,7 @@ const SHELL = [
   "js/data.js",
   "js/cal-model.js",
   "js/prefs.js",
+  "js/event-form.js",
   "js/chrome-icons.js",
   "js/calendar.js",
   "js/sheet.js",

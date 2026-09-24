@@ -54,13 +54,15 @@ export function visibleCosts(lines, me) {
   return (lines || []).filter((l) => l.scope === "shared" || l.enteredBy === me);
 }
 
-export function newCostLine({ category, payer, amount, scope, state = "recorded", me, now }) {
+/* A cost line may carry a name ("Taxi home", round 2) and a currency other
+   than euros when travelling; the bank line gives the euros later (C). */
+export function newCostLine({ category, payer, amount, scope, state = "recorded", currency = "EUR", name = "", me, now }) {
   if (!EDITABLE_STATES.includes(state)) throw new Error("only estimate or recorded can be typed");
   if (!Number.isInteger(amount) || amount < 0) throw new Error("amount must be whole cents");
   const at = now.toISOString();
   return {
-    id: "co_" + uid(), category, payer, scope, amount, currency: "EUR", state,
-    evidence: [{ kind: "typed", amount, currency: "EUR", by: me, at }],
+    id: "co_" + uid(), name: String(name || "").trim(), category, payer, scope, amount, currency, state,
+    evidence: [{ kind: "typed", amount, currency, by: me, at }],
     enteredBy: me,
   };
 }
