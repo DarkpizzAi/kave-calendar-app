@@ -8,14 +8,64 @@
 "use strict";
 
 import { initTheme } from "./theme.js";
-import { render } from "./render.js";
+import { render, isCalendar, dataSync } from "./render.js";
 import { wire, showBanner } from "./wire.js";
 import { initPullToSync } from "./pull-to-sync.js";
+import { appData } from "./data.js";
+import { store } from "./store.js";
+import { initCalendar, backToToday, closeMenus } from "./calendar.js";
+import { initSheet, back, sheetOpen } from "./sheet.js";
 
 initTheme();
 wire();
-render();
 initPullToSync();
+
+const data = await appData();
+data.subscribe(render);
+
+/* Sync on open and whenever the app comes back into view. The status goes
+   to Settings only; the Calendar never shows it. */
+async function syncNow() {
+  if (!store.state.settings.token) return;
+  dataSync.state = "working"; dataSync.message = "Syncing...";
+  const r = await data.sync([...new Set([...data.loadedYears(), String(new Date().getFullYear()), String(new Date().getFullYear() + 1)])]);
+  const kind = r.error && r.error.gh;
+  Object.assign(dataSync, r.ok ? { state: "ok", message: "Synced" }
+    : { state: kind === "offline" ? "offline" : "failed",
+        message: kind === "offline" ? "Offline. Your edits are kept and sent when you are back online."
+          : kind === "unauthorized" ? "Sync failed: the token was rejected. Check it below."
+          : kind === "rateLimited" ? "Sync failed: rate limited by GitHub. It retries on its own."
+          : "Sync failed: " + ((r.error && r.error.message) || "unknown error") }, { at: Date.now() });
+  render();
+}
+
+initSheet();
+initCalendar({ data, render, isCalendar, sync: syncNow });
+render();
+syncNow();
+document.addEventListener("visibilitychange", () => { if (document.visibilityState === "visible") syncNow(); });
+window.addEventListener("online", syncNow);
+
+/* The two round buttons. "+" arrives with the event form (round 2). */
+document.getElementById("fabs").addEventListener("click", (e) => {
+  const b = e.target.closest("[data-fab]");
+  if (!b) return;
+  if (b.dataset.fab === "today") backToToday();
+  else showBanner("Adding events arrives with the event form (round 2).");
+});
+
+/* Backspace = Back on a computer (except while typing), like the phone's
+   Back; Escape too. Up one sheet level, else close a menu or search. */
+document.addEventListener("keydown", (e) => {
+  const typing = e.target.closest && e.target.closest("input, textarea, [contenteditable]");
+  if (e.key === "Escape" || (e.key === "Backspace" && !typing)) {
+    if (sheetOpen()) { e.preventDefault(); back(); }
+    else if (e.key === "Escape" && closeMenus()) e.preventDefault();
+  }
+  if ((e.key === "Enter" || e.key === " ") && !typing && e.target.matches && e.target.matches("#view [data-act][role=button]")) {
+    e.preventDefault(); e.target.click();
+  }
+});
 
 /* ---------- service worker ---------- */
 

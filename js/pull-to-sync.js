@@ -8,9 +8,10 @@
    2. It does not arm on a tab with no data of its own. Spoon armed it on
       Settings for a while, where it could only spin and fetch nothing.
 
-   Today and Trips have no data yet, so right now this arms nowhere and the
-   handler is the shape waiting for them. That is deliberate: wiring the
-   gesture to a fake refresh would make it look like it works. */
+   The Calendar's pull lives in calendar.js, because there one pull also
+   reveals See previous and the list, not the window, is what scrolls. Trips
+   has no data yet, so this still arms nowhere; it is the shape waiting for
+   the tabs that scroll the window. */
 "use strict";
 
 import { currentView } from "./render.js";

@@ -75,7 +75,7 @@ export function iconsOf(e, viewer) {
   return acts.map((a) => iconFor(a, e, viewer));
 }
 
-const fold = (s) => String(s || "").toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "");
+const fold = (s) => String(s || "").toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
 export function searchEvents(events, query) {
   const q = fold(query).trim();
   if (!q) return [];

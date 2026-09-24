@@ -24,9 +24,15 @@ html, body {
   font: 16px/var(--lh-base) var(--font-ui);
 }
 
-body {
-  padding-top: var(--header-h, 56px);
-  padding-bottom: calc(var(--nav-h) + env(safe-area-inset-bottom, 0px));
+/* One scrolling list between the header and the bar (prototype P4). The
+   host may still let the page grow tall (a desktop window, a viewer), which
+   is why scrolling uses scrollIntoView and loading needs a real scroll. */
+html, body { height: 100%; }
+.shell {
+  height: 100%; height: 100dvh;
+  display: flex; flex-direction: column;
+  position: relative; overflow: hidden;
+  max-width: 1120px; margin: 0 auto;
 }
 
 h1, h2, h3 {
@@ -36,17 +42,20 @@ h1, h2, h3 {
   margin: 0;
 }
 
-/* ---------- header ---------- */
+/* ---------- header: the tab's name only, Spoon's rounded header ---------- */
 .app-header {
-  position: fixed; top: 0; left: 0; right: 0; z-index: 10;
-  background: var(--surface);
-  border-bottom: 1px solid var(--rule);
-  /* env(safe-area-inset-top) is 0 in today's standalone window, but it costs
-     nothing and is correct the day that changes */
-  padding: calc(14px + env(safe-area-inset-top, 0px)) var(--sp-4) 14px;
-  display: flex; align-items: center; gap: var(--sp-2);
+  flex: none;
+  padding: calc(var(--sp-4) + env(safe-area-inset-top, 0px)) var(--sp-4) var(--sp-2);
 }
 .app-header h1 { font-size: var(--fs-display); }
+
+.mn {
+  flex: 1; min-height: 0;
+  overflow-y: auto; overscroll-behavior: contain;
+  background: var(--surface);
+  border-radius: var(--r-sheet);
+  padding: var(--sp-4) var(--sp-4) calc(var(--sp-7) * 2);
+}
 
 /* ---------- views ---------- */
 main { padding: var(--sp-4); }
@@ -111,29 +120,30 @@ button.danger { background: transparent; color: var(--text); }
 }
 .swatch[aria-pressed="true"] { border-color: var(--text); }
 
-/* ---------- bottom nav ---------- */
+/* ---------- bottom nav: exactly Spoon's. Page background, no top rule, a
+   soft-accent pill behind the active tab's 24px icon, its label bold. ---------- */
 .bottom-nav {
-  position: fixed; left: 0; right: 0; bottom: 0; z-index: 10;
-  height: calc(var(--nav-h) + env(safe-area-inset-bottom, 0px));
+  flex: none; display: flex;
+  background: var(--bg);
   padding-bottom: env(safe-area-inset-bottom, 0px);
-  background: var(--surface);
-  border-top: 1px solid var(--rule);
-  display: flex;
 }
 .bottom-nav button {
-  flex: 1;
-  background: none; border: none; border-radius: 0;
+  flex: 1; height: var(--nav-h);
+  background: transparent; border: 0; border-radius: 0;
   color: var(--text-dim);
   display: flex; flex-direction: column; align-items: center; justify-content: center;
-  gap: 3px; padding: 0; min-height: 0;
+  gap: var(--sp-1); padding: 0; min-height: 0;
 }
-.bottom-nav button[aria-current="page"] { color: var(--accent); }
-.nav-icon { font-size: var(--fs-body); line-height: 1; }
-.nav-label { font-size: var(--fs-micro); font-weight: 500; }
+.nav-icon { display: grid; place-items: center; width: 52px; height: 30px; border-radius: var(--r-pill); transition: background var(--motion-base) var(--ease-standard); }
+.bottom-nav svg { width: 24px; height: 24px; }
+.bottom-nav button[aria-current="page"] { color: var(--accent-ink); }
+.bottom-nav button[aria-current="page"] .nav-icon { background: var(--accent-soft); }
+.nav-label { font-size: var(--fs-micro); line-height: 1; letter-spacing: var(--tracking-label); }
+.bottom-nav button[aria-current="page"] .nav-label { font-weight: 600; }
 
 /* ---------- banner ---------- */
 .banner {
-  position: fixed; left: var(--sp-3); right: var(--sp-3);
+  position: fixed; max-width: 720px; margin: 0 auto; left: var(--sp-3); right: var(--sp-3);
   bottom: calc(var(--nav-h) + env(safe-area-inset-bottom, 0px) + var(--sp-3));
   background: var(--text); color: var(--bg);
   border-radius: var(--r-control);
@@ -152,3 +162,202 @@ button.danger { background: transparent; color: var(--text); }
     transition-duration: .01ms !important;
   }
 }
+
+/* ================= Calendar (ported from prototype P4) ================= */
+.shell svg{width:18px;height:18px;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
+.shell button{font:inherit;color:inherit;cursor:pointer}
+.fab{color:var(--accent-text)}
+.fab.add svg{width:26px;height:26px;stroke-width:2.5}
+.mn .card{padding:var(--sp-3)}
+/* the gates before the Calendar: no token, then who am I */
+.gate{display:flex;flex-direction:column;gap:var(--sp-3);align-items:flex-start;padding:var(--sp-4) 0}
+.gate-title{margin:0;font-size:var(--fs-title-lg);font-weight:600;letter-spacing:var(--tracking-heading)}
+.gate .lede{margin:0}
+/* the sheet: one sheet, levels inside */
+.sheet{position:absolute;left:0;right:0;top:56px;bottom:0;margin:0 auto;max-width:720px;background:var(--surface);border-radius:var(--r-sheet) var(--r-sheet) 0 0;box-shadow:var(--shadow-raised);display:flex;flex-direction:column;overflow:hidden;z-index:8}
+.sheet.in{animation:sheet-up var(--motion-slow) var(--ease-sheet)}
+.sheet.out{animation:sheet-down var(--motion-base) var(--ease-standard) forwards}
+.shade.out{animation:fade-out var(--motion-base) var(--ease-standard) forwards}
+@keyframes sheet-up{from{transform:translateY(40%);opacity:0}}
+@keyframes sheet-down{to{transform:translateY(60%);opacity:0}}
+@keyframes fade-out{to{opacity:0}}
+.sstage{flex:1;min-height:0;position:relative;display:flex;flex-direction:column;overflow:hidden}
+.sbody{flex:1;min-height:0;overflow-y:auto;padding:var(--sp-4);display:flex;flex-direction:column;gap:var(--sp-3)}
+.sbody.leaving{position:absolute;inset:0;pointer-events:none}
+.sheet.lv-day .sbody,.sheet.lv-event .sbody{padding:0;gap:0}
+/* depth moves vertically: deeper, the old level leaves upwards and the new
+   one rises from the bottom; Back reverses */
+.sbody.out-up{animation:lv-out-up var(--motion-base) var(--ease-standard) forwards}
+.sbody.in-up{animation:lv-in-up var(--motion-base) var(--ease-standard)}
+.sbody.out-down{animation:lv-out-down var(--motion-base) var(--ease-standard) forwards}
+.sbody.in-down{animation:lv-in-down var(--motion-base) var(--ease-standard)}
+@keyframes lv-out-up{to{transform:translateY(-30%);opacity:0}}
+@keyframes lv-in-up{from{transform:translateY(40%);opacity:0}}
+@keyframes lv-out-down{to{transform:translateY(40%);opacity:0}}
+@keyframes lv-in-down{from{transform:translateY(-30%);opacity:0}}
+.todo-l.done{color:var(--text-dim);text-decoration:line-through}
+a.ticket{color:inherit;text-decoration:none}
+@media (prefers-reduced-motion: reduce){
+  .sfield,.sheet.in,.sheet.out,.shade.out,.slide-left,.slide-right,.views .ind,.sbody.out-up,.sbody.in-up,.sbody.out-down,.sbody.in-down{animation:none}
+  .fab.to-today,.fab.to-today svg,.nav-icon{transition:none}
+}
+/* two round buttons: add, and above it back to today (Spoon's to-top, a bare chevron) */
+.fab{position:absolute;right:var(--sp-4);width:56px;height:56px;border-radius:var(--r-round);border:0;background:var(--accent);color:var(--accent-text);box-shadow:var(--shadow-raised);z-index:4;display:grid;place-items:center;padding:0}
+.fab.add{bottom:calc(var(--nav-h) + var(--sp-4) + env(safe-area-inset-bottom,0px));font-size:var(--fs-title-lg)}
+.fab.to-today{width:44px;height:44px;right:calc(var(--sp-4) + 6px);bottom:calc(var(--nav-h) + var(--sp-4) + 56px + var(--sp-3) + env(safe-area-inset-bottom,0px));opacity:0;transform:translateY(8px);pointer-events:none;transition:opacity .18s var(--ease-standard),transform .18s var(--ease-standard)}
+.fab.to-today svg{width:22px;height:22px;stroke-width:2.5;transition:transform .18s var(--ease-standard)}
+.fab.to-today.show{opacity:1;transform:none;pointer-events:auto}
+.fab.to-today.down svg{transform:rotate(180deg)}
+/* the top block: Today card and the controls */
+.top{display:flex;flex-direction:column;gap:var(--sp-3)}
+.ctl{position:relative;display:flex;align-items:center;gap:var(--sp-2)}
+.page{display:flex;flex-direction:column;gap:var(--sp-3)}
+/* room below the last card, so a jump can always bring its target to the top */
+.page::after{content:"";flex:none;height:50vh}
+.slide-left{animation:sl var(--motion-slow) var(--ease-sheet)}
+.slide-right{animation:sr var(--motion-slow) var(--ease-sheet)}
+@keyframes sl{from{transform:translateX(40%);opacity:0}}
+@keyframes sr{from{transform:translateX(-40%);opacity:0}}
+.ctl2{display:flex;gap:var(--sp-2);align-items:center}
+.ctl.searching .ctl2{flex:1}
+/* the view switch: the selected pill is the soft accent and slides with the page */
+.views{position:relative;flex:1;display:flex;background:var(--surface-2);border-radius:var(--r-pill);padding:3px}
+.views .ind{position:absolute;top:3px;bottom:3px;left:3px;width:calc((100% - 6px) / 3);border-radius:var(--r-pill);background:var(--panel);box-shadow:var(--shadow-card);transform:translateX(calc(var(--i) * 100%));animation:ind var(--motion-slow) var(--ease-sheet)}
+@keyframes ind{from{transform:translateX(calc(var(--from) * 100%))}}
+.views button{position:relative;flex:1;border:0;background:none;padding:7px var(--sp-2);border-radius:var(--r-pill);font-size:var(--fs-meta)}
+.views button.on{font-weight:var(--fw-strong)}
+.ib{flex:none;width:40px;height:40px;border:0;border-radius:var(--r-round);background:var(--surface-2);color:var(--text-dim);display:grid;place-items:center;padding:0}
+.sfield{flex:1;display:flex;align-items:center;gap:var(--sp-2);height:40px;padding:0 var(--sp-1) 0 var(--sp-3);border-radius:var(--r-control);background:var(--surface-2);transform-origin:right center;animation:grow var(--motion-slow) var(--ease-sheet)}
+@keyframes grow{from{clip-path:inset(0 0 0 calc(100% - 40px) round var(--r-round))}to{clip-path:inset(0 0 0 0 round var(--r-control))}}
+.sfield .si{display:grid;color:var(--text-dim)}
+.sfield svg{width:16px;height:16px}
+.sfield input{flex:1;min-width:0;border:0;outline:0;background:transparent;color:var(--text);font:inherit;font-size:var(--fs-body)}
+.clr{border:0;background:none;color:var(--text-dim);display:grid;place-items:center;padding:6px}
+.menu{position:absolute;right:0;top:48px;width:240px;background:var(--panel);border-radius:var(--r-card);box-shadow:var(--shadow-raised);padding:var(--sp-3);display:flex;flex-direction:column;gap:var(--sp-2);z-index:6}
+.mt{margin:0;font-size:var(--fs-micro);font-weight:var(--fw-medium);letter-spacing:var(--tracking-label);color:var(--text-dim);text-transform:uppercase}
+.opt{border:0;text-align:left;padding:8px var(--sp-3);border-radius:var(--r-pill);background:var(--surface-2)}
+.opt.on{background:var(--accent);color:var(--accent-text);font-weight:var(--fw-strong)}
+.mh{margin:0;color:var(--text-dim);font-size:var(--fs-meta)}
+/* Today card: accent, "Today", what, where, when, tickets; tap opens today */
+.todayc{border-radius:var(--r-card);padding:var(--sp-4);display:flex;flex-direction:column;gap:var(--sp-3);cursor:pointer;background:var(--accent);color:var(--accent-text)}
+.tbig{margin:0;font-size:var(--fs-title-lg);font-weight:var(--fw-strong);letter-spacing:var(--tracking-heading);line-height:1}
+.thol{margin:-4px 0 0;font-size:var(--fs-meta);font-weight:var(--fw-medium)}
+.titem{display:grid;grid-template-columns:auto minmax(0,1fr);column-gap:var(--sp-3);align-items:center}
+.ticons{font-size:22px;line-height:1;display:flex;align-items:center;gap:2px}
+.tbody{display:flex;flex-direction:column;gap:2px;min-width:0}
+.ttitle{margin:0;font-size:var(--fs-body);font-weight:var(--fw-strong)}
+.tmeta{margin:0;font-size:var(--fs-meta);opacity:.85}
+.tticket{align-self:flex-start;margin-top:var(--sp-1);border:1.5px solid currentColor;border-radius:var(--r-pill);padding:1px var(--sp-2);font-size:var(--fs-meta);font-weight:var(--fw-medium)}
+/* labels: the ALL CAPS corner label that names a card (P1 finding 12) */
+.lbl{font-size:var(--fs-meta);font-weight:var(--fw-medium);letter-spacing:var(--tracking-label);text-transform:uppercase;font-variant-numeric:tabular-nums;color:var(--text)}
+.chev{width:14px;height:14px;stroke-width:2.5;vertical-align:-2px;margin-left:2px;color:var(--text-dim)}
+/* rows: the icon cell is as wide as the row's own icons; dates share one column */
+.rows{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:5px;min-width:0}
+.rows li{display:grid;grid-template-columns:calc(var(--n) * 20px) minmax(0,1fr) auto;align-items:center;column-gap:var(--sp-2);min-width:0}
+.rows.dated li{grid-template-columns:52px calc(var(--n) * 20px) minmax(0,1fr) auto}
+.rows li.note{column-gap:0}
+.rows.dated li.note{grid-template-columns:52px 0 minmax(0,1fr) auto;column-gap:var(--sp-2)}
+.rows li[data-act]{cursor:pointer;min-height:32px}
+.c-d{font-size:var(--fs-meta);color:var(--text-dim);font-variant-numeric:tabular-nums;white-space:nowrap}
+.c-i{font-size:15px;line-height:1;white-space:nowrap;letter-spacing:2px}
+.c-t{overflow:hidden;white-space:nowrap;text-overflow:ellipsis;font-size:var(--fs-meta)}
+.grey .c-i,.ic.grey{filter:grayscale(1);opacity:.45}
+.grey .c-t{color:var(--text-dim)}
+.idea .c-i,.ic.idea{opacity:.45}
+.todo{width:7px;height:7px;border-radius:var(--r-round);background:currentColor}
+.flag{display:inline-block;border-radius:var(--r-pill);padding:1px var(--sp-2);font-size:var(--fs-meta);font-weight:var(--fw-medium);max-width:100%;overflow:hidden;text-overflow:ellipsis;vertical-align:middle}
+.flag.acc{background:var(--accent);color:var(--accent-text)}
+.flag.soft{background:var(--accent-soft);color:var(--text)}
+/* weekly */
+.month{margin:var(--sp-3) 0 0;font-size:var(--fs-title-lg);font-weight:var(--fw-strong);letter-spacing:var(--tracking-heading);line-height:var(--lh-title)}
+.week{display:flex;flex-direction:column;gap:var(--sp-2);margin-bottom:var(--sp-2)}
+.wk{align-self:flex-start;border:0;background:none;padding:var(--sp-1) 0;color:var(--text-dim);cursor:pointer}
+.g3{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:var(--sp-2);align-items:stretch}
+.day{background:var(--panel);border-radius:var(--r-card);min-height:84px;padding:var(--sp-2);display:flex;flex-direction:column;gap:var(--sp-2);min-width:0;border:2px solid transparent;cursor:pointer}
+.day.today{border-color:var(--accent)}
+.dl{align-self:flex-start;padding:1px var(--sp-2);margin-left:calc(-1 * var(--sp-1));border-radius:var(--r-pill)}
+.dl.on{background:var(--accent);color:var(--accent-text);font-weight:var(--fw-strong)}
+.icons{display:flex;flex-wrap:wrap;gap:4px;font-size:18px;line-height:1.15}
+.reveal{border:0;background:transparent;color:var(--text-dim);font-size:var(--fs-ui);padding:9px 0;border-radius:var(--r-control)}
+/* monthly and yearly cards */
+.wcard,.mcard{background:var(--panel);border-radius:var(--r-card);padding:var(--sp-3);display:flex;flex-direction:column;gap:var(--sp-2);border:2px solid transparent;cursor:pointer}
+.wcard.now,.mcard.now{border-color:var(--accent)}
+.wh{display:flex;gap:var(--sp-2);align-items:center;flex-wrap:wrap}
+.away{margin:0;display:grid;grid-template-columns:20px minmax(0,1fr);column-gap:var(--sp-2);font-size:var(--fs-meta);background:var(--surface-2);border-radius:var(--r-control);padding:var(--sp-1) var(--sp-2)}
+.away.grey{color:var(--text-dim)}
+.mh{margin:0;display:flex;justify-content:space-between;align-items:center}
+.cnt{color:var(--text-dim);font-size:var(--fs-meta)}
+.heat{display:grid;grid-template-columns:repeat(var(--n),minmax(0,1fr));gap:2px}
+.heat i{height:16px;border-radius:2px;background:var(--surface-2)}
+.heat i.on{background:var(--accent)}
+.heat i.we{box-shadow:inset 0 -3px 0 var(--rule-strong)}
+.heat i.hol{box-shadow:inset 0 -3px 0 var(--accent)}
+.heat i.on.we,.heat i.on.hol{box-shadow:none}
+.heat i.t{outline:2px solid var(--text);outline-offset:-2px}
+/* search */
+.hint{margin:0;color:var(--text-dim);font-size:var(--fs-meta)}
+.card{background:var(--panel);border-radius:var(--r-card);padding:var(--sp-3)}
+/* the sheet: header taps and swipes close; each level looks different */
+.shade{position:absolute;inset:0;background:var(--bg);opacity:.6;z-index:7}
+.sbar{flex:none;background:var(--accent-soft);border-radius:var(--r-sheet);padding:var(--sp-5) var(--sp-4) var(--sp-4);position:relative;touch-action:none;cursor:pointer}
+.grab{position:absolute;top:8px;left:50%;transform:translateX(-50%);width:36px;height:4px;border-radius:var(--r-pill);background:var(--text-dim);opacity:.5}
+.stitle{margin:0;font-size:var(--fs-title-lg);font-weight:var(--fw-strong);letter-spacing:var(--tracking-heading);line-height:1.2}
+/* week level: a roomy row per day, "Monday 21" in Title Case */
+.lrow{background:var(--panel);border-radius:var(--r-card);padding:var(--sp-3);display:flex;flex-direction:column;gap:var(--sp-2);cursor:pointer}
+.lrow.today{outline:2px solid var(--accent);outline-offset:-2px}
+.lday{font-size:var(--fs-body);font-weight:var(--fw-strong)}
+.greyw .wicons,.greyw .eicons{filter:grayscale(1);opacity:.45}
+.todo-l{margin:0;display:flex;align-items:center;gap:var(--sp-2)}
+.box{width:14px;height:14px;border:2px solid var(--text-dim);border-radius:4px;flex:none}
+.ticket{margin:0;align-self:flex-start;background:var(--surface-2);border-radius:var(--r-pill);padding:4px var(--sp-3);font-size:var(--fs-meta)}
+.hol{align-self:flex-start}
+/* event level: no cards, a recipe-style page on the sheet itself */
+.sheet.lv-event .sbody{padding:0;gap:0}
+.epage{display:flex;flex-direction:column}
+.ehero{padding:var(--sp-5) var(--sp-4) var(--sp-4);display:flex;flex-direction:column;gap:var(--sp-2)}
+.eicons{font-size:48px;line-height:1;display:flex;gap:var(--sp-1)}
+.esub{margin:0;color:var(--text-dim)}
+.esec{padding:var(--sp-4);border-top:1px solid var(--rule);display:flex;flex-direction:column;gap:var(--sp-2)}
+.esec h3{margin:0;font-size:var(--fs-title);font-weight:var(--fw-strong);letter-spacing:var(--tracking-heading)}
+.esec p{margin:0}
+.epage > .hint{padding:var(--sp-4)}
+/* wide window: a week is one row of seven; controls in two lines, left-aligned */
+@media (min-width: 900px){
+  .app-header{padding-inline:var(--sp-5)}
+  .mn{padding:var(--sp-5) var(--sp-5) calc(var(--sp-7) * 2)}
+  .ctl{flex-wrap:wrap;justify-content:flex-start}
+  .ctl .views{flex:none;width:380px}
+  .ctl.searching .ctl2{width:380px}
+  .g3{grid-template-columns:repeat(7,minmax(0,1fr))}
+  .day{min-height:110px}
+  .fab.add{right:var(--sp-6)}
+  .fab.to-today{right:calc(var(--sp-6) + 6px)}
+}
+/* day level (P2 feedback): no cards, sections on the sheet like a recipe */
+.sheet.lv-day .sbody{padding:0;gap:0}
+.dpage{display:flex;flex-direction:column}
+.dhol{margin:0;padding:var(--sp-3) var(--sp-4);font-weight:var(--fw-medium);color:var(--text-dim)}
+.dsec{padding:var(--sp-4);border-top:1px solid var(--rule);display:flex;flex-direction:column;gap:var(--sp-2);cursor:pointer}
+.dpage > .dsec:first-child{border-top:0}
+.dhead{display:flex;gap:var(--sp-3);align-items:center}
+.dhead h3{margin:0;font-size:var(--fs-title);font-weight:var(--fw-strong);letter-spacing:var(--tracking-heading)}
+.dhead .chev{margin-left:auto;width:18px;height:18px}
+.dpage > .hint{padding:var(--sp-4)}
+/* day strips with room, a closing rule (layout A until Task 9c) */
+.dpage{padding-bottom:var(--sp-7)}
+.dsec{display:flex;flex-direction:row;align-items:center;gap:var(--sp-3);padding:var(--sp-5) var(--sp-4);border-top:1px solid var(--rule)}
+.dpage > .dsec:first-child{border-top:0}
+.dpage > .dsec:last-of-type{border-bottom:1px solid var(--rule)}
+.dmain{flex:1;min-width:0;display:flex;flex-direction:column;gap:var(--sp-2)}
+.dhead{display:flex;align-items:flex-start;justify-content:space-between;gap:var(--sp-3)}
+.dhead h3,.dmain > h3{margin:0;font-size:var(--fs-title);font-weight:var(--fw-strong);letter-spacing:var(--tracking-heading)}
+.dicons{flex:none;font-size:24px;line-height:1;display:flex;gap:2px}
+.dline{margin:0}
+.dline + .dline{color:var(--text-dim)}
+.dchev{flex:none;align-self:center;display:grid;place-items:center;color:var(--text-dim)}
+.dchev .chev{width:20px;height:20px;margin:0}
+.day.empty,.lrow.empty,.wcard.empty{cursor:default}
+.wh .away{display:inline-block;margin:0;padding:1px var(--sp-2);border-radius:var(--r-pill);background:var(--surface-2);font-size:var(--fs-meta)}
+.hintrow .c-t{color:var(--accent-ink);font-weight:var(--fw-medium)}
+[data-week],[data-month],#today{scroll-margin-top:var(--sp-4)}
+
