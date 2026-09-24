@@ -42,6 +42,7 @@ const SHELL = [
   "github.js",
   "js/util.js",
   "js/dates.js",
+  "js/money.js",
   "js/store.js",
   "js/theme.js",
   "js/sync.js",
