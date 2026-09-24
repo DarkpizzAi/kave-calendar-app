@@ -50,6 +50,8 @@ const SHELL = [
   "js/icons.js",
   "js/filter.js",
   "js/views.js",
+  "js/data.js",
+  "js/cal-model.js",
   "js/store.js",
   "js/theme.js",
   "js/sync.js",
