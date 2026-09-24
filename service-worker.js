@@ -45,6 +45,7 @@ const SHELL = [
   "js/money.js",
   "js/merge.js",
   "js/local.js",
+  "js/model.js",
   "js/store.js",
   "js/theme.js",
   "js/sync.js",
