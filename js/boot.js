@@ -14,7 +14,8 @@ import { initPullToSync } from "./pull-to-sync.js";
 import { appData } from "./data.js";
 import { store } from "./store.js";
 import { initCalendar, backToToday, closeMenus } from "./calendar.js";
-import { initSheet, back, sheetOpen } from "./sheet.js";
+import { initSheet, back, sheetOpen, refreshSheet } from "./sheet.js";
+import { initEvent, newEventForm } from "./view-event.js";
 
 initTheme();
 wire();
@@ -41,6 +42,7 @@ async function syncNow() {
 
 actions.sync = syncNow;
 initSheet();
+initEvent({ data, refresh: refreshSheet });
 initCalendar({ data, render, isCalendar, sync: syncNow });
 render();
 syncNow();
@@ -52,7 +54,7 @@ document.getElementById("fabs").addEventListener("click", (e) => {
   const b = e.target.closest("[data-fab]");
   if (!b) return;
   if (b.dataset.fab === "today") backToToday();
-  else showBanner("Adding events arrives with the event form (round 2).");
+  else newEventForm();
 });
 
 /* Backspace = Back on a computer (except while typing), like the phone's

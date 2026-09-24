@@ -384,3 +384,85 @@ a.ticket{color:inherit;text-decoration:none}
 .hintrow .c-t{color:var(--accent-ink);font-weight:var(--fw-medium)}
 [data-week],[data-month],#today{scroll-margin-top:var(--sp-4)}
 
+/* ================= The event page and form (round 2) =================
+   After Google Calendar: a group per kind of information, a line icon on
+   the left instead of a label, one text column, a thin full-width rule
+   between groups. To do and Costs are titled sections. */
+.sbar{display:flex;align-items:center;gap:var(--sp-3)}
+.sbar .stitle{flex:1;min-width:0}
+.bar-acts{display:flex;gap:var(--sp-2);flex:none}
+.bar-acts:empty{display:none}
+.bar-acts .sbtn{min-height:40px;min-width:40px;padding:8px;border-radius:var(--r-round);background:none;display:grid;place-items:center}
+.bar-acts .sbtn svg{width:22px;height:22px}
+.bar-acts .act-btn{min-height:40px;padding:8px var(--sp-3);border-radius:var(--r-control);background:var(--surface);font-weight:500}
+.bar-acts .act-btn.primary,#sheetRoot button.primary{background:var(--accent);color:var(--accent-text)}
+.sheet.lv-event .sbody,.sheet.lv-edit .sbody,.sheet.lv-new .sbody{padding:0 0 var(--sp-7);gap:0}
+.grp{display:grid;grid-template-columns:24px minmax(0,1fr);column-gap:var(--sp-4);padding:var(--sp-4);border-top:1px solid var(--rule)}
+.grp:first-child{border-top:0}
+.gic{color:var(--text-dim);padding-top:2px}
+.gic svg{width:22px;height:22px;stroke-width:1.8}
+.gbody{display:flex;flex-direction:column;align-items:flex-start;gap:var(--sp-2);min-width:0}
+.gbody p{margin:0;font-size:var(--fs-body)}
+.gbody .big{font-size:var(--fs-lede);font-weight:500}
+.dim{color:var(--text-dim)}
+.pad{padding:var(--sp-4)}
+.grp.sec{grid-template-columns:minmax(0,1fr);row-gap:var(--sp-2)}
+.sh{margin:0;font-size:var(--fs-lede);font-weight:600;letter-spacing:var(--tracking-heading);line-height:var(--lh-title)}
+.maps{color:var(--text);font-size:var(--fs-ui)}
+.ticket{display:inline-flex;align-items:center;gap:var(--sp-1);background:var(--surface-2);color:var(--text);text-decoration:none;border-radius:var(--r-pill);padding:6px var(--sp-3);font-size:var(--fs-ui)}
+.ticket svg{width:14px;height:14px}
+.ref{display:flex;align-items:center;gap:var(--sp-2);flex-wrap:wrap}
+.refv{font-variant-numeric:tabular-nums}
+#sheetRoot .copy{min-height:32px;padding:4px var(--sp-2);font-size:var(--fs-meta);color:var(--text-dim);background:none;display:inline-flex;align-items:center;gap:var(--sp-1)}
+#sheetRoot .copy svg{width:16px;height:16px}
+/* to-dos tick on the page; the list ends with a line to write a task */
+#sheetRoot .todo{background:none;padding:var(--sp-1) 0;width:100%;text-align:left;display:flex;align-items:center;gap:var(--sp-3)}
+.box{width:22px;height:22px;border-radius:6px;border:2px solid var(--rule-strong);display:grid;place-items:center;flex:none}
+.box svg{width:14px;height:14px;stroke-width:3}
+.box.empty{border-style:dashed}
+.todo.done .box{background:var(--accent);border-color:var(--accent);color:var(--accent-text)}
+.todo.done .tt{text-decoration:line-through;color:var(--text-dim)}
+.tt{flex:1}
+.who{font-size:var(--fs-meta);color:var(--text-dim)}
+.newtodo,.newline{display:flex;align-items:center;gap:var(--sp-3);flex-wrap:wrap;width:100%}
+#sheetRoot input.bare{background:none;padding-left:0;flex:1;min-width:160px;width:auto}
+.plus{width:22px;height:22px;border-radius:6px;border:2px dashed var(--rule-strong);display:grid;place-items:center;color:var(--text-dim);flex:none}
+.plus svg{width:14px;height:14px}
+/* costs: name and details left; price and its rung right; rules only between */
+.cost{display:flex;align-items:flex-start;gap:var(--sp-3);width:100%;padding:var(--sp-2) 0}
+.cost + .cost,.cost + .newcost{border-top:1px solid var(--rule)}
+.cost + .newcost{padding-top:var(--sp-3)}
+.cleft{flex:1;min-width:0;display:flex;flex-direction:column;gap:2px}
+.cright{display:flex;flex-direction:column;align-items:flex-end;gap:2px;text-align:right}
+.cname{margin:0;font-size:var(--fs-body);font-weight:500}
+.camt{margin:0;font-size:var(--fs-body);font-weight:600;font-variant-numeric:tabular-nums}
+.cmeta{margin:0;font-size:var(--fs-meta);color:var(--text-dim)}
+.rung{margin:0;display:inline-flex;align-items:center;gap:3px;font-size:var(--fs-meta);color:var(--text-dim)}
+.rung svg{width:14px;height:14px}
+.cost.fixed .rung{color:var(--text)}
+.newcost{display:flex;flex-direction:column;gap:var(--sp-2);width:100%}
+/* the form */
+.line{display:flex;gap:var(--sp-2);width:100%;flex-wrap:wrap;align-items:center}
+.line input{flex:1;min-width:120px;width:auto}
+.line input.amt{flex:0 1 140px;min-width:100px;font-variant-numeric:tabular-nums}
+#sheetRoot select,#sheetRoot textarea{font:inherit;font-size:var(--fs-body);color:var(--text);background:var(--surface-2);border:none;border-radius:var(--r-control);padding:10px 12px;min-height:var(--touch-min)}
+#sheetRoot textarea{width:100%;resize:vertical}
+#sheetRoot input[type=date],#sheetRoot input[type=time]{flex:1;width:auto}
+#sheetRoot input.titlein{font-size:var(--fs-title-lg);font-weight:600;background:none;padding-left:0}
+.need{outline:2px solid var(--text);outline-offset:1px}
+.sub{margin:var(--sp-1) 0 0;font-size:var(--fs-ui);font-weight:500;color:var(--text-dim)}
+#sheetRoot button.add{background:none;padding-left:0;display:inline-flex;align-items:center;gap:var(--sp-2)}
+#sheetRoot button.add svg{width:16px;height:16px}
+#sheetRoot .iconbtn{min-height:0;padding:6px;background:none;color:var(--text-dim)}
+#sheetRoot .iconbtn svg{width:16px;height:16px}
+.acts{display:flex;flex-wrap:wrap;align-items:center;gap:var(--sp-2)}
+.act{display:inline-flex;align-items:center;gap:var(--sp-1);background:var(--surface-2);border-radius:var(--r-pill);padding:4px 4px 4px var(--sp-3);font-size:var(--fs-ui)}
+.then{color:var(--text-dim);font-size:var(--fs-ui)}
+.catgrid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:var(--sp-2);width:100%}
+#sheetRoot .catgrid button{justify-content:flex-start;text-align:left;font-size:var(--fs-ui);display:flex;align-items:center;gap:var(--sp-2)}
+.ci{font-size:20px;line-height:1}
+#sheetRoot .choices button.big{font-size:22px;min-width:52px}
+/* the undo banner */
+.banner.undo{display:flex;align-items:center;justify-content:space-between;gap:var(--sp-3)}
+.banner.undo button{background:none;color:var(--bg);font-weight:600;min-height:36px}
+@media (min-width:900px){.catgrid{grid-template-columns:repeat(3,minmax(0,1fr))}}

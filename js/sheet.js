@@ -36,11 +36,13 @@ let stack = [];
 let root = null;
 
 /* Other screens add their own levels (Settings: Calendar defaults,
-   Categories): { title(level), body(level), onAction(button) }. */
+   Categories; the event page and form): { title(level), body(level),
+   onAction(button), bar(level) for buttons in the bar, onInput(field) }. */
 const custom = {};
 export function registerLevel(kind, def) { custom[kind] = def; }
 
 export const sheetOpen = () => stack.length > 0;
+export const topLevel = () => stack[stack.length - 1] || null;
 
 function findEvent(id) { const f = frameNow(); return f && f.events.find((e) => e.id === id); }
 
@@ -124,13 +126,15 @@ function draw(anim) {
   let sh = root.querySelector(".sheet:not(.out)");
   if (!sh) {
     root.innerHTML = '<div class="shade" data-sact="close"></div><section class="sheet in" role="dialog" aria-modal="true" aria-labelledby="stitle">'
-      + '<header class="sbar" data-sact="close" data-swipe="sheet"><span class="grab" aria-hidden="true"></span><h2 class="stitle" id="stitle"></h2></header>'
+      + '<header class="sbar" data-sact="close" data-swipe="sheet"><span class="grab" aria-hidden="true"></span><h2 class="stitle" id="stitle"></h2><div class="bar-acts"></div></header>'
       + '<div class="sstage"></div></section>';
     sh = root.querySelector(".sheet");
     anim = "";
   }
   sh.className = `sheet lv-${l.kind}${anim === "" && sh.classList.contains("in") ? " in" : ""}`;
   sh.querySelector(".stitle").textContent = title(l);
+  const def = custom[l.kind];
+  sh.querySelector(".bar-acts").innerHTML = def && def.bar ? def.bar(l) : "";
   const stage = sh.querySelector(".sstage");
   const fresh = document.createElement("div");
   fresh.className = "sbody";
@@ -153,6 +157,13 @@ function draw(anim) {
 
 /* Called after the page redraws (new data): refresh the open level in place. */
 export function refreshSheet() { if (stack.length) draw(""); }
+
+/* Swap the level on top for another (a new event, once saved, becomes its page). */
+export function replaceTop(l) {
+  if (!stack.length) return openLevel(l);
+  stack[stack.length - 1] = l;
+  draw("");
+}
 
 export function openLevel(l) {
   const deeper = stack.length > 0;
@@ -190,7 +201,8 @@ export function initSheet() {
     if (stack.length) up();
   });
   root.addEventListener("click", (e) => {
-    const b = e.target.closest("[data-sact]");
+    const barBtn = e.target.closest(".bar-acts button");
+    const b = barBtn ? null : e.target.closest("[data-sact]");
     if (!b) {
       /* a registered level's own buttons go to its handler */
       const l = stack[stack.length - 1], btn = e.target.closest("button");
@@ -202,6 +214,12 @@ export function initSheet() {
     else if (a === "day") openLevel({ kind: "day", d: b.dataset.d });
     else if (a === "event") openLevel({ kind: "event", id: b.dataset.id });
   });
+  const onField = (e) => {
+    const l = stack[stack.length - 1];
+    if (l && custom[l.kind] && custom[l.kind].onInput) custom[l.kind].onInput(e.target, e);
+  };
+  root.addEventListener("input", onField);
+  root.addEventListener("change", onField);
   root.addEventListener("keydown", (e) => {
     if ((e.key === "Enter" || e.key === " ") && e.target.matches("[data-sact][role=button]")) { e.preventDefault(); e.target.click(); }
   });
