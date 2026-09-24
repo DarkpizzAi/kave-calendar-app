@@ -13,7 +13,8 @@ import { store } from "./store.js";
 
 /* palette id -> display name. Must stay in step with the [data-palette]
    blocks in tokens.css; adding one here without adding it there silently
-   falls back to Cobalt. */
+   falls back to Cobalt. #theme-preload in index.html repeats the non-Cobalt
+   ids (it runs before modules load); change both, then recompute its hash. */
 export const PALETTES = {
   cobalt: "Cobalt",
   amber: "Amber",

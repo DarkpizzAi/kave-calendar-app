@@ -37,7 +37,7 @@
     base-uri 'none';
     object-src 'none';
     form-action 'none';
-    script-src 'self' 'sha256-Wz6ivtNbeHVqFsQoyzx4+c1tiJMCeWliwTU5WlSnM+8=';
+    script-src 'self' 'sha256-dmiCGcaBfFdWH1wv/MbmTZVpPGP8AExt//pJTH7klYw=';
     style-src 'self' 'unsafe-inline' https://fonts.googleapis.com;
     style-src-elem 'self' https://fonts.googleapis.com;
     style-src-attr 'unsafe-inline';
@@ -65,7 +65,8 @@
     root.dataset.themeBoot = "1";
     try {
       var s = JSON.parse(localStorage.getItem("compass.settings")) || {};
-      if (s.palette && s.palette !== "cobalt") root.setAttribute("data-palette", s.palette);
+      /* same list as PALETTES in js/theme.js; a retired palette reads as Cobalt */
+      if (s.palette === "amber" || s.palette === "chartreuse") root.setAttribute("data-palette", s.palette);
       root.style.colorScheme = matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light";
     } catch (e) { /* first run, or storage blocked */ }
   })();
