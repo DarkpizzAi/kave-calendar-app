@@ -90,3 +90,13 @@ The app with no token saved is a real screen, seen after every reinstall. It
 is invisible to a diff and to a dev run with a token present, and in the
 sister app that blind spot hid three defects in one release. Test it
 deliberately.
+
+## Work in progress
+
+Sub-project A (the Calendar and the event record) is being built on branch
+**`compass-a`**, not merged because `main` deploys. The design decisions,
+the plan and the handoff for a new chat live in the private kave-hub repo:
+read "Current design at a glance" at the top of
+`docs/superpowers/specs/2026-09-24-compass-a-core-design.md` first, then the
+"Handoff for a new chat" section of
+`docs/superpowers/plans/2026-09-24-compass-a-core.md`.
