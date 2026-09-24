@@ -1,7 +1,7 @@
 # Compass - non-negotiables
 
 Rules that are expensive to break and easy to break by accident. Everything
-else, including the whole design system, lives in the `design` plugin of the
+else, including the whole design system, lives in the `brand` plugin of the
 private `kave-hub` repo: read `brand/data/household-look.md` and
 `brand/data/household-tokens.css`, or invoke its `apply-household-look`
 skill. **Do not restate the design system here.** This repo is public.
@@ -71,16 +71,18 @@ Everything else belongs in the repo - events, cost lines, checklists, travel
 data, the insights queue, transcripts. Anything on the box is invisible,
 unversioned, and lost if the box dies.
 
-## Compass is the confirmation gate
+## The bank extracts are the source of truth, never Compass
 
-What a person reviewed and accepted from a nightly sweep, or entered by hand,
-is the source of truth. Nothing downstream may contradict it.
+Settled 2026-09-20 and not to be reopened. Compass **enriches**: it says what
+a bank line *means* (whose it is, how it splits, which trip it belongs to),
+never how much it was. A hand-entered cost is a claim; when a sweep matches it
+to a bank line, an insight offers to lock it and **the bank's figure wins** on
+any mismatch. The amount locks, the interpretation stays editable.
 
-The unconfirmed remainder is not this app's problem: it belongs to a separate
-finance app, and **that app reads the confirmed set from here**, one way.
-Never build a path that infers the same number independently, and never add
-anything to the user's data automatically - a sweep proposes, a person
-decides.
+The dependency runs one way: the finance side reads the extracts and consults
+Compass for interpretation. Never build a path where Compass's number
+overrides an extract, and never add anything to the data automatically - a
+sweep proposes, a person decides.
 
 ## Check the no-token state
 

@@ -3,12 +3,11 @@
 The household planner: events, what they cost, trips, and the loose ends
 attached to them. Replaces Google Calendar and the yearly planning sheet.
 
-**This is a shell, not a finished app.** Home, Insights and Travel are
-deliberate dashed stubs. Compass has been brainstormed - see
-`compass-planning-app-brainstorm.md` in the working folder, which covers the
-event model, three kinds of money, the two-person noise filter, the daily
-recap, a travel tab and a finance facts log - but it has no spec and no data
-model yet. What exists here is everything the household
+**This is a shell, not a finished app.** Calendar, Insights, Trips and Radar
+are deliberate dashed stubs. Compass has been brainstormed - see
+`calendar/data/compass-planning-app-brainstorm.md` in kave-hub, which covers
+the event model, money, the two-person noise filter, the five tabs and the
+daily recap - but it has no spec and no data model yet. What exists here is everything the household
 conventions already decided: the look, the module shape, the security
 posture, the service worker, and a Settings tab that actually works.
 
@@ -18,10 +17,11 @@ so GitHub Pages can serve it for free.
 ## Where things live
 
 **The repo is the data store.** Events, cost lines, checklists, travel data,
-the insights queue, voice-note transcripts and the finance facts log all live
-in the private `DarkpizzAi/kave-hub` repo under `calendar/data/`, reached with
+the insights queue and voice-note transcripts all live in the private
+`DarkpizzAi/kave-hub` repo under `calendar/data/`, reached with
 a personal token pasted in Settings. That is the pattern this shell was built
-on and it stands.
+on and it stands. The finance facts log Compass writes to is not Compass
+data: it lives with the finance plugin, `finance/data/` in kave-hub.
 
 **An always-on mini PC runs what the app cannot.** Arriving early October
 2026, on 24/7, also a media server. It runs two separable scheduled jobs: a
@@ -47,33 +47,15 @@ Nothing personal is ever committed to *this* repo, which is the public shell.
 
 ## What Compass owns
 
-**Compass is the confirmation gate.** Anything that passes through it is the
-source of truth: a proposal from the nightly sweep that someone reviewed and
-accepted, and anything entered by hand. Nothing downstream may contradict it.
+**Interpretation, never amounts.** The bank extracts are the source of truth
+for money. Compass enriches them: whose a line is, how it splits, which trip
+it belongs to. A cost typed into Compass is a claim until a sweep matches it
+to a bank line and someone locks it; on a mismatch the bank's figure wins.
+The finance side reads the extracts and consults Compass, one way.
 
-Everything else is not Compass's problem. The large unconfirmed remainder,
-the ordinary spend that never attaches to a plan or a trip, belongs to a
-finance app that does not exist yet. **That app will read the confirmed set
-from Compass**, not the other way round, and not by inferring the same number
-separately.
-
-So the split is confirmed versus unconfirmed, not travel versus not-travel.
-Travel is just where confirmation naturally happens, because a trip has a
-date window, a place and a ticket to confirm against.
-
-**Compass is the trips dashboard.** That was a standing request of its own
-until 20/09/2026, when it was retired as superseded by this app: the Travel
-tab is that item, and there is no second surface to build.
-
-Deriving trips from bank transactions was tried before this app existed -
-grouping on the merchant's city and a contiguous date window - and abandoned.
-The failure modes are written up in the hub repo and are worth reading before
-designing anything that matches a charge to a plan, because they are this
-app's hard problem seen from the other end. The short version: **a ledger can
-corroborate a trip, it cannot originate one.** A merchant's registered
-address is not a location, suburbs split one trip into several, day trips
-nest inside longer ones, and a single-day candidate is usually a booking made
-from home.
+What Compass is the source of truth for is everything the bank cannot know:
+events, trips and their phases, checklists, ideas on the Radar, and the
+decisions people made on insights.
 
 ## Run locally
 
@@ -208,8 +190,8 @@ features.
 
 ## Status
 
-**Shell only.** Home, Insights and Travel are dashed stubs. Settings works: paste a token, check it against the hub repo,
+**Shell only.** Calendar, Insights, Trips and Radar are dashed stubs. Settings works: paste a token, check it against the hub repo,
 switch palette, read the running service-worker version, see whether the CSP
-preload was blocked. Home, Insights and Travel are stubs.
+preload was blocked.
 
 Next: a spec for what Compass actually does.

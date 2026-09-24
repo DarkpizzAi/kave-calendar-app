@@ -14,18 +14,22 @@ import { escapeHtml } from "./util.js";
 import { PALETTES, applyPalette, themeBootRan, paletteAccents } from "./theme.js";
 import { status as syncStatus, checkToken } from "./sync.js";
 
-/* Named from the brainstorm, so the shell does not contradict it: the home
-   screen is NOT a month grid (the grid is somewhere you go), Insights is its
-   own tab where nothing is ever added automatically, and Travel is the
-   been/want-to-go loop. Settings last, as everywhere in this household. */
+/* The five tabs from the brainstorm's tab map (kave-hub
+   calendar/data/compass-planning-app-brainstorm.md). Calendar is home and
+   back from anywhere returns to it; there is no separate home screen. Trips
+   is for what is real, Radar for what is not. Settings last, as everywhere
+   in this household. */
 export const VIEWS = {
-  home: "Home",
+  calendar: "Calendar",
   insights: "Insights",
-  travel: "Travel",
+  trips: "Trips",
+  radar: "Radar",
   settings: "Settings",
 };
 
-let current = "home";
+const ICONS = { calendar: "&#9638;", insights: "&#9670;", trips: "&#9650;", radar: "&#9678;", settings: "&#9881;" };
+
+let current = "calendar";
 
 export function currentView() { return current; }
 
@@ -42,27 +46,23 @@ function stub(title, line) {
   return `<div class="stub"><b>${escapeHtml(title)}</b>${escapeHtml(line)}</div>`;
 }
 
-function renderHome() {
-  return `
-    <h2 class="view-title">Home</h2>
-    <p class="lede">This week and next, loose ends, what is coming, and where the other person is.</p>
-    ${stub("Not built yet", "Four panels, and deliberately not a month grid. Brainstormed, not specced.")}
-  `;
-}
+const STUBS = {
+  calendar: ["Today, then the weeks ahead.",
+    "Day cards of icons, Mon-Thu then Fri-Sun. Trip days get an accent border. + creates an event."],
+  insights: ["What needs doing, and what needs a decision.",
+    "Checklist items, trip warnings, and proposals from mail, bank lines and voice notes. Nothing is ever added automatically."],
+  trips: ["The next departure, every trip, and the throwback.",
+    "Phases, events, bookings and costs per trip. + creates a trip and can pull in existing events."],
+  radar: ["What might happen, and what we are watching.",
+    "The bucket list and prices being watched. Tap an idea to make it an event or a trip."],
+};
 
-function renderInsights() {
+function renderStub(id) {
+  const [lede, line] = STUBS[id];
   return `
-    <h2 class="view-title">Insights</h2>
-    <p class="lede">What the nightly pass worked out, waiting for a yes or no.</p>
-    ${stub("Not built yet", "Proposals from mail, bank lines and voice notes. Nothing is ever added automatically.")}
-  `;
-}
-
-function renderTravel() {
-  return `
-    <h2 class="view-title">Travel</h2>
-    <p class="lede">Where we have been, and where we want to go.</p>
-    ${stub("Not built yet", "A wishlist entry gets dates and becomes a trip, the trip collects costs, then it drops into the been-list.")}
+    <h2 class="view-title">${escapeHtml(VIEWS[id])}</h2>
+    <p class="lede">${escapeHtml(lede)}</p>
+    ${stub("Not built yet", line)}
   `;
 }
 
@@ -122,7 +122,7 @@ function renderSettings() {
       <h3 class="section-title">About</h3>
       <div class="card">
         <p class="status-line">Compass <span id="swVersion">checking version...</span></p>
-        <p class="hint">The household planner. Shell only: brainstormed, not specced. Data in the repo; an always-on mini PC runs the nightly pass.</p>
+        <p class="hint">The household planner. Shell only: brainstormed, spec in progress. Data in kave-hub; the mini PC runs the sweeps.</p>
       </div>
     </section>
   `;
@@ -131,7 +131,7 @@ function renderSettings() {
 function renderNav() {
   return Object.entries(VIEWS).map(([id, label]) => `
     <button data-view="${escapeHtml(id)}" ${current === id ? 'aria-current="page"' : ""}>
-      <span class="nav-icon" aria-hidden="true">${id === "home" ? "&#9679;" : id === "insights" ? "&#9670;" : id === "travel" ? "&#9650;" : "&#9881;"}</span>
+      <span class="nav-icon" aria-hidden="true">${ICONS[id]}</span>
       <span class="nav-label">${escapeHtml(label)}</span>
     </button>`).join("");
 }
@@ -139,10 +139,7 @@ function renderNav() {
 export function render() {
   const main = document.getElementById("view");
   main.innerHTML =
-    current === "home" ? renderHome() :
-    current === "insights" ? renderInsights() :
-    current === "travel" ? renderTravel() :
-    renderSettings();
+    current === "settings" ? renderSettings() : renderStub(current);
 
   document.getElementById("nav").innerHTML = renderNav();
   bindView();
