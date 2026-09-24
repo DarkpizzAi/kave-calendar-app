@@ -16,11 +16,12 @@ export function escapeHtml(s) {
 
 /* escapeHtml is not enough in an href. A URL scheme has no characters for it
    to escape, so `javascript:...` used to come straight through a template
-   literal in Spoon and become a live link on its own origin. Anything that is
-   not an absolute http(s) URL is dropped rather than rendered. */
+   literal in Spoon and become a live link on its own origin. No base URL on
+   purpose: a relative string would resolve to a link back into this app.
+   Anything that is not an absolute http(s) URL is dropped. */
 export function safeUrl(u) {
   try {
-    const url = new URL(String(u), location.href);
+    const url = new URL(String(u));
     return (url.protocol === "http:" || url.protocol === "https:") ? url.href : "";
   } catch { return ""; }
 }
