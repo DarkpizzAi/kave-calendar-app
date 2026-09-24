@@ -1,4 +1,4 @@
-import { test, eq, throws } from "./run.js";
+import { test, eq, ok, throws } from "./run.js";
 import { memStorage, fakeGh } from "./helpers.js";
 import { createLocal } from "../js/local.js";
 import { createSync, pathFor } from "../js/sync.js";
@@ -65,4 +65,19 @@ test("gives up after three conflicts and keeps the queue", async () => {
   gh.putFile = async () => { const e = new Error("conflict"); e.gh = "conflict"; e.status = 409; throw e; };
   await throws(() => createSync({ gh, local }).flushYear("2026"));
   eq(local.pendingYears(), ["2026"]);
+});
+
+test("review I1: an edit queued while a sync runs is sent by that sync's rerun", async () => {
+  const gh = fakeGh({});
+  const local = createLocal(memStorage());
+  const sync = createSync({ gh, local });
+  const rec = (id) => ({ id, title: id, start: "2026-10-01", deleted: false, updated: { at: "2026-09-24T10:00:0" + id.length + "Z", by: "isa" } });
+  local.enqueue("2026", rec("a"));
+  const first = sync.syncNow([]);
+  local.enqueue("2026", rec("bb"));
+  const second = await sync.syncNow([]);
+  ok(second.skipped, "the latch skips the second call");
+  await first;
+  eq(gh.files["calendar/data/compass/events-2026.json"].json.events.map((e) => e.id).sort(), ["a", "bb"]);
+  eq(local.pendingYears(), []);
 });

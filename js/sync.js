@@ -58,9 +58,33 @@ export function createSync({ gh, local }) {
     throw e;
   }
 
-  async function syncNow(years) {
-    if (syncing) return { ok: true, skipped: true };
+  /* A sync asked for while one runs is not dropped (final review I1): the
+     running sync runs once more when it finishes, with the union of the
+     years, and the skipped caller waits for that. */
+  let running = null, again = null;
+  function syncNow(years) {
+    if (syncing) {
+      again = [...new Set([...(again || []), ...years])];
+      return running.then((r) => ({ ...r, skipped: true }));
+    }
     syncing = true;
+    running = (async () => {
+      try {
+        let r = await syncOnce(years);
+        while (again) {
+          const ys = again; again = null;
+          const r2 = await syncOnce(ys);
+          if (!r2.ok) r = r2;
+        }
+        return r;
+      } finally {
+        syncing = false;   // the latch covers the rerun too, and is always cleared
+      }
+    })();
+    return running;
+  }
+
+  async function syncOnce(years) {
     try {
       /* Each year flushes on its own: one failing file must not hold back
          the others, or a year move could leave the new copy stranded. */
@@ -78,8 +102,6 @@ export function createSync({ gh, local }) {
       return { ok: true };
     } catch (e) {
       return { ok: false, error: e };
-    } finally {
-      syncing = false;
     }
   }
 

@@ -79,8 +79,12 @@ export function restore(e, me, now) {
    year; moving it to another year writes it there and leaves a marker in
    the old file, so the old file cannot bring it back on the next merge. */
 export function writesFor(prev, next) {
-  const writes = [{ year: yearOf(next), record: next }];
-  if (prev && yearOf(prev) !== yearOf(next)) {
+  /* A moved event is restored in the year it arrives in: coming back to a
+     year it once left, it must beat the "moved away" marker there, or it
+     would vanish from both files (final review C1). */
+  const moving = prev && yearOf(prev) !== yearOf(next);
+  const writes = [{ year: yearOf(next), record: moving ? { ...next, restoredAt: next.updated.at } : next }];
+  if (moving) {
     writes.push({
       year: yearOf(prev),
       record: { id: prev.id, deleted: true, deletedAt: next.updated.at, movedTo: yearOf(next), updated: next.updated },

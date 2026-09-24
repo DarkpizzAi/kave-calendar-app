@@ -14,7 +14,7 @@ import { HOLIDAYS, holidayOn } from "./holidays.js";
 import { applyDetail } from "./filter.js";
 import { store } from "./store.js";
 import { indexByDay, weekRows, tappable, zoomWeekTarget, zoomMonthTarget, isAway, isBig, awayText,
-  shouldLoadMore, nextCount, iconsOf, searchEvents, shortDate, seePrevious, pastMonths } from "./cal-model.js";
+  shouldLoadMore, nextCount, iconsOf, searchEvents, shortDate, seePrevious, pastMonths, gesture } from "./cal-model.js";
 import { openLevel, sheetOpen } from "./sheet.js";
 import { ICON } from "./chrome-icons.js";
 import { readPrefs, byCategories } from "./prefs.js";
@@ -373,23 +373,28 @@ export function initCalendar(c) {
 
   /* Gestures: swipe the list sideways to change view; pull down at the top
      (or wheel up) to reveal See previous. */
+  /* Mouse and pen use pointer events. A finger uses touch events: when a
+     touch starts to scroll, the browser cancels the pointer and never sends
+     pointerup, so a pull would never register on a phone (final review I6). */
   let g = null;
-  mn.addEventListener("pointerdown", (e) => {
-    g = ctx.isCalendar() && !sheetOpen() ? { x: e.clientX, y: e.clientY, top: mn.scrollTop <= 0 } : null;
-  });
-  document.addEventListener("pointerup", (e) => {
+  const start = (x, y) => { g = ctx.isCalendar() && !sheetOpen() ? { x, y, top: mn.scrollTop <= 0 } : null; };
+  const end = (x, y) => {
     if (!g) return;
-    const dx = e.clientX - g.x, dy = e.clientY - g.y;
-    const wasTop = g.top; g = null;
-    if (Math.abs(dx) > 70 && Math.abs(dx) > 1.5 * Math.abs(dy) && !S.searchOpen) {
-      const i = VIEWS.indexOf(S.view) + (dx < 0 ? 1 : -1);
+    const act = gesture({ dx: x - g.x, dy: y - g.y, top: g.top, searching: S.searchOpen });
+    g = null;
+    if (act === "next" || act === "prev") {
+      const i = VIEWS.indexOf(S.view) + (act === "next" ? 1 : -1);
       if (i >= 0 && i < VIEWS.length) { swallowClick(); setView(VIEWS[i]); }
-    } else if (wasTop && dy > 60 && !S.searchOpen) {
+    } else if (act === "pull") {
       /* one pull does both: reveals See previous and syncs (quietly) */
       ctx.sync();
       if (!S.revealPrev) { S.revealPrev = true; ctx.render(); }
     }
-  });
+  };
+  mn.addEventListener("pointerdown", (e) => { if (e.pointerType !== "touch") start(e.clientX, e.clientY); });
+  document.addEventListener("pointerup", (e) => { if (e.pointerType !== "touch") end(e.clientX, e.clientY); });
+  mn.addEventListener("touchstart", (e) => { if (e.touches.length === 1) start(e.touches[0].clientX, e.touches[0].clientY); }, { passive: true });
+  mn.addEventListener("touchend", (e) => { const t = e.changedTouches[0]; if (t) end(t.clientX, t.clientY); }, { passive: true });
   mn.addEventListener("wheel", (e) => {
     if (ctx.isCalendar() && mn.scrollTop <= 0 && e.deltaY < -30 && !S.revealPrev && !S.searchOpen) { S.revealPrev = true; ctx.render(); }
   }, { passive: true });

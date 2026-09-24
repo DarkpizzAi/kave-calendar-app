@@ -155,8 +155,14 @@ function draw(anim) {
   afterAnim(fresh, () => { old.remove(); fresh.classList.remove("in-up", "in-down"); });
 }
 
+/* A background redraw (new data from a sync) must never rebuild an open
+   form: the input would be replaced and the phone's keyboard would close
+   mid-word (final review I2). The form's values live in its draft anyway. */
+const FORMS = ["edit", "new"];
+export const refreshable = (l) => !!l && !FORMS.includes(l.kind);
+
 /* Called after the page redraws (new data): refresh the open level in place. */
-export function refreshSheet() { if (stack.length) draw(""); }
+export function refreshSheet() { if (refreshable(stack[stack.length - 1])) draw(""); }
 
 /* Swap the level on top for another (a new event, once saved, becomes its page). */
 export function replaceTop(l) {

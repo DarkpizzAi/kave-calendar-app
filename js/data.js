@@ -38,6 +38,9 @@ export function createData({ sync, local, now, me }) {
     },
     save(prev, next) {
       const who = requireMe();
+      /* an event that vanished under an open form (the other phone deleted
+         it) must not be saved as a record with no id (final review I3) */
+      if (!next || !next.id || (prev !== null && !prev)) throw new Error("this event is no longer here");
       const stamped = touch(next, who, now());
       for (const w of writesFor(prev, stamped)) { local.enqueue(w.year, w.record); refresh(w.year); }
       notify();

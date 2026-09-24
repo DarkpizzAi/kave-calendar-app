@@ -68,6 +68,16 @@ export function shouldLoadMore(box, { count, cap, pending, searching }) {
 }
 export const nextCount = (count, step, cap) => Math.min(cap, count + step);
 
+/* One rule for a finished drag, mouse or touch: a clear sideways swipe
+   changes view, a pull down from the very top reveals See previous (and
+   syncs); anything else is an ordinary scroll. */
+export function gesture({ dx, dy, top, searching }) {
+  if (searching) return null;
+  if (Math.abs(dx) > 70 && Math.abs(dx) > 1.5 * Math.abs(dy)) return dx < 0 ? "next" : "prev";
+  if (top && dy > 60 && Math.abs(dy) > Math.abs(dx)) return "pull";
+  return null;
+}
+
 /* See previous: reveal more of what is loaded, load the year before, or
    nothing, once kave-hub has no older year. */
 export function seePrevious({ from, firstMonday, exhausted }) {
