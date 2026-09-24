@@ -1,23 +1,90 @@
-/* Compass: sync status and the token check.
-
-   There is no data sync yet, because Compass's data model has not been
-   designed. What exists is the half that is already decided: whether the
-   token works, and how that is reported.
-
-   When the feature spec lands, the engine it grows follows Spoon's, and the
-   four things Spoon learned the hard way are not optional:
-     - conditional GETs with an ETag, so a 304 is free and uncharged
-     - two lanes, so a contended file is not held back by a large one
-     - a lane stamped only when actually entered, never when merely due
-     - the `syncing` latch cleared in a `finally`, because clearing it on the
-       normal tail leaves it stuck on forever after one throw, and the app
-       then goes quietly stale with no error to show for it
-   The reasoning is in the Spoon README's Status section. Read it before
-   writing a sync engine here. */
+/* Compass: sync. Spoon's engine, with its four rules intact:
+     - conditional GETs with an ETag, so a 304 is free
+     - two lanes (near: this year and next; far: older years on demand), so
+       a big history load never holds back today's edits
+     - a lane stamped only when actually entered
+     - the `syncing` latch cleared in a `finally`
+   Writes read the file fresh, merge per event, and write with its sha; a
+   stale sha is re-read and retried, three times at most. The token check
+   below it is unchanged from the shell. */
 "use strict";
 
 import { store } from "./store.js";
 import { github } from "../github.js";
+import { mergeEvents } from "./merge.js";
+
+export const pathFor = (y) => `calendar/data/compass/events-${y}.json`;
+const isConflict = (e) => e && (e.gh === "conflict" || (e.gh === "http" && e.status === 422));
+
+export function createSync({ gh, local }) {
+  let syncing = false;
+  const lanes = { near: 0, far: 0 };
+
+  async function loadYear(y) {
+    const rec = local.getYear(y);
+    try {
+      const r = await gh.getFile(pathFor(y), { etag: rec && rec.etag });
+      if (r.notModified) return rec.events;
+      local.setYear(y, { events: r.json.events || [], sha: r.sha, etag: r.etag });
+      return r.json.events || [];
+    } catch (e) {
+      if (e && e.gh === "notFound") { local.setYear(y, { events: [], sha: null, etag: null }); return []; }
+      throw e;
+    }
+  }
+
+  async function flushYear(y) {
+    const queued = local.pendingFor(y);
+    if (!queued.length) return;
+    for (let attempt = 0; attempt < 3; attempt++) {
+      let remote = [], sha = null;
+      try {
+        const r = await gh.getFile(pathFor(y));
+        remote = r.json.events || []; sha = r.sha;
+      } catch (e) { if (!(e && e.gh === "notFound")) throw e; }
+      const merged = mergeEvents(remote, queued);
+      try {
+        const out = await gh.putFile(pathFor(y), { schema: 1, year: Number(y), events: merged }, sha,
+          `compass: ${queued.length} event edit(s) in ${y} by ${store.state.settings.me || "?"}`);
+        local.setYear(y, { events: merged, sha: out.sha, etag: null });
+        local.dequeue(y, queued);
+        return;
+      } catch (e) {
+        if (!isConflict(e)) throw e;
+      }
+    }
+    const e = new Error("the file kept changing; your edits are kept and will be retried");
+    e.gh = "conflict";
+    throw e;
+  }
+
+  async function syncNow(years) {
+    if (syncing) return { ok: true, skipped: true };
+    syncing = true;
+    try {
+      /* Each year flushes on its own: one failing file must not hold back
+         the others, or a year move could leave the new copy stranded. */
+      let firstError = null;
+      for (const y of local.pendingYears()) {
+        try { await flushYear(y); } catch (e) { firstError = firstError || e; }
+      }
+      if (firstError) throw firstError;
+      const thisYear = String(new Date().getFullYear());
+      for (const y of years) {
+        const lane = Number(y) >= Number(thisYear) ? "near" : "far";
+        lanes[lane] = Date.now();
+        await loadYear(y);
+      }
+      return { ok: true };
+    } catch (e) {
+      return { ok: false, error: e };
+    } finally {
+      syncing = false;
+    }
+  }
+
+  return { loadYear, flushYear, syncNow, syncing: () => syncing, lanes };
+}
 
 /* Transient, not persisted: a status is about this session. */
 export let status = { state: "idle", message: "", at: 0 };
