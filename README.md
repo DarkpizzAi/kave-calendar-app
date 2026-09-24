@@ -3,13 +3,15 @@
 The household planner: events, what they cost, trips, and the loose ends
 attached to them. Replaces Google Calendar and the yearly planning sheet.
 
-**This is a shell, not a finished app.** Calendar, Insights, Trips and Radar
-are deliberate dashed stubs. Compass has been brainstormed - see
-`calendar/data/compass-planning-app-brainstorm.md` in kave-hub, which covers
-the event model, money, the two-person noise filter, the five tabs and the
-daily recap - but it has no spec and no data model yet. What exists here is everything the household
-conventions already decided: the look, the module shape, the security
-posture, the service worker, and a Settings tab that actually works.
+**On `main`, this is the shell:** Calendar, Insights, Trips and Radar are
+dashed stubs, and Settings works. **Sub-project A** (the data model, the
+Calendar, events, the sheet import) is being built on branch `compass-a`.
+Its design is one document in the private kave-hub repo,
+`docs/superpowers/specs/2026-09-24-compass-a-core-design.md`, and its plan
+with a handoff for a new chat is
+`docs/superpowers/plans/2026-09-24-compass-a-core.md`. The product
+brainstorm for the later sub-projects (Trips and Radar, Insights, the box's
+jobs) is `calendar/data/compass-planning-app-brainstorm.md` there.
 
 **This repo is the static app shell only.** No data, no secrets. It is public
 so GitHub Pages can serve it for free.
@@ -190,8 +192,10 @@ features.
 
 ## Status
 
-**Shell only.** Calendar, Insights, Trips and Radar are dashed stubs. Settings works: paste a token, check it against the hub repo,
+**`main` is the shell** (v0.6): Calendar, Insights, Trips and Radar are
+dashed stubs; Settings works (paste a token, check it against the hub repo,
 switch palette, read the running service-worker version, see whether the CSP
-preload was blocked.
+preload was blocked). **Branch `compass-a`** adds the data layer and the
+Calendar's logic (65 browser tests, `tests/`), with the Calendar screen next.
 
 Next: a spec for what Compass actually does.
