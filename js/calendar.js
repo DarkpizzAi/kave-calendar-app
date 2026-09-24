@@ -14,7 +14,7 @@ import { HOLIDAYS, holidayOn } from "./holidays.js";
 import { applyDetail } from "./filter.js";
 import { store } from "./store.js";
 import { indexByDay, weekRows, tappable, zoomWeekTarget, zoomMonthTarget, isAway, isBig, awayText,
-  shouldLoadMore, nextCount, iconsOf, searchEvents, shortDate } from "./cal-model.js";
+  shouldLoadMore, nextCount, iconsOf, searchEvents, shortDate, seePrevious, pastMonths } from "./cal-model.js";
 import { openLevel, sheetOpen } from "./sheet.js";
 import { ICON } from "./chrome-icons.js";
 import { readPrefs, byCategories } from "./prefs.js";
@@ -31,6 +31,9 @@ const S = {
   past: { weekly: 0, monthly: 0, yearly: 0 }, future: { weekly: 10, monthly: 10, yearly: 15 },
   revealPrev: false, searchOpen: false, query: "", menu: false,
   scrollTo: null, keepAnchor: false, pending: false,
+  /* older years, loaded on demand: the oldest year shown, and whether
+     kave-hub has anything older */
+  floor: null, exhausted: false, loadingOlder: false,
 };
 
 let ctx = null;          // { data, render, isCalendar, sync }
@@ -53,7 +56,8 @@ function buildFrame() {
   const events = shown.map((x) => x.event);
   const idx = indexByDay(events);
   const last = events.reduce((m, e) => ((e.end || e.start) > m ? (e.end || e.start) : m), "");
-  const range = loadRange(today, last);
+  if (!S.floor) S.floor = thisYear;
+  const range = loadRange(today, last, S.floor);
   return { me, style, today, thisYear, events, idx, grey, range,
     on: (d) => idx.get(d) || [], thisMonday: mondayOf(today), firstMonday: mondayOf(range.min) };
 }
@@ -155,7 +159,8 @@ function weekBlocks(from, count, kind) {
 const prevBtn = () => '<button class="reveal" data-act="prev">See previous</button>';
 function weeks(kind) {
   const from = addDays(frame.thisMonday, -7 * S.past[kind]);
-  return { past: (S.revealPrev && from > frame.firstMonday ? prevBtn() : "") + weekBlocks(from, S.past[kind], kind),
+  const next = seePrevious({ from, firstMonday: frame.firstMonday, exhausted: S.exhausted });
+  return { past: (S.revealPrev && next !== "none" ? prevBtn() : "") + weekBlocks(from, S.past[kind], kind),
     future: weekBlocks(frame.thisMonday, S.future[kind], kind) };
 }
 
@@ -182,9 +187,10 @@ function monthCard(y, mo) {
 }
 function yearly() {
   const y0 = Number(frame.thisYear), m0 = Number(frame.today.slice(5, 7)) - 1;
-  const start = Math.max(0, m0 - S.past.yearly);
-  let past = S.revealPrev && start > 0 ? prevBtn() : "";
-  for (let mo = start; mo < m0; mo++) past += monthCard(y0, mo);
+  const shown = pastMonths(frame.today, S.floor, S.past.yearly);
+  const more = pastMonths(frame.today, S.floor, S.past.yearly + 1).length > shown.length;
+  let past = S.revealPrev && (more || !S.exhausted) ? prevBtn() : "";
+  for (const ym of shown) past += monthCard(Number(ym.slice(0, 4)), Number(ym.slice(5, 7)) - 1);
   let future = "";
   for (let y = y0, mo = m0, n = 0; ymOf(y, mo) + "-01" <= frame.range.max && n < S.future.yearly; n++) {
     future += monthCard(y, mo);
@@ -259,6 +265,48 @@ function loadMore(mn) {
   setTimeout(() => { S.pending = false; ctx.render(); }, 0);
 }
 
+/* ---- older years on demand (spec: See previous, search, opening an old
+   event). kave-hub is asked for the year before the oldest one shown; an
+   empty or missing year means there is nothing older. ---- */
+async function loadOlder() {
+  if (S.exhausted || S.loadingOlder) return false;
+  S.loadingOlder = true;
+  const y = String(Number(S.floor) - 1);
+  try {
+    await ctx.data.ensureYear(y);
+    if (ctx.data.events().some((e) => e.start.startsWith(y))) S.floor = y; else S.exhausted = true;
+    return !S.exhausted;
+  } catch {
+    /* offline or no token: a year already cached still shows; otherwise
+       try again on the next tap */
+    if (ctx.data.events().some((e) => e.start.startsWith(y))) { S.floor = y; return true; }
+    return false;
+  } finally {
+    S.loadingOlder = false;
+  }
+}
+async function loadAllOlder() {
+  for (let i = 0; i < 15 && !S.exhausted; i++) if (!(await loadOlder())) break;
+  if (S.searchOpen) ctx.render();
+}
+async function showPrevious() {
+  const step = S.view === "yearly" ? 3 : 4;
+  if (S.view === "yearly") {
+    const more = pastMonths(frame.today, S.floor, S.past.yearly + 1).length > S.past.yearly;
+    if (!more && !(await loadOlder())) { ctx.render(); return; }
+    S.past.yearly = pastMonths(frame.today, S.floor, S.past.yearly + step).length;
+  } else {
+    const from = addDays(frame.thisMonday, -7 * S.past[S.view]);
+    const next = seePrevious({ from, firstMonday: frame.firstMonday, exhausted: S.exhausted });
+    if (next === "none" || (next === "older" && !(await loadOlder()))) { ctx.render(); return; }
+    const floorMonday = mondayOf(S.floor + "-01-01");
+    const most = Math.round((Date.parse(frame.thisMonday) - Date.parse(floorMonday)) / 6048e5);
+    S.past[S.view] = Math.min(most, S.past[S.view] + step);
+  }
+  S.revealPrev = false; S.keepAnchor = true;
+  ctx.render();
+}
+
 function setView(v, target) {
   if (v === S.view && !target) return;
   S.slide = VIEWS.indexOf(v) > VIEWS.indexOf(S.view) ? "slide-left" : v === S.view ? "" : "slide-right";
@@ -283,9 +331,9 @@ function onClick(e) {
   if (a === "view") setView(b.dataset.v);
   else if (a === "menu") { S.menu = !S.menu; ctx.render(); }
   else if (a === "detail") { S.detail = b.dataset.v; S.menu = false; ctx.render(); }
-  else if (a === "search") { S.searchOpen = true; S.menu = false; ctx.render(); }
+  else if (a === "search") { S.searchOpen = true; S.menu = false; ctx.render(); loadAllOlder(); }
   else if (a === "closesearch") { S.searchOpen = false; S.query = ""; ctx.render(); }
-  else if (a === "prev") { S.past[S.view] += S.view === "yearly" ? 3 : 4; S.revealPrev = false; S.keepAnchor = true; ctx.render(); }
+  else if (a === "prev") showPrevious();
   else if (a === "zoomweek") { e.stopPropagation(); setView("monthly", zoomWeekTarget(b.dataset.m)); }
   else if (a === "zoommonth") setView("monthly", zoomMonthTarget(b.dataset.ym));
   else if (a === "day") openLevel({ kind: "day", d: b.dataset.d });

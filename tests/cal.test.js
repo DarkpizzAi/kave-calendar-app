@@ -61,3 +61,22 @@ test("cal: search ignores accents and case, across title, venue, city, guests", 
   eq(searchEvents(evs, "razz").map((e) => e.id), ["Gig"]);
   eq(searchEvents(evs, "  ").length, 0);
 });
+
+/* ---- older years on demand (Isa, 2026-09-24: 2024 and 2025 reachable) ---- */
+import { seePrevious, pastMonths } from "../js/cal-model.js";
+import { loadRange } from "../js/views.js";
+
+test("cal: the range starts at the oldest year loaded", () => {
+  eq(loadRange("2026-09-24", "", "2024").min, "2024-01-01");
+  eq(loadRange("2026-09-24", "").min, "2026-01-01");
+});
+test("cal: See previous reveals more, then loads the year before, then stops", () => {
+  eq(seePrevious({ from: "2026-03-02", firstMonday: "2025-12-29", exhausted: false }), "more");
+  eq(seePrevious({ from: "2025-12-29", firstMonday: "2025-12-29", exhausted: false }), "older");
+  eq(seePrevious({ from: "2025-12-29", firstMonday: "2025-12-29", exhausted: true }), "none");
+});
+test("cal: Yearly's past months run across years, oldest first", () => {
+  eq(pastMonths("2026-03-10", "2025", 4), ["2025-11", "2025-12", "2026-01", "2026-02"]);
+  eq(pastMonths("2026-03-10", "2026", 12), ["2026-01", "2026-02"]);
+  eq(pastMonths("2026-03-10", "2025", 0), []);
+});

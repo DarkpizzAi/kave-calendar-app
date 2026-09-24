@@ -68,6 +68,26 @@ export function shouldLoadMore(box, { count, cap, pending, searching }) {
 }
 export const nextCount = (count, step, cap) => Math.min(cap, count + step);
 
+/* See previous: reveal more of what is loaded, load the year before, or
+   nothing, once kave-hub has no older year. */
+export function seePrevious({ from, firstMonday, exhausted }) {
+  if (from > firstMonday) return "more";
+  return exhausted ? "none" : "older";
+}
+
+/* Yearly's past months, oldest first: the last `count` months before this
+   one, never before January of the floor year. */
+export function pastMonths(today, floorYear, count) {
+  const out = [];
+  let y = Number(today.slice(0, 4)), m = Number(today.slice(5, 7)) - 1;
+  while (out.length < count) {
+    if (--m < 0) { m = 11; y--; }
+    if (y < Number(floorYear)) break;
+    out.unshift(`${y}-${String(m + 1).padStart(2, "0")}`);
+  }
+  return out;
+}
+
 /* The emoji for an event, drawn for this viewer. A dated idea shows ❔. */
 export function iconsOf(e, viewer) {
   if (e.status === "idea") return ["❔"];
