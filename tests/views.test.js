@@ -88,3 +88,9 @@ test("the catalogue from round 1b, and person icons follow the viewer", () => {
   eq(iconFor({ type: "drinks", icon: "🍻" }, { owner: "isa" }, "hugo"), "🍻");
   eq(iconFor({ type: "nonsense", icon: "" }, { owner: "isa" }, "isa"), "📌");
 });
+
+test("the catalogue has a work event category (Isa, 2026-09-24)", () => {
+  const work = CATEGORIES.find((c) => c.type === "work");
+  ok(work, "work category");
+  eq([work.label, work.icons.map((i) => i.icon)], ["Work event", ["🏢", "💻", "🎤"]]);
+});

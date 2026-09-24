@@ -32,7 +32,7 @@ test("prefs: summaries for the two Settings buttons", () => {
   let p = readPrefs({ defaultView: "monthly", defaultDetail: "partial", cardStyle: "icons" });
   eq(defaultsSummary(p), "Monthly, Partial, Icons only");
   p = toggleCategory(toggleCategory(p, "isa", "yearly", "cinema"), "isa", "yearly", "gaming");
-  eq(categoriesSummary(p, "isa"), "Weekly all, Monthly all, Yearly 16");
+  eq(categoriesSummary(p, "isa"), "Weekly all, Monthly all, Yearly 17", "19 categories, 2 hidden");
   eq(categoriesSummary(p, "hugo"), "Weekly all, Monthly all, Yearly all");
 });
 test("prefs: stored junk falls back to defaults", () => {

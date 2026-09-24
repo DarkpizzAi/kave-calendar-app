@@ -26,6 +26,7 @@ export const CATEGORIES = [
   { type: "sport", label: "Sport or exercise", icons: [{ icon: "weights" }, { icon: "running" }, { icon: "🏅", note: "a race" }, { icon: "🎾", note: "tennis" }, { icon: "🏓", note: "padel" }] },
   { type: "hike", label: "Hike", icons: [{ icon: "🥾" }, { icon: "⛰" }] },
   { type: "business-trip", label: "Business trip", icons: [{ icon: "💼" }] },
+  { type: "work", label: "Work event", icons: [{ icon: "🏢" }, { icon: "💻", note: "at home or online" }, { icon: "🎤", note: "a talk" }] },
   { type: "visitor", label: "Visitor", icons: [{ icon: "🧳" }, { icon: "🏠", note: "staying with us" }] },
   { type: "transport", label: "Transport", icons: [{ icon: "✈️" }, { icon: "🛫", note: "outbound" }, { icon: "🛬", note: "return" }, { icon: "🚆" }, { icon: "🚄" }, { icon: "🚌" }, { icon: "🚗", note: "car" }] },
   { type: "accommodation", label: "Accommodation", icons: [{ icon: "🏨" }, { icon: "🏡" }, { icon: "⛺" }] },
