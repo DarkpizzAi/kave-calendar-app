@@ -15,7 +15,7 @@ import { PALETTES, applyPalette, themeBootRan, paletteAccents } from "./theme.js
 import { status as syncStatus, checkToken } from "./sync.js";
 
 /* The five tabs from the brainstorm's tab map (kave-hub
-   calendar/data/compass-planning-app-brainstorm.md). Calendar is home and
+   the Compass A spec in kave-hub). Calendar is home and
    back from anywhere returns to it; there is no separate home screen. Trips
    is for what is real, Radar for what is not. Settings last, as everywhere
    in this household. */
@@ -48,7 +48,7 @@ function stub(title, line) {
 
 const STUBS = {
   calendar: ["Today, then the weeks ahead.",
-    "Day cards of icons, Mon-Thu then Fri-Sun. Trip days get an accent border. + creates an event."],
+    "The Today card, then Weekly, Monthly and Yearly views. Being built on branch compass-a."],
   insights: ["What needs doing, and what needs a decision.",
     "Checklist items, trip warnings, and proposals from mail, bank lines and voice notes. Nothing is ever added automatically."],
   trips: ["The next departure, every trip, and the throwback.",
@@ -122,7 +122,7 @@ function renderSettings() {
       <h3 class="section-title">About</h3>
       <div class="card">
         <p class="status-line">Compass <span id="swVersion">checking version...</span></p>
-        <p class="hint">The household planner. Shell only: brainstormed, spec in progress. Data in kave-hub; the mini PC runs the sweeps.</p>
+        <p class="hint">The household planner. Shell only; the Calendar is being built. Data in kave-hub; the mini PC runs the sweeps.</p>
       </div>
     </section>
   `;
