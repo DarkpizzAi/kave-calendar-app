@@ -6,6 +6,7 @@
     document.getElementById("out").textContent = "Tests run only on localhost.";
   } else {
     await import("./util.test.js");
+    await import("./dates.test.js");
     const { runAll } = await import("./run.js");
     runAll();
   }

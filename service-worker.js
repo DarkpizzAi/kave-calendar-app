@@ -41,6 +41,7 @@ const SHELL = [
   "manifest.json",
   "github.js",
   "js/util.js",
+  "js/dates.js",
   "js/store.js",
   "js/theme.js",
   "js/sync.js",
