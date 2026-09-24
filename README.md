@@ -89,14 +89,14 @@ reload always shows your latest edit. The service worker does not run on
 ## The look
 
 `tokens.css` is **generated**. It is a verbatim copy of
-`design/data/household-tokens.css` in kave-hub, placed by that repo's
-`design/tools/sync-household-tokens.py`.
+`brand/data/household-tokens.css` in kave-hub, placed by that repo's
+`brand/tools/sync-household-tokens.py`.
 
 **Never hand-edit `tokens.css`.** Edit the hub and re-sync. To check this copy
 has not drifted, from the kave-hub repo:
 
 ```bash
-python design/tools/sync-household-tokens.py --check
+python brand/tools/sync-household-tokens.py --check
 ```
 
 `styles.css` uses those tokens and defines none of its own. Density tier here

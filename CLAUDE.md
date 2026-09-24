@@ -2,8 +2,8 @@
 
 Rules that are expensive to break and easy to break by accident. Everything
 else, including the whole design system, lives in the `design` plugin of the
-private `kave-hub` repo: read `design/data/household-look.md` and
-`design/data/household-tokens.css`, or invoke its `apply-household-look`
+private `kave-hub` repo: read `brand/data/household-look.md` and
+`brand/data/household-tokens.css`, or invoke its `apply-household-look`
 skill. **Do not restate the design system here.** This repo is public.
 
 ## Never rename
@@ -20,11 +20,11 @@ the symptom looks like "my change did nothing" rather than like an error.
 
 ## `tokens.css` is generated
 
-It is a verbatim copy of `design/data/household-tokens.css` in kave-hub,
-placed by that repo's `design/tools/sync-household-tokens.py`.
+It is a verbatim copy of `brand/data/household-tokens.css` in kave-hub,
+placed by that repo's `brand/tools/sync-household-tokens.py`.
 
 **Never hand-edit it.** Edit the hub and re-sync. Check for drift with
-`python design/tools/sync-household-tokens.py --check` from the hub. If you
+`python brand/tools/sync-household-tokens.py --check` from the hub. If you
 change how this app links or names that file, flip its flag in that script's
 `TARGETS` in the same commit, or the check stops guarding it silently.
 

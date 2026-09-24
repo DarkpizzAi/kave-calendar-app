@@ -77,7 +77,7 @@ function renderSettings() {
   const accents = paletteAccents();
   const swatches = Object.entries(PALETTES).map(([id, name]) => `
     <button class="swatch" data-palette="${escapeHtml(id)}"
-            aria-pressed="${s.palette === id}" title="${escapeHtml(name)}"
+            aria-pressed="${(PALETTES[s.palette] ? s.palette : "cobalt") === id}" title="${escapeHtml(name)}"
             aria-label="${escapeHtml(name)}"
             style="background:${escapeHtml(accents[id] || "")}"></button>`).join("");
 

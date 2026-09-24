@@ -1,7 +1,7 @@
 /* Compass: palette and colour-scheme handling.
 
    The token values are NOT here. They live in tokens.css, generated from
-   design/data/household-tokens.css in kave-hub. This module only decides
+   brand/data/household-tokens.css in kave-hub. This module only decides
    which palette is selected and keeps the browser's colour-scheme in step.
 
    Light or dark follows the OS and nothing else. There is deliberately no
@@ -18,9 +18,6 @@ export const PALETTES = {
   cobalt: "Cobalt",
   amber: "Amber",
   chartreuse: "Chartreuse",
-  lime: "Lime",
-  tangerine: "Tangerine",
-  volt: "Volt",
 };
 
 export function darkNow() {
@@ -37,7 +34,8 @@ export function syncColorScheme() {
 
 export function applyPalette(palette) {
   const root = document.documentElement;
-  if (palette && palette !== "cobalt") root.setAttribute("data-palette", palette);
+  /* a palette retired from the hub (lime, tangerine, volt) reads as Cobalt */
+  if (PALETTES[palette] && palette !== "cobalt") root.setAttribute("data-palette", palette);
   else root.removeAttribute("data-palette");
   syncColorScheme();
 }
@@ -51,7 +49,7 @@ export function initTheme() {
 
 /* Each palette's accent, for the swatches in Settings.
 
-   Read from tokens.css rather than hardcoded here: a second copy of six hex
+   Read from tokens.css rather than hardcoded here: a second copy of the hex
    values is a second thing to keep in step, and it would drift the first time
    a palette is retuned in the hub. Same trick Spoon uses - set the attribute,
    read the resolved value, put it back - and it has to restore exactly what
