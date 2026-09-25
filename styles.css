@@ -271,11 +271,14 @@ a.ticket{color:inherit;text-decoration:none}
 .ctl.searching .ctl2{flex:1}
 /* the view switch: the selected pill is the soft accent and slides with the page */
 .views{position:relative;flex:1;display:flex;background:var(--surface-2);border-radius:var(--r-pill);padding:3px}
-/* F24: the tab indicator moves with the page it belongs to -- same timing. */
-.views .ind{position:absolute;top:3px;bottom:3px;left:3px;width:calc((100% - 6px) / 3);border-radius:var(--r-pill);background:var(--panel);box-shadow:var(--shadow-card);transform:translateX(calc(var(--i) * 100%));animation:ind var(--motion-base) var(--ease-drag)}
+/* F24: the tab indicator moves with the page it belongs to -- same timing.
+   F30: the selected pill is the accent colour, reversing section 3's
+   original "card colour, not accent" wording (Isa's explicit call, round
+   4) -- same construction as the day/week/month label pills' .on (F27). */
+.views .ind{position:absolute;top:3px;bottom:3px;left:3px;width:calc((100% - 6px) / 3);border-radius:var(--r-pill);background:var(--accent);box-shadow:var(--shadow-card);transform:translateX(calc(var(--i) * 100%));animation:ind var(--motion-base) var(--ease-drag)}
 @keyframes ind{from{transform:translateX(calc(var(--from) * 100%))}}
 .views button{position:relative;flex:1;border:0;background:none;padding:7px var(--sp-2);border-radius:var(--r-pill);font-size:var(--fs-meta)}
-.views button.on{font-weight:var(--fw-strong)}
+.views button.on{font-weight:var(--fw-strong);color:var(--accent-text)}
 .ib{flex:none;width:40px;height:40px;border:0;border-radius:var(--r-round);background:var(--surface-2);color:var(--text-dim);display:grid;place-items:center;padding:0}
 .sfield{flex:1;display:flex;align-items:center;gap:var(--sp-2);height:40px;padding:0 var(--sp-1) 0 var(--sp-3);border-radius:var(--r-control);background:var(--surface-2);transform-origin:right center;animation:grow var(--motion-slow) var(--ease-sheet)}
 @keyframes grow{from{clip-path:inset(0 0 0 calc(100% - 40px) round var(--r-round))}to{clip-path:inset(0 0 0 0 round var(--r-control))}}
