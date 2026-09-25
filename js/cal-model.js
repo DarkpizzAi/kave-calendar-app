@@ -137,6 +137,23 @@ export function todaysCount(eventsToday, me, detail) {
   return applyDetail(eventsToday.filter((e) => !e.deleted), me, detail).length;
 }
 
+/* F20: the Yearly month card's own unique-events-in-month collection,
+   pulled out so it can run once against the filtered index (the card's
+   body and the heat-strip, F12/F17, unaffected) and once against an
+   unfiltered-by-category index (the "N plans" count, which must match
+   what Monthly actually shows once you jump there -- Isa: category
+   filters are a Calendar display choice, not a count that should lie
+   about how many plans exist). `on` is a day -> events accessor, same
+   shape as a frame's `on`. */
+export function eventsInMonth(on, key, days) {
+  const out = [];
+  for (let dd = 1; dd <= days; dd++) {
+    const d = `${key}-${String(dd).padStart(2, "0")}`;
+    for (const e of on(d)) if (!out.includes(e)) out.push(e);
+  }
+  return out;
+}
+
 /* The emoji for an event, drawn for this viewer. A dated idea shows ❔. */
 export function iconsOf(e, viewer) {
   if (e.status === "idea") return ["❔"];

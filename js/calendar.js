@@ -15,7 +15,7 @@ import { applyDetail } from "./filter.js";
 import { store } from "./store.js";
 import { indexByDay, weekRows, tappable, zoomWeekTarget, zoomMonthTarget, isAway, awayText,
   shouldLoadMore, nextCount, iconsOf, searchEvents, shortDate, pastMonths, gesture, lastEventDay,
-  fullPastWeeks, fullPastMonths, backToTodayState, todaysCount as cmTodaysCount } from "./cal-model.js";
+  fullPastWeeks, fullPastMonths, backToTodayState, todaysCount as cmTodaysCount, eventsInMonth } from "./cal-model.js";
 import { openLevel, sheetOpen } from "./sheet.js";
 import { ICON } from "./chrome-icons.js";
 import { readPrefs, byCategories } from "./prefs.js";
@@ -59,8 +59,15 @@ function buildFrame() {
   const last = lastEventDay(events);
   if (!S.floor) S.floor = thisYear;
   const range = loadRange(today, last, S.floor);
+  /* F20: "N plans" must not respect the category filters (the heat-strip
+     fill still does, F17/F12 unaffected) -- an index built with detail
+     applied but no category filtering, so the count matches what Monthly
+     will actually show once you jump there. */
+  const allEvents = applyDetail(ctx.data.events(), me, S.detail).map((x) => x.event);
+  const allIdx = indexByDay(allEvents);
   return { me, style, today, thisYear, events, idx, grey, range,
-    on: (d) => idx.get(d) || [], thisMonday: mondayOf(today), firstMonday: mondayOf(range.min) };
+    on: (d) => idx.get(d) || [], onAll: (d) => allIdx.get(d) || [],
+    thisMonday: mondayOf(today), firstMonday: mondayOf(range.min) };
 }
 
 /* ---- pieces ---- */
@@ -197,11 +204,16 @@ function monthCard(y, mo) {
      Categories in Settings genuinely changes what a month's card lists. */
   const items = evs.map((e) => ({ d: e.start, html: row(e, true, true) }))
     .concat(lw.map((w) => ({ d: w.start, html: noteRowPlain(w.start, `${w.text}, ${w.names}`) })));
+  /* F20: the count is unfiltered by category (frame.onAll), a partial
+     revert of F17 -- it has to match what Monthly will show once you jump
+     there. The heat-strip fill above is unaffected, still built from
+     frame.on (filtered). */
+  const plansCount = eventsInMonth(frame.onAll, key, n).length;
   /* F11: the month heading is plain text, no chevron, not a tap target; "N
      plans" plus a literal ">" is the only jump into Monthly. */
   return `<div class="mcard${now ? " now" : ""}" data-month="${key}">`
     + `<p class="mh"><span class="lbl-pill">${MONTHS[mo].toUpperCase()}</span>`
-    + `<button class="plans-line" data-act="zoommonth" data-ym="${key}">${evs.length} plan${evs.length === 1 ? "" : "s"} &gt;</button></p>`
+    + `<button class="plans-line" data-act="zoommonth" data-ym="${key}">${plansCount} plan${plansCount === 1 ? "" : "s"} &gt;</button></p>`
     + `<div class="heat" style="--n:${n}" aria-hidden="true">${cells}</div>` + list(sortByDay(items), true) + "</div>";
 }
 function yearly() {

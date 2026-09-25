@@ -1,7 +1,8 @@
 import { test, eq, ok } from "./run.js";
 import { weekRows, indexByDay, tappable, zoomWeekTarget, zoomMonthTarget, isAway, isBig, awayText,
   shouldLoadMore, nextCount, iconsOf, searchEvents, todaysCount, fullPastWeeks, fullPastMonths,
-  backToTodayState } from "../js/cal-model.js";
+  backToTodayState, eventsInMonth } from "../js/cal-model.js";
+import { readPrefs, byCategories } from "../js/prefs.js";
 
 const ev = (id, start, extra = {}) => ({ id, title: id, start, end: null, owner: "shared", status: "planned", activities: [], ...extra });
 const act = (type, icon) => ({ type, icon });
@@ -135,4 +136,31 @@ test("cal: fullPastWeeks and fullPastMonths reach exactly 1 January of the floor
 });
 test("cal: Back to today discards the loaded past, the floor resets to this year", () => {
   eq(backToTodayState("2026"), { past: { weekly: 0, monthly: 0, yearly: 0 }, floor: "2026", exhausted: false });
+});
+
+/* ---- F20: "N plans" must not respect the category filters; the heat-strip
+   fill still does (unaffected). eventsInMonth is the pure piece
+   calendar.js's monthCard runs once against a filtered index (heat-strip)
+   and once against an unfiltered one (the count), so the two can now
+   disagree on purpose. ---- */
+test("cal: eventsInMonth collects each unique event once across the month", () => {
+  const drinks = ev("drinks", "2026-10-05", { activities: [act("drinks")] });
+  const trip = ev("trip", "2026-10-10", { activities: [act("transport")], end: "2026-10-12" });
+  const idx = indexByDay([drinks, trip]);
+  const on = (d) => idx.get(d) || [];
+  eq(eventsInMonth(on, "2026-10", 31).map((e) => e.id), ["drinks", "trip"]);
+});
+test("cal: F20 -- the plans count ignores category filters, unlike the heat-strip fill", () => {
+  const drinks = ev("drinks", "2026-10-05", { activities: [act("drinks")] });
+  const trip = ev("trip", "2026-10-10", { activities: [act("transport")] });
+  const all = [drinks, trip];
+  const prefs = readPrefs({}); // Yearly's default already hides "drinks" (F17): no toggle needed
+  const filtered = byCategories(all, prefs, "isa", "yearly");
+  const onAll = (d) => (indexByDay(all).get(d) || []);
+  const onFiltered = (d) => (indexByDay(filtered).get(d) || []);
+  const count = eventsInMonth(onAll, "2026-10", 31).length;
+  const heatEvents = eventsInMonth(onFiltered, "2026-10", 31).length;
+  eq(count, 2, "the count includes the hidden-category event");
+  eq(heatEvents, 1, "the heat-strip's own event list stays filtered");
+  ok(count !== heatEvents, "F20: count and heat-strip now disagree when a category is hidden");
 });
