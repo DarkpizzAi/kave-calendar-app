@@ -476,13 +476,12 @@ a.ticket{color:inherit;text-decoration:none}
 [data-week],[data-month],#today{scroll-margin-top:60px}
 
 /* ---- F9: one typography for every card label ("FRI 25", "WEEK 39",
-   "SEPTEMBER"). F27: only the current day/week/month keeps the pill behind
-   it (filled accent, an accent border); every other card's label is plain
-   text, no pill, no border -- .lbl-pill alone (no .on) now carries no
-   background or border of its own, so it reads identically to .lbl-plain
-   until a card earns .on. ---- */
+   "SEPTEMBER"). F27 removed the pill from every card except the current
+   day/week/month; F73 removes it from the current card too, so .lbl-pill
+   never carries a fill or border of its own any more -- it reads
+   identically to .lbl-plain whether or not a card earns .on. Only the
+   card's own accent border (elsewhere) still marks the current card. ---- */
 .lbl-pill,.lbl-plain{display:inline-block;align-self:flex-start;font-size:var(--fs-meta);font-weight:var(--fw-medium);letter-spacing:var(--tracking-label);text-transform:uppercase;font-variant-numeric:tabular-nums;color:var(--text);border-radius:var(--r-pill);padding:2px var(--sp-2);border:1px solid transparent}
-.lbl-pill.on{background:var(--accent);color:var(--accent-text);font-weight:var(--fw-strong);border-color:var(--accent)}
 /* F8/F27: Weekly's "WEEK 39" divider is never a tap target and never gets
    the pill treatment, current week or not -- .lbl-plain, not .lbl-pill, so
    there is no .on to accidentally apply. */
