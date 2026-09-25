@@ -261,7 +261,12 @@ a.ticket{color:inherit;text-decoration:none}
    stacked on top of that flex gap, doubling the step to 24px where the
    household's standard control-row-to-content gap is one sp-3 (12px). No
    new value: just the duplicate removed. */
-.ctl{display:flex;flex-wrap:wrap;align-items:center;gap:var(--sp-3)}
+/* F65: gap between the segmented toggle and the round icon buttons is a
+   deliberate one-off 6px, tighter than the spacing grid's --sp-2 (8px) --
+   for a row of controls this closely related, per the approved round-6
+   mock-up (calendar/mockups/round-6-filterbar.html). Not --sp-3 (12px,
+   used elsewhere for control-row-to-content spacing) and not --sp-2. */
+.ctl{display:flex;flex-wrap:wrap;align-items:center;gap:6px;width:100%}
 /* F54: F26's sticky month/year title bar is removed entirely -- no more
    .sec-title, in any view. */
 .page{display:flex;flex-direction:column;gap:var(--sp-3)}
@@ -284,7 +289,7 @@ a.ticket{color:inherit;text-decoration:none}
 .slide-right{animation:sr var(--motion-base) var(--ease-drag);will-change:transform,opacity}
 @keyframes sl{from{transform:translateX(18%);opacity:0}}
 @keyframes sr{from{transform:translateX(-18%);opacity:0}}
-.ctl2{display:flex;gap:var(--sp-3);align-items:center}
+.ctl2{display:flex;gap:6px;align-items:center}
 .ctl.searching .ctl2{flex:1}
 /* F59: Spoon's real .segment/.seg-thumb/.segment button construction
    (kave-food-app/styles.css, its Period + Group-by segmented control),
@@ -302,7 +307,14 @@ a.ticket{color:inherit;text-decoration:none}
    equal fr tracks are still sized equal to each other, but that shared
    size is bumped up to whatever the widest cell (Monthly) actually needs,
    so no cell can truncate and all three stay the same width. */
-.segment{position:relative;display:grid;grid-template-columns:repeat(3,1fr);background:var(--surface-2);border-radius:var(--r-pill);padding:3px}
+/* F65: --ctl-h is the one thing that makes the toggle and the round icon
+   buttons equal by construction instead of by two numbers that happen to
+   match and then drift -- which is exactly what happened: .segment
+   measured 39px live, .ib measured 44px, because a global touch-target
+   min-height:44px rule was silently overriding .ib's own height:40px. Per
+   the approved round-6 mock-up. */
+:root{--ctl-h:40px}
+.segment{position:relative;display:grid;grid-template-columns:repeat(3,1fr);height:var(--ctl-h);background:var(--surface-2);border-radius:var(--r-pill);padding:3px}
 .seg-thumb{position:absolute;top:3px;bottom:3px;left:3px;width:calc(33.33% - 3px);border-radius:var(--r-pill);background:var(--accent);box-shadow:var(--shadow-card);transform:translateX(calc(var(--i) * 100%));animation:ind var(--motion-base) var(--ease-drag)}
 @keyframes ind{from{transform:translateX(calc(var(--from) * 100%))}}
 /* F36: matches Spoon's "6 months / all time" toggle's own text size,
@@ -315,7 +327,10 @@ a.ticket{color:inherit;text-decoration:none}
    thumb -- Compass's toggle is a tablist (aria-selected), not Spoon's plain
    toggle buttons (aria-pressed), so the same rule keys off aria-selected. */
 .segment button[aria-selected="true"]{color:var(--accent-text);font-weight:var(--fw-strong)}
-.ib{flex:none;width:40px;height:40px;border:0;border-radius:var(--r-round);background:var(--surface-2);color:var(--text-dim);display:grid;place-items:center;padding:0}
+/* F65: both height and min-height set explicitly, from the same --ctl-h
+   var(--segment) reads -- the actual fix, so no ambient touch-target rule
+   can push .ib taller than the toggle again. */
+.ib{flex:none;width:var(--ctl-h);height:var(--ctl-h);min-height:var(--ctl-h);border:0;border-radius:var(--r-round);background:var(--surface-2);color:var(--text-dim);display:grid;place-items:center;padding:0}
 .sfield{flex:1;display:flex;align-items:center;gap:var(--sp-2);height:40px;padding:0 var(--sp-1) 0 var(--sp-3);border-radius:var(--r-control);background:var(--surface-2);transform-origin:right center;animation:grow var(--motion-slow) var(--ease-sheet)}
 @keyframes grow{from{clip-path:inset(0 0 0 calc(100% - 40px) round var(--r-round))}to{clip-path:inset(0 0 0 0 round var(--r-control))}}
 .sfield .si{display:grid;color:var(--text-dim)}
@@ -407,7 +422,12 @@ a.ticket{color:inherit;text-decoration:none}
 @media (min-width: 900px){
   .app-header{padding-inline:var(--sp-5)}
   .mn{padding:var(--sp-5) var(--sp-5) calc(var(--sp-7) * 2)}
-  .ctl{flex-wrap:wrap;justify-content:flex-start}
+  /* F65: below this breakpoint .ctl spans the full phone width (width:100%,
+     set unconditionally); above it, per the approved round-6 mock-up, it
+     stops stretching and settles to the left instead -- reusing this
+     existing wide-screen breakpoint (already used just below for .segment's
+     own fixed width), not a second invented one. */
+  .ctl{flex-wrap:wrap;justify-content:flex-start;width:auto;max-width:518px}
   .ctl .segment{flex:none;width:380px}
   .ctl.searching .ctl2{width:380px}
   .g3{grid-template-columns:repeat(7,minmax(0,1fr))}
