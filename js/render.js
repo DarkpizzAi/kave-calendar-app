@@ -10,7 +10,7 @@
 "use strict";
 
 import { store } from "./store.js";
-import { escapeHtml } from "./util.js";
+import { escapeHtml, copyText } from "./util.js";
 import { PALETTES, applyPalette, themeBootRan, paletteAccents, paletteSofts } from "./theme.js";
 import { status as syncStatus, checkToken } from "./sync.js";
 import { ICON } from "./chrome-icons.js";
@@ -119,12 +119,17 @@ function renderSettings() {
         ${field('<label for="tokenInput">GitHub token</label>', `<div class="token-row"><input id="tokenInput" type="password" placeholder="${s.token ? "Token saved" : "github_pat_..."}"`
           + ` autocomplete="off" autocapitalize="off" spellcheck="false" enterkeyhint="done"><button id="clearToken"${s.token ? "" : " disabled"}>Clear</button></div>${tok}`,
           "Stored on this device only, sent only to GitHub. Fine-grained, Contents: read and write on kave-hub.")}
+        ${field('<label for="appLink">App link</label>', `<div class="token-row"><input id="appLink" type="text" value="${escapeHtml(APP_URL)}" readonly><button id="copyAppLink">Copy</button></div>`,
+          "Open Compass on another device: copy this and send it to your phone.")}
         ${field("About", `<p class="sync-line muted">Compass <span id="swVersion">checking version...</span></p>${diag}`,
           "The household planner. Data in kave-hub; the mini PC runs the sweeps.")}
       </div>
     </div>
   </div>`;
 }
+
+/* The public address, the same wherever this copy runs (a PC, localhost) */
+const APP_URL = "https://darkpizzai.github.io/kave-compass-app/";
 
 /* The two Settings sheets, as levels of the one sheet. */
 const VIEW_LABEL = { weekly: "Weekly", monthly: "Monthly", yearly: "Yearly" };
@@ -238,6 +243,18 @@ function bindView() {
   });
   const clear = document.getElementById("clearToken");
   if (clear) clear.addEventListener("click", () => store.setSetting("token", ""));
+
+  /* App link: copy, or leave the link selected to copy by hand */
+  const copy = document.getElementById("copyAppLink");
+  if (copy) copy.addEventListener("click", () => {
+    const input = document.getElementById("appLink");
+    input.focus(); input.select();
+    copyText(input.value).then((ok) => {
+      if (!ok) return;
+      copy.textContent = "Copied";
+      setTimeout(() => { copy.textContent = "Copy"; }, 1500);
+    });
+  });
 
   const ver = document.getElementById("swVersion");
   if (ver) reportVersion(ver);

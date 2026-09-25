@@ -36,3 +36,13 @@ export function uid() {
 export function own(obj, key) {
   return Object.prototype.hasOwnProperty.call(obj, key);
 }
+
+/* Copy text: the clipboard API first, then the older copy command (it often
+   works where the API is refused, as in an embedded frame). Resolves true
+   when copied, false when the caller should leave the text selected. */
+export async function copyText(text, { clipboard = navigator.clipboard, legacy = () => document.execCommand("copy") } = {}) {
+  if (clipboard) {
+    try { await clipboard.writeText(text); return true; } catch { /* refused: try the older way */ }
+  }
+  try { return !!legacy(); } catch { return false; }
+}

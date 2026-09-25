@@ -12,3 +12,12 @@ test("safeUrl drops javascript:, relative and empty", () => {
   eq(safeUrl("not a url"), "");
   eq(safeUrl(""), "");
 });
+
+import { copyText } from "../js/util.js";
+test("copyText: the clipboard first, then the older copy command, else false", async () => {
+  const written = [];
+  eq(await copyText("u", { clipboard: { writeText: async (t) => { written.push(t); } }, legacy: () => false }), true);
+  eq(written, ["u"]);
+  eq(await copyText("u", { clipboard: { writeText: async () => { throw new Error("denied"); } }, legacy: () => true }), true);
+  eq(await copyText("u", { clipboard: null, legacy: () => false }), false);
+});
