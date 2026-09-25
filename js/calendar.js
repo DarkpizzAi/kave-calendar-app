@@ -16,7 +16,7 @@ import { store } from "./store.js";
 import { indexByDay, weekRows, tappable, zoomWeekTarget, zoomMonthTarget, isAway, awayText,
   shouldLoadMore, nextCount, iconsOf, searchEvents, shortDate, pastMonths, gesture, lastEventDay,
   fullPastWeeks, fullPastMonths, backToTodayState, todaysCount as cmTodaysCount, eventsInMonth, hideCancelled,
-  hasLoadedOlder } from "./cal-model.js";
+  hasLoadedOlder, hasOpenTodos } from "./cal-model.js";
 import { openLevel, sheetOpen } from "./sheet.js";
 import { ICON } from "./chrome-icons.js";
 import { readPrefs, byCategories } from "./prefs.js";
@@ -84,7 +84,7 @@ function row(e, withDate, click) {
   return `<li class="${cls(e)}" style="--n:${ic.length}"${click ? ` data-act="event" data-id="${esc(e.id)}"` : ""}>`
     + (withDate ? `<span class="c-d">${esc(shortDate(e.start, frame.thisYear))}</span>` : "")
     + `<span class="c-i">${ic.map(esc).join("")}</span><span class="c-t">${esc(e.title)}</span>`
-    + ((e.checklist || []).some((c) => !c.done) ? `<span class="todo-ic" aria-label="Open to-dos">${ICON.checkbox}</span>` : "") + "</li>";
+    + (hasOpenTodos(e) ? `<span class="todo-ic" aria-label="Open to-dos">${ICON.checkbox}</span>` : "") + "</li>";
 }
 const list = (items, dated) => (items ? `<ul class="rows${dated ? " dated" : ""}">${items}</ul>` : "");
 export const rows = (evs, dated, click) => list(evs.map((e) => row(e, dated, click)).join(""), dated);

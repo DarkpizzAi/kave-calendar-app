@@ -7,7 +7,7 @@
 
 import { escapeHtml as esc, safeUrl } from "./util.js";
 import { todayKey } from "./dates.js";
-import { newEvent, STATUSES } from "./model.js";
+import { newEvent, STATUSES, STATUS_LABEL } from "./model.js";
 import { CATEGORIES as MONEY, formatCents, shareOf, visibleCosts } from "./money.js";
 import { CATEGORIES, iconFor, categoryOf } from "./icons.js";
 import { readForm, costDefaults, canChangeCost, addTask, addCost, whenLine, mapsUrl } from "./event-form.js";
@@ -19,7 +19,6 @@ import { ICON } from "./chrome-icons.js";
 const MONEY_AZ = MONEY.map((c) => [c.slug, c.label]).sort((a, b) => a[1].localeCompare(b[1]));
 const MONEY_LABEL = Object.fromEntries(MONEY_AZ);
 const CURRENCIES = [["EUR", "€ EUR"], ["GBP", "£ GBP"], ["USD", "$ USD"], ["CHF", "CHF"], ["CZK", "Kč CZK"], ["MAD", "MAD"], ["MYR", "RM MYR"], ["VND", "₫ VND"]];
-const STATUS_LABEL = { idea: "Idea", planned: "Planned", booked: "Booked", done: "Done", cancelled: "Cancelled" };
 const OWNERS = [["shared", "Both of us"], ["isa", "Isa"], ["hugo", "Hugo"]];
 const RUNG = { estimate: ["estimate", "Estimate", "An estimate"], recorded: ["recorded", "Recorded", "Recorded by hand"],
   confirmed: ["confirmed", "Email", "Confirmed by the booking email"], locked: ["locked", "Bank", "Locked by the bank extract"] };

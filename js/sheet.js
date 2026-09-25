@@ -14,9 +14,10 @@ import { escapeHtml as esc, safeUrl } from "./util.js";
 import { addDays, dayOfWeek } from "./dates.js";
 import { isoWeek } from "./views.js";
 import { holidayOn } from "./holidays.js";
-import { tappable, iconsOf, shortDate } from "./cal-model.js";
+import { tappable, iconsOf, shortDate, hasOpenTodos, guestsExcludingViewer } from "./cal-model.js";
 import { rows, frameNow, detailGrey, place } from "./calendar.js";
 import { ICON } from "./chrome-icons.js";
+import { STATUS_LABEL } from "./model.js";
 
 const LONGDOW = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"];
 const MONTHS = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
@@ -87,13 +88,28 @@ function weekBody(m, f) {
    title block in the same flex row, rather than the icons living inside the
    title's own row, which left them centred on just that line instead of on
    the chevron's. */
+/* F39: the person's name(s) sit before the title, the status pill after --
+   name, title, status, in that reading order. Named only when it isn't the
+   viewer's own event or a shared one, same condition the old second line
+   used. */
+function stripName(e, f) { return e.owner !== f.me && e.owner !== "shared" ? who(e.owner) : ""; }
+
 function strip(e, f) {
-  const lines = [[place(e), e.end && e.end !== e.start ? "until " + shortDate(e.end, f.thisYear) : ""].filter(Boolean).join(" · "),
-    e.guests || (e.owner !== f.me && e.owner !== "shared" ? who(e.owner) : "")].filter(Boolean);
+  /* F37: the line under the title is the status, then the guests with the
+     viewer's own name filtered out -- never "Isa · Apu" on Isa's phone. */
+  const statusGuests = [STATUS_LABEL[e.status], guestsExcludingViewer(e.guests, who(f.me))].filter(Boolean).join(" · ");
+  const untilLine = e.end && e.end !== e.start ? "until " + shortDate(e.end, f.thisYear) : "";
+  const lines = [statusGuests, untilLine].filter(Boolean);
+  const name = stripName(e, f);
+  /* F38: no inline add-task in this view -- a small checkbox glyph (F16)
+     stands in for the whole to-do list, to the left of the category icons,
+     only when something is still unchecked. Adding a task stays on the
+     full event page. */
+  const todoIcon = hasOpenTodos(e) ? `<span class="todo-ic" aria-label="Open to-dos">${ICON.checkbox}</span>` : "";
   return `<section class="dsec layA${detailGrey(e) ? " greyw" : ""}" data-sact="event" data-id="${esc(e.id)}" role="button" tabindex="0">`
-    + `<div class="dmain"><h3>${esc(e.title)}</h3>`
-    + lines.map((l) => `<p class="dline">${esc(l)}</p>`).join("") + checklist(e) + tickets(e)
-    + `</div><span class="dicons">${iconsOf(e, f.me).map(esc).join("")}</span><span class="dchev">${ICON.chev}</span></section>`;
+    + `<div class="dmain"><h3>${name ? `${esc(name)} ` : ""}${esc(e.title)} <span class="flag soft">${esc(STATUS_LABEL[e.status] || "")}</span></h3>`
+    + lines.map((l) => `<p class="dline">${esc(l)}</p>`).join("") + tickets(e)
+    + `</div><span class="dicons">${todoIcon}${iconsOf(e, f.me).map(esc).join("")}</span><span class="dchev">${ICON.chev}</span></section>`;
 }
 function dayBody(d, f) {
   const evs = f.on(d), hol = holidayOn(d);
