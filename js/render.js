@@ -49,8 +49,16 @@ export function setView(name) {
   if (!VIEWS[name]) return;
   if (name === current && name === "calendar") { backToToday(); return; }
   current = name;
+  /* F64: every tab switch lands scrolled to the top, filters visible.
+     Setting scrollTop here used to be undone right after: `firstDraw` was
+     reset to true on every switch, so afterCalendar's "before.first"
+     branch (render.js -> calendar.js) fired again and scrolled to #today
+     instead, which sits below the filter bar and section heading -- so
+     returning to Calendar always hid the controls, not just on first load.
+     firstDraw now stays whatever it already is (true only for the app's
+     genuine first render), so afterCalendar falls through to its literal
+     "mn.scrollTop = before.top" branch, which is the 0 set right here. */
   document.getElementById("view").scrollTop = 0;
-  firstDraw = true;
   render();
 }
 
