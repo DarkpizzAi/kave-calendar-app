@@ -66,3 +66,7 @@ test("event form: the Maps link is a safe search url", () => {
   eq(mapsUrl("Razzmatazz", "barcelona"), "https://www.google.com/maps/search/?api=1&query=Razzmatazz%2C%20barcelona");
   eq(mapsUrl("", ""), null);
 });
+
+test("M1: the when line never prints a typo'd far end date", () => {
+  ok(!whenLine(base({ end: "2099-01-01" })).includes("2099"));
+});

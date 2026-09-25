@@ -190,20 +190,29 @@ export function back() {
   return true;
 }
 
+/* closeAll steps history back n entries at once; the browser answers with
+   popstate events that must not each close another level. They are ignored
+   one by one, never more than were caused (final review M3). */
+export function createPopGate() {
+  let pending = 0;
+  return { expect(n) { pending += n; }, take() { if (pending > 0) { pending--; return true; } return false; }, reset() { pending = 0; } };
+}
+const pops = createPopGate();
+
 export function closeAll() {
   const n = stack.length;
   if (!n) return;
   stack = [];
   draw("");
-  ignorePops += n;
-  try { history.go(-n); } catch { ignorePops = 0; }
+  /* history.go(-n) fires a single popstate for the whole jump */
+  pops.expect(1);
+  try { history.go(-n); } catch { pops.reset(); }
 }
-let ignorePops = 0;
 
 export function initSheet() {
   root = document.getElementById("sheetRoot");
   window.addEventListener("popstate", () => {
-    if (ignorePops > 0) { ignorePops = 0; return; }
+    if (pops.take()) return;
     if (stack.length) up();
   });
   root.addEventListener("click", (e) => {
@@ -212,7 +221,11 @@ export function initSheet() {
     if (!b) {
       /* a registered level's own buttons go to its handler */
       const l = stack[stack.length - 1], btn = e.target.closest("button");
-      if (btn && l && custom[l.kind] && custom[l.kind].onAction) { custom[l.kind].onAction(btn); draw(""); }
+      if (btn && l && custom[l.kind] && custom[l.kind].onAction) {
+        custom[l.kind].onAction(btn);
+        /* opening another level has drawn it with its own animation already (M2) */
+        if (stack[stack.length - 1] === l) draw("");
+      }
       return;
     }
     const a = b.dataset.sact;

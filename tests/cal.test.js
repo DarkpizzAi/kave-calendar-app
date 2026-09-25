@@ -95,3 +95,18 @@ test("review I6: one gesture rule for mouse and touch (swipe sideways, pull at t
   eq(gesture({ dx: -120, dy: 10, top: false, searching: true }), null, "no swipes while searching");
   eq(gesture({ dx: 80, dy: 70, top: false, searching: false }), null, "diagonal is a scroll");
 });
+
+/* ---- deferred minors from the final review ---- */
+import { lastEventDay } from "../js/cal-model.js";
+test("M1: a typo'd far end date stretches neither the range nor the text", () => {
+  const typo = { id: "t", title: "Anglet", owner: "hugo", start: "2026-10-16", end: "2099-01-01" };
+  eq(lastEventDay([typo, { id: "b", start: "2026-11-01", end: null }]), "2026-12-16", "62 days from the start at most");
+  ok(!awayText(typo, "2026").includes("2099"));
+  eq(awayText({ ...typo, end: "2026-10-01" }, "2026"), "Hugo in Anglet, Fri 16 to Fri 16", "an end before the start is one day");
+});
+import { createPopGate } from "../js/sheet.js";
+test("M3: Back events are ignored one by one, never more than were caused", () => {
+  const gate = createPopGate();
+  gate.expect(2);
+  eq([gate.take(), gate.take(), gate.take()], [true, true, false]);
+});

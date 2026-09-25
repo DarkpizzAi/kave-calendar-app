@@ -5,7 +5,7 @@
 import { validateEvent } from "./model.js";
 import { newCostLine, toCents, EDITABLE_STATES } from "./money.js";
 import { safeUrl, uid } from "./util.js";
-import { dayOfWeek } from "./dates.js";
+import { dayOfWeek, daysOf } from "./dates.js";
 
 const LONGDOW = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"];
 const MONTHS = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
@@ -63,7 +63,9 @@ const longDay = (d, thisYear) =>
 
 /* "Thursday 24 September · 21:00 to 03:00" */
 export function whenLine(e, thisYear = e.start.slice(0, 4)) {
-  const days = longDay(e.start, thisYear) + (e.end && e.end !== e.start ? " to " + longDay(e.end, thisYear) : "");
+  /* the real last day: a typo'd end (2099) or an end before the start prints nothing odd (M1) */
+  const all = daysOf(e), last = all.length ? all[all.length - 1] : e.start;
+  const days = longDay(e.start, thisYear) + (last !== e.start ? " to " + longDay(last, thisYear) : "");
   const times = e.startTime ? ` · ${e.startTime}${e.endTime ? " to " + e.endTime : ""}` : "";
   return days + times;
 }

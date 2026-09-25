@@ -52,9 +52,17 @@ export function isBig(e) {
   return isAway(e) || has(e, ["visitor"]);
 }
 
+/* An event's real last day: daysOf caps a span at 62 days and reads an end
+   before the start as one day, so a typo'd end (2099) stretches nothing
+   (final review M1). */
+const lastDay = (e) => { const d = daysOf(e); return d.length ? d[d.length - 1] : e.start; };
+export function lastEventDay(events) {
+  return events.reduce((m, e) => { const l = lastDay(e); return l > m ? l : m; }, "");
+}
+
 export function awayText(e, thisYear) {
   const who = e.owner === "shared" ? e.title : `${e.owner === "isa" ? "Isa" : "Hugo"} in ${e.title}`;
-  return `${who}, ${shortDate(e.start, thisYear)} to ${shortDate(e.end || e.start, thisYear)}`;
+  return `${who}, ${shortDate(e.start, thisYear)} to ${shortDate(lastDay(e), thisYear)}`;
 }
 
 /* Load more only on a real scroll of a list that actually scrolls, near its

@@ -14,7 +14,7 @@ import { HOLIDAYS, holidayOn } from "./holidays.js";
 import { applyDetail } from "./filter.js";
 import { store } from "./store.js";
 import { indexByDay, weekRows, tappable, zoomWeekTarget, zoomMonthTarget, isAway, isBig, awayText,
-  shouldLoadMore, nextCount, iconsOf, searchEvents, shortDate, seePrevious, pastMonths, gesture } from "./cal-model.js";
+  shouldLoadMore, nextCount, iconsOf, searchEvents, shortDate, seePrevious, pastMonths, gesture, lastEventDay } from "./cal-model.js";
 import { openLevel, sheetOpen } from "./sheet.js";
 import { ICON } from "./chrome-icons.js";
 import { readPrefs, byCategories } from "./prefs.js";
@@ -55,7 +55,7 @@ function buildFrame() {
   const grey = new Set(shown.filter((x) => x.grey).map((x) => x.event.id));
   const events = shown.map((x) => x.event);
   const idx = indexByDay(events);
-  const last = events.reduce((m, e) => ((e.end || e.start) > m ? (e.end || e.start) : m), "");
+  const last = lastEventDay(events);
   if (!S.floor) S.floor = thisYear;
   const range = loadRange(today, last, S.floor);
   return { me, style, today, thisYear, events, idx, grey, range,
@@ -268,8 +268,15 @@ function loadMore(mn) {
 /* ---- older years on demand (spec: See previous, search, opening an old
    event). kave-hub is asked for the year before the oldest one shown; an
    empty or missing year means there is nothing older. ---- */
-async function loadOlder() {
-  if (S.exhausted || S.loadingOlder) return false;
+let olderInFlight = null;
+function loadOlder() {
+  /* a tap while another load runs waits for it instead of being lost (M4) */
+  if (olderInFlight) return olderInFlight;
+  olderInFlight = loadOlderOnce().finally(() => { olderInFlight = null; });
+  return olderInFlight;
+}
+async function loadOlderOnce() {
+  if (S.exhausted) return false;
   S.loadingOlder = true;
   const y = String(Number(S.floor) - 1);
   try {
