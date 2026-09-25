@@ -14,7 +14,7 @@ import { escapeHtml as esc, safeUrl } from "./util.js";
 import { addDays, dayOfWeek } from "./dates.js";
 import { isoWeek } from "./views.js";
 import { holidayOn } from "./holidays.js";
-import { tappable, iconsOf, shortDate, hasOpenTodos, guestsExcludingViewer } from "./cal-model.js";
+import { tappable, iconsOf, hasOpenTodos, guestsExcludingViewer } from "./cal-model.js";
 import { rows, frameNow, detailGrey, place } from "./calendar.js";
 import { ICON } from "./chrome-icons.js";
 import { STATUS_LABEL } from "./model.js";
@@ -97,9 +97,10 @@ function stripName(e, f) { return e.owner !== f.me && e.owner !== "shared" ? who
 function strip(e, f) {
   /* F37: the line under the title is the status, then the guests with the
      viewer's own name filtered out -- never "Isa · Apu" on Isa's phone. */
+  /* F43: the "until Sun" day-span used to repeat here too, redundant with
+     the date already named by the day this strip belongs to. */
   const statusGuests = [STATUS_LABEL[e.status], guestsExcludingViewer(e.guests, who(f.me))].filter(Boolean).join(" · ");
-  const untilLine = e.end && e.end !== e.start ? "until " + shortDate(e.end, f.thisYear) : "";
-  const lines = [statusGuests, untilLine].filter(Boolean);
+  const lines = [statusGuests].filter(Boolean);
   const name = stripName(e, f);
   /* F38: no inline add-task in this view -- a small checkbox glyph (F16)
      stands in for the whole to-do list, to the left of the category icons,
