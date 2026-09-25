@@ -9,12 +9,17 @@ import { iconFor } from "./icons.js";
 import { applyDetail } from "./filter.js";
 
 const DOW = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
-const MON = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
 
-/* "Mon 21" in rows; another year's date says its month and year. */
+/* F62: "Mon 21" in rows -- weekday and day-of-month only, for every year,
+   not just the current one. Yearly's future-year cards used to append the
+   month (and year) here, "Fri 24 Sep 2027" instead of "Fri 24" -- but each
+   card already names its own month and year (monthCard's heading,
+   yearHead), so repeating it on every line was redundant, and the current
+   year's lines never did it. `thisYear` is unused now but kept in the
+   signature: every call site already threads frame.thisYear through, and
+   dropping the parameter buys nothing. */
 export function shortDate(day, thisYear) {
-  const base = `${DOW[dayOfWeek(day)]} ${Number(day.slice(8))}`;
-  return day.slice(0, 4) === thisYear ? base : `${base} ${MON[Number(day.slice(5, 7)) - 1]} ${day.slice(0, 4)}`;
+  return `${DOW[dayOfWeek(day)]} ${Number(day.slice(8))}`;
 }
 
 /* Weekly: day cards three a row (3, 3, 1), one row of seven when wide. */
