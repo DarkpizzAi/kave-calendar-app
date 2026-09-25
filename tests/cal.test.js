@@ -1,7 +1,8 @@
 import { test, eq, ok } from "./run.js";
 import { weekRows, indexByDay, tappable, zoomWeekTarget, zoomMonthTarget, isAway, isBig, awayText,
   shouldLoadMore, nextCount, iconsOf, searchEvents, todaysCount, fullPastWeeks, fullPastMonths,
-  backToTodayState, eventsInMonth, tripCityFor, defaultCity, hideCancelled } from "../js/cal-model.js";
+  backToTodayState, eventsInMonth, tripCityFor, defaultCity, hideCancelled,
+  hasOpenTodos, guestsExcludingViewer } from "../js/cal-model.js";
 import { readPrefs, byCategories } from "../js/prefs.js";
 
 const ev = (id, start, extra = {}) => ({ id, title: id, start, end: null, owner: "shared", status: "planned", activities: [], ...extra });
@@ -199,4 +200,23 @@ test("cal: F22 -- a blank new event defaults to Barcelona; one dated inside a tr
   eq(defaultCity([], "2026-09-25"), "barcelona", "nothing on the calendar");
   eq(defaultCity([trip], "2026-09-25"), "barcelona", "that day is not inside any trip");
   eq(defaultCity([trip], "2026-11-12"), "lisbon", "that day is inside the trip");
+});
+
+/* ---- F37: guests text with the viewer's own name filtered out ---- */
+test("cal: guestsExcludingViewer drops the viewer's own name, case-insensitively", () => {
+  eq(guestsExcludingViewer("Isa, Apu, Jordi", "Isa"), "Apu, Jordi");
+  eq(guestsExcludingViewer("isa, Apu, Jordi", "Isa"), "Apu, Jordi", "case-insensitive match");
+  eq(guestsExcludingViewer("Apu, Jordi", "Isa"), "Apu, Jordi", "unaffected when the viewer isn't listed");
+  eq(guestsExcludingViewer("Isa", "Isa"), "", "the viewer alone leaves nothing");
+  eq(guestsExcludingViewer("", "Isa"), "");
+  eq(guestsExcludingViewer(null, "Isa"), "");
+  eq(guestsExcludingViewer("Apu,  Jordi ,Isa", "Isa"), "Apu, Jordi", "extra whitespace around names is trimmed");
+});
+
+/* ---- F38: does this event have at least one open to-do ---- */
+test("cal: hasOpenTodos", () => {
+  eq(hasOpenTodos(ev("a", "2026-10-01")), false, "no checklist at all");
+  eq(hasOpenTodos(ev("b", "2026-10-01", { checklist: [] })), false);
+  eq(hasOpenTodos(ev("c", "2026-10-01", { checklist: [{ id: "1", text: "x", done: true }] })), false, "every item done");
+  eq(hasOpenTodos(ev("d", "2026-10-01", { checklist: [{ id: "1", text: "x", done: true }, { id: "2", text: "y", done: false }] })), true);
 });

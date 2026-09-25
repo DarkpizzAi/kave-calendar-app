@@ -190,6 +190,26 @@ export function iconsOf(e, viewer) {
   return acts.map((a) => iconFor(a, e, viewer));
 }
 
+/* F16/F38: true when an event has at least one unchecked to-do -- the one
+   place this is decided, so the list row's icon (calendar.js) and the
+   single-day strip's icon (sheet.js) can never drift apart. */
+export function hasOpenTodos(e) {
+  return (e.checklist || []).some((c) => !c.done);
+}
+
+/* F37: the guests text with the viewer's own first name removed, so "Isa"
+   never appears in guests shown on Isa's own phone even if she is listed.
+   Guests is free text, comma-separated first names (spec section 1); a
+   case-insensitive whole-name match is removed, the rest rejoined. */
+export function guestsExcludingViewer(guests, viewerName) {
+  const vn = String(viewerName || "").trim().toLowerCase();
+  return String(guests || "")
+    .split(",")
+    .map((g) => g.trim())
+    .filter((g) => g && g.toLowerCase() !== vn)
+    .join(", ");
+}
+
 const fold = (s) => String(s || "").toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
 export function searchEvents(events, query) {
   const q = fold(query).trim();
