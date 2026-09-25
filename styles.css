@@ -193,7 +193,15 @@ button:disabled { opacity: .5; cursor: default; }
 /* ================= Calendar (ported from prototype P4) ================= */
 .shell svg{width:18px;height:18px;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
 .shell button{font:inherit;color:inherit;cursor:pointer}
-.fab{color:var(--accent-text)}
+/* F63: `.shell button{color:inherit}` (one class + one element,
+   specificity 0,1,1) was quietly beating the plain `.fab{color:
+   var(--accent-text)}` below (0,1,0) -- so the "+", up and down buttons'
+   icons rendered in the ambient --text colour, inherited from .shell,
+   instead of --accent-text, failing the household look's accent-text-on-
+   accent contrast minimum (household-look.md's contrast table, 4.5:1).
+   `.shell .fab` (0,2,0) outranks `.shell button` on the classes column, so
+   it wins without an !important. */
+.shell .fab{color:var(--accent-text)}
 .fab.add svg{width:26px;height:26px;stroke-width:2.5}
 .mn .card{padding:var(--sp-3)}
 /* the gates before the Calendar: no token, then who am I */
@@ -232,7 +240,9 @@ a.ticket{color:inherit;text-decoration:none}
    it, up (scroll to top) and down (jump to today, collapsing loaded-older
    data), the same icon mirrored rather than two different shapes. F6's
    "load older" is no longer one of them (F29: it moved inline). */
-.fab{position:absolute;width:56px;height:56px;border-radius:var(--r-round);border:0;background:var(--accent);color:var(--accent-text);box-shadow:var(--shadow-raised);z-index:4;display:grid;place-items:center;padding:0}
+/* F63: colour lives in the `.shell .fab` rule above, at a specificity that
+   actually beats `.shell button{color:inherit}` -- not repeated here. */
+.fab{position:absolute;width:56px;height:56px;border-radius:var(--r-round);border:0;background:var(--accent);box-shadow:var(--shadow-raised);z-index:4;display:grid;place-items:center;padding:0}
 .fab.add{right:var(--sp-4);bottom:calc(var(--nav-h) + var(--sp-4) + env(safe-area-inset-bottom,0px));font-size:var(--fs-title-lg)}
 /* F55: one fixed slot, always the same distance above "+" -- up and down
    share this single position (never two heights) and are shown mutually
@@ -245,7 +255,13 @@ a.ticket{color:inherit;text-decoration:none}
 .top{display:flex;flex-direction:column;gap:var(--sp-3)}
 /* F36: matches Spoon's Trends chart button row (kave-food-app's
    .control-row) for spacing -- var(--sp-3), not --sp-2. */
-.ctl{display:flex;flex-wrap:wrap;align-items:center;gap:var(--sp-3);padding-bottom:var(--sp-3)}
+/* F66: .ctl (the filter bar) is a direct child of .page, which already
+   puts var(--sp-3) between it and .content -- the section heading is
+   .content's first child. This rule's own padding-bottom:var(--sp-3)
+   stacked on top of that flex gap, doubling the step to 24px where the
+   household's standard control-row-to-content gap is one sp-3 (12px). No
+   new value: just the duplicate removed. */
+.ctl{display:flex;flex-wrap:wrap;align-items:center;gap:var(--sp-3)}
 /* F54: F26's sticky month/year title bar is removed entirely -- no more
    .sec-title, in any view. */
 .page{display:flex;flex-direction:column;gap:var(--sp-3)}
@@ -278,12 +294,23 @@ a.ticket{color:inherit;text-decoration:none}
    calc(33.33% - 3px), not calc(50% - 3px), and its translateX is 0/100/200%
    -- driven here by --i (0, 1 or 2, set per render in calendar.js) rather
    than three fixed [data-on] selectors, the same value at each step. */
-.segment{position:relative;display:flex;background:var(--surface-2);border-radius:var(--r-pill);padding:3px}
+/* F69: display:grid with three equal 1fr columns, not flex. Flex's
+   flex:1 1 0 + min-width:0 (Spoon's own construction, F59) actively let a
+   segment shrink below its own label's width, so "Monthly" -- the longest
+   of the three -- truncated to "Mont..." at 375px while "Weekly"/"Yearly"
+   stayed full width. Grid's 1fr tracks default to an auto (content) floor:
+   equal fr tracks are still sized equal to each other, but that shared
+   size is bumped up to whatever the widest cell (Monthly) actually needs,
+   so no cell can truncate and all three stay the same width. */
+.segment{position:relative;display:grid;grid-template-columns:repeat(3,1fr);background:var(--surface-2);border-radius:var(--r-pill);padding:3px}
 .seg-thumb{position:absolute;top:3px;bottom:3px;left:3px;width:calc(33.33% - 3px);border-radius:var(--r-pill);background:var(--accent);box-shadow:var(--shadow-card);transform:translateX(calc(var(--i) * 100%));animation:ind var(--motion-base) var(--ease-drag)}
 @keyframes ind{from{transform:translateX(calc(var(--from) * 100%))}}
 /* F36: matches Spoon's "6 months / all time" toggle's own text size,
    --fs-ui, not --fs-meta. */
-.segment button{position:relative;z-index:1;flex:1 1 0;min-width:0;border:none;background:none;font:inherit;font-size:var(--fs-ui);font-weight:var(--fw-medium);color:var(--text-dim);padding:7px var(--sp-2);min-height:0;border-radius:var(--r-pill);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+/* F69: no flex/min-width/overflow-ellipsis any more -- .segment is a grid
+   now, and grid items stretch to fill their (equal) column with no
+   truncation needed. */
+.segment button{position:relative;z-index:1;border:none;background:none;font:inherit;font-size:var(--fs-ui);font-weight:var(--fw-medium);color:var(--text-dim);padding:7px var(--sp-2);min-height:0;border-radius:var(--r-pill);white-space:nowrap}
 /* F30/F59: the selected button's text is accent-text on the accent-filled
    thumb -- Compass's toggle is a tablist (aria-selected), not Spoon's plain
    toggle buttons (aria-pressed), so the same rule keys off aria-selected. */
