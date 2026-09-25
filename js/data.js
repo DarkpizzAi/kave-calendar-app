@@ -10,8 +10,20 @@ export function createData({ sync, local, now, me }) {
   const listeners = [];
   const notify = () => listeners.forEach((fn) => fn());
 
+  /* F31: a cached year's `events` must be an array (sync.js always writes
+     one); if a stale/legacy/corrupt cache entry ever holds anything else,
+     mergeEvents's base.map throws *synchronously*, here, outside any of
+     ensureYear's own try/catch -- the rejected promise then reaches
+     calendar.js's broad `.catch(() => {})` (meant for offline/no-token
+     failures) and is swallowed with no visible error. That year's events
+     never reach `years[y]`, so they vanish from ctx.data.events() with no
+     symptom except the gap where they should have drawn (the Yearly
+     heat-strip fill, for a viewer's own or shared/other events that month).
+     Normalise instead of trusting the shape: a genuinely broken cache reads
+     as an empty year rather than silently discarding a real one. */
   function view(y) {
-    const cached = (local.getYear(y) || { events: [] }).events;
+    const raw = (local.getYear(y) || { events: [] }).events;
+    const cached = Array.isArray(raw) ? raw : raw && typeof raw === "object" ? Object.values(raw) : [];
     return mergeEvents(cached, local.pendingFor(y));
   }
   function refresh(y) { years[y] = view(y); }
