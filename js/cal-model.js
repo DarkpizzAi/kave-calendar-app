@@ -64,6 +64,18 @@ export function lastEventDay(events) {
   return events.reduce((m, e) => { const l = lastDay(e); return l > m ? l : m; }, "");
 }
 
+/* F22: a new event defaults its city to Barcelona, unless its date falls
+   within a trip the person is already on -- reusing isAway (Monthly's own
+   "away" test, spec section 3) rather than a second definition of "trip".
+   `events` need not be pre-filtered: deleted events are skipped here. */
+export function tripCityFor(events, date) {
+  const e = events.find((ev) => !ev.deleted && isAway(ev) && daysOf(ev).includes(date));
+  return e && e.city ? e.city : null;
+}
+
+/* F22: the form's actual default -- Barcelona, unless a trip's city wins. */
+export const defaultCity = (events, date) => tripCityFor(events, date) || "barcelona";
+
 export function awayText(e, thisYear) {
   const who = e.owner === "shared" ? e.title : `${e.owner === "isa" ? "Isa" : "Hugo"} in ${e.title}`;
   return `${who}, ${shortDate(e.start, thisYear)} to ${shortDate(lastDay(e), thisYear)}`;

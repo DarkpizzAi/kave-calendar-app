@@ -1,7 +1,7 @@
 import { test, eq, ok } from "./run.js";
 import { weekRows, indexByDay, tappable, zoomWeekTarget, zoomMonthTarget, isAway, isBig, awayText,
   shouldLoadMore, nextCount, iconsOf, searchEvents, todaysCount, fullPastWeeks, fullPastMonths,
-  backToTodayState, eventsInMonth } from "../js/cal-model.js";
+  backToTodayState, eventsInMonth, tripCityFor, defaultCity } from "../js/cal-model.js";
 import { readPrefs, byCategories } from "../js/prefs.js";
 
 const ev = (id, start, extra = {}) => ({ id, title: id, start, end: null, owner: "shared", status: "planned", activities: [], ...extra });
@@ -163,4 +163,27 @@ test("cal: F20 -- the plans count ignores category filters, unlike the heat-stri
   eq(count, 2, "the count includes the hidden-category event");
   eq(heatEvents, 1, "the heat-strip's own event list stays filtered");
   ok(count !== heatEvents, "F20: count and heat-strip now disagree when a category is hidden");
+});
+
+/* ---- F22: default city, trip-aware -- reuses isAway (Monthly's "away"
+   test), never a second definition of "trip". ---- */
+test("cal: tripCityFor finds the trip covering a date, city and all", () => {
+  const flight = ev("f", "2026-10-01", { activities: [act("transport")], end: "2026-10-05", city: "porto" });
+  eq(tripCityFor([flight], "2026-10-03"), "porto", "inside the span");
+  eq(tripCityFor([flight], "2026-10-01"), "porto", "the first day");
+  eq(tripCityFor([flight], "2026-10-05"), "porto", "the last day");
+  eq(tripCityFor([flight], "2026-10-06"), null, "outside the span");
+  eq(tripCityFor([flight], "2026-09-30"), null, "before the span");
+});
+test("cal: tripCityFor ignores a non-trip activity, a deleted event, and a trip with no city", () => {
+  const dinner = ev("d", "2026-10-01", { activities: [act("eating")], city: "madrid" });
+  const gone = ev("g", "2026-10-01", { activities: [act("transport")], city: "rome", deleted: true });
+  const noCity = ev("n", "2026-10-01", { activities: [act("accommodation")] });
+  eq(tripCityFor([dinner, gone, noCity], "2026-10-01"), null);
+});
+test("cal: F22 -- a blank new event defaults to Barcelona; one dated inside a trip takes that trip's city", () => {
+  const trip = ev("t", "2026-11-10", { activities: [act("accommodation")], end: "2026-11-14", city: "lisbon" });
+  eq(defaultCity([], "2026-09-25"), "barcelona", "nothing on the calendar");
+  eq(defaultCity([trip], "2026-09-25"), "barcelona", "that day is not inside any trip");
+  eq(defaultCity([trip], "2026-11-12"), "lisbon", "that day is inside the trip");
 });

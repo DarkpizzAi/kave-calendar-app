@@ -11,6 +11,7 @@ import { newEvent, STATUSES } from "./model.js";
 import { CATEGORIES as MONEY, formatCents, shareOf, visibleCosts } from "./money.js";
 import { CATEGORIES, iconFor, categoryOf } from "./icons.js";
 import { readForm, costDefaults, canChangeCost, addTask, addCost, whenLine, mapsUrl } from "./event-form.js";
+import { defaultCity } from "./cal-model.js";
 import { registerLevel, openLevel, replaceTop, back, closeAll, topLevel } from "./sheet.js";
 import { store } from "./store.js";
 import { ICON } from "./chrome-icons.js";
@@ -101,9 +102,15 @@ function toDraft(e) {
   return { ...JSON.parse(JSON.stringify(e)), refs: (e.bookingRefs || []).join(", "),
     city: e.city ? e.city[0].toUpperCase() + e.city.slice(1) : "", newCost: null };
 }
-function blank() {
-  return { title: "", start: todayKey(), end: "", startTime: "", endTime: "", owner: "shared", status: "planned", activities: [],
-    city: "", venue: "", guests: "", notes: "", refs: "", links: [], checklist: [], costs: [], newCost: null };
+/* F22: a new event defaults its city to Barcelona, unless its day falls
+   inside a trip already on the calendar (tripCityFor, cal-model.js), in
+   which case that trip's city wins instead. `date` lets the day-level
+   sheet's own "+" (F21) default to the day it was opened from. */
+function blank(date) {
+  const start = date || todayKey();
+  const city = defaultCity(data.events(), start);
+  return { title: "", start, end: "", startTime: "", endTime: "", owner: "shared", status: "planned", activities: [],
+    city: city[0].toUpperCase() + city.slice(1), venue: "", guests: "", notes: "", refs: "", links: [], checklist: [], costs: [], newCost: null };
 }
 function activityForm(d) {
   const chips = d.activities.map((a, i) => `<span class="act">${esc(iconFor(a, d, me()))} ${esc(categoryOf(a.type).label)}`
@@ -288,9 +295,10 @@ export function initEvent(ctx) {
 
 const currentId = () => (topLevel() || {}).id;
 
-/* The + button: an empty form. */
-export function newEventForm() {
+/* The + button: an empty form. F21: the day-level sheet's own "+" passes
+   that day, so the form (and F22's trip-aware default city) starts there. */
+export function newEventForm(date) {
   if (!me()) { banner("Choose who you are in Settings first."); return; }
-  draft = blank(); picker = null;
+  draft = blank(date); picker = null;
   openLevel({ kind: "new" });
 }
