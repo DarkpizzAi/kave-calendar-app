@@ -1,5 +1,5 @@
 import { test, eq, ok, throws } from "./run.js";
-import { readForm, costDefaults, canChangeCost, addTask, addCost, whenLine, mapsUrl } from "../js/event-form.js";
+import { readForm, costDefaults, canChangeCost, addTask, addCost, whenLine, mapsUrl, toDraft, isMapsUrl, costPayerText } from "../js/event-form.js";
 import { newEvent, validateEvent } from "../js/model.js";
 import { newCostLine } from "../js/money.js";
 
@@ -69,4 +69,42 @@ test("event form: the Maps link is a safe search url", () => {
 
 test("M1: the when line never prints a typo'd far end date", () => {
   ok(!whenLine(base({ end: "2099-01-01" })).includes("2099"));
+});
+
+test("F44: toDraft defaults every list field, so editing an event missing them never crashes formPage", () => {
+  const bare = { id: "ev_1", title: "Old event", start: "2020-01-01", owner: "isa", status: "planned" };
+  const d = toDraft(bare);
+  eq([d.activities, d.links, d.checklist, d.costs], [[], [], [], []]);
+  eq(d.newCost, null);
+});
+test("F44: toDraft still carries over real lists and derived fields (refs, city)", () => {
+  const e = base({ city: "barcelona", bookingRefs: ["RA-1", "RA-2"], links: [{ label: "RA", url: "https://ra.co/x" }] });
+  const d = toDraft(e);
+  eq(d.refs, "RA-1, RA-2");
+  eq(d.city, "Barcelona");
+  eq(d.links, [{ label: "RA", url: "https://ra.co/x" }]);
+});
+
+test("F49: isMapsUrl recognises a Maps link typed into Venue, and rejects a plain place name", () => {
+  ok(isMapsUrl("https://maps.google.com/?q=Razzmatazz"));
+  ok(isMapsUrl("https://www.google.com/maps/place/Razzmatazz"));
+  ok(isMapsUrl("https://goo.gl/maps/abc123"));
+  ok(isMapsUrl("https://maps.app.goo.gl/abc123"));
+  ok(!isMapsUrl("Razzmatazz"));
+  ok(!isMapsUrl(""));
+  ok(!isMapsUrl("javascript:alert(1)"));
+});
+test("F49: mapsVenueUrl uses a Maps link typed into Venue directly, instead of wrapping it in a search query", () => {
+  eq(mapsUrl("https://maps.app.goo.gl/abc123", "barcelona"), "https://maps.app.goo.gl/abc123");
+  eq(mapsUrl("Razzmatazz", "barcelona"), "https://www.google.com/maps/search/?api=1&query=Razzmatazz%2C%20barcelona");
+});
+
+test("F41: a cost entirely the viewer's own shows no payer or scope text at all", () => {
+  eq(costPayerText({ payer: "isa", scope: "personal" }, "isa"), "");
+});
+test("F41: someone else's cost says who paid; a shared cost adds Split cost", () => {
+  eq(costPayerText({ payer: "hugo", scope: "personal" }, "isa"), "Paid by Hugo");
+  eq(costPayerText({ payer: "isa", scope: "shared" }, "isa"), "Split cost");
+  eq(costPayerText({ payer: "hugo", scope: "shared" }, "isa"), "Paid by Hugo · Split cost");
+  eq(costPayerText({ payer: "hugo", scope: "shared" }, "hugo"), "Split cost");
 });

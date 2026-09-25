@@ -70,7 +70,50 @@ export function whenLine(e, thisYear = e.start.slice(0, 4)) {
   return days + times;
 }
 
+/* F49: a Venue field can already hold a Maps link (pasted, not typed as a
+   place name). Detect that case and use it as-is for "Open in Maps" instead
+   of wrapping it in a broken search query -- extracting the real place name
+   from an arbitrary Maps link needs a paid Places API call, out of scope. */
+export function isMapsUrl(text) {
+  const u = safeUrl(String(text || "").trim());
+  if (!u) return false;
+  try {
+    const { hostname } = new URL(u);
+    return hostname === "maps.google.com" || hostname === "goo.gl" || hostname === "maps.app.goo.gl"
+      || /(^|\.)google\.[a-z.]+$/.test(hostname) && u.includes("/maps");
+  } catch { return false; }
+}
+
 export function mapsUrl(venue, city) {
+  const v = String(venue || "").trim();
+  if (isMapsUrl(v)) return safeUrl(v);
   const q = [venue, city].map((x) => String(x || "").trim()).filter(Boolean).join(", ");
   return q ? safeUrl("https://www.google.com/maps/search/?api=1&query=" + encodeURIComponent(q)) : null;
+}
+
+/* F44's root cause: toDraft used to be a bare JSON clone in view-event.js,
+   so an event missing links/checklist/costs/activities (any older or
+   imported event that predates a field -- blank() always sets them, but an
+   existing event on disk may not) left those undefined. formPage's
+   d.links.map(...) then threw, aborting the sheet's draw() partway through:
+   the title and Save/Cancel/Delete bar had already been swapped to "Edit
+   event", but the body swap never ran, so the old read-only page stayed in
+   the DOM underneath -- reading as "the cost fields (and everything else)
+   vanished". Every list field is defaulted here so the form can never
+   crash on a missing one. */
+export function toDraft(e) {
+  return { ...JSON.parse(JSON.stringify(e)), refs: (e.bookingRefs || []).join(", "),
+    city: e.city ? e.city[0].toUpperCase() + e.city.slice(1) : "",
+    activities: e.activities || [], links: e.links || [], checklist: e.checklist || [], costs: e.costs || [],
+    newCost: null };
+}
+
+/* F41: a cost entirely the viewer's own (personal, paid by them) shows no
+   payer or scope text at all. Someone else's line says who paid; a shared
+   line adds "Split cost" regardless of who paid it. */
+export function costPayerText(cost, viewer) {
+  const parts = [];
+  if (cost.payer !== viewer) parts.push("Paid by " + (cost.payer === "isa" ? "Isa" : cost.payer === "hugo" ? "Hugo" : "Both of us"));
+  if (cost.scope === "shared") parts.push("Split cost");
+  return parts.join(" · ");
 }
