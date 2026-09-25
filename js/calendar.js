@@ -106,8 +106,7 @@ function todayAnchor() {
 /* ---- control row ----
    F28: the view toggle, detail and search controls stop floating -- this
    row scrolls away with the page again, same as section 3's original
-   wording. F26's month/year title is no longer drawn inside it (its own
-   standalone sticky bar, secTitle() below). */
+   wording. */
 function controls() {
   const idx = VIEWS.indexOf(S.view), from = S.fromView == null ? idx : VIEWS.indexOf(S.fromView);
   const views = `<div class="views" role="tablist"><span class="ind" style="--i:${idx};--from:${from}"></span>`
@@ -126,24 +125,13 @@ function controls() {
   return `<div class="ctl${S.searchOpen ? " searching" : ""}">${S.searchOpen ? "" : views}<div class="ctl2">${S.searchOpen ? "" : detail + older}${search}</div>${menu}</div>`;
 }
 
-/* ---- F26: the coarse, standalone sticky title -- the month name under
-   Weekly and Monthly, the year under Yearly. Its own small bar, not living
-   inside the (now non-floating, F28) control row, so it can keep floating
-   on its own as the list scrolls; the same scroll-tracking that already
-   drove "Back to today" and F29's load-older keeps it current
-   (updateSectionTitle). Empty while searching (CSS hides it then). */
-function secTitleBar() {
-  return `<p class="sec-title${S.searchOpen ? " searching" : ""}" id="secTitle" aria-hidden="true"></p>`;
-}
-
 /* ---- Weekly and Monthly: runs of weeks ---- */
-/* F26: the month heading is the section boundary the sticky title (F26,
-   secTitleBar above) tracks -- one per month, not one per day/week card, so
-   "October" only takes over from "September" when the list actually
-   scrolls into October. */
+/* F54: this heading used to also be F26's sticky-title section boundary
+   (data-sec); F26 is fully reverted, so it is back to being just the plain,
+   non-sticky "September" heading, drawn once per month. */
 const monthHead = (d) => {
   const label = `${MONTHS[Number(d.slice(5, 7)) - 1]}${d.slice(0, 4) !== frame.thisYear ? " " + d.slice(0, 4) : ""}`;
-  return `<h3 class="month" data-sec="${esc(label)}">${esc(label)}</h3>`;
+  return `<h3 class="month">${esc(label)}</h3>`;
 };
 const weekLabel = (m) => `WEEK ${isoWeek(m)}`;
 
@@ -214,9 +202,8 @@ const daysIn = (y, mo) => new Date(Date.UTC(y, mo + 1, 0)).getUTCDate();
 /* F10: the year heading is big, once, like Monthly's big month heading. Isa's
    correction in the mock-up round: the year heading itself takes no border
    -- only the current month's card does, the same accent outline as
-   Weekly's today-card and Monthly's current-week card. F26: it is also
-   Yearly's section boundary for the sticky title (the year, not a month). */
-const yearHead = (y) => `<p class="year-big" data-sec="${y}">${y}</p>`;
+   Weekly's today-card and Monthly's current-week card. */
+const yearHead = (y) => `<p class="year-big">${y}</p>`;
 function monthCard(y, mo) {
   const key = ymOf(y, mo), n = daysIn(y, mo), now = key === frame.today.slice(0, 7);
   const evs = []; let cells = "";
@@ -295,20 +282,20 @@ function ensureYears() {
 }
 
 /* ---- the tab ----
-   F28: the control row scrolls with the page again (F5 reversed); F26's
-   title is its own standalone sticky bar, drawn right after it so it is the
-   thing that keeps floating once the controls themselves scroll away. F4:
-   no more Today card, just its anchor. */
+   F28: the control row scrolls with the page again (F5 reversed). F54: F26's
+   sticky month/year title is gone entirely -- the big per-section heading
+   (monthHead/yearHead) is the only heading now, drawn once, non-sticky,
+   where it always was. F4: no more Today card, just its anchor. */
 /* F34: the swipe animation now applies only to .content (the list), not
-   the whole .page -- the controls and the sticky title stay put; only the
-   view toggle's own .ind pill (its own transform/animation, untouched)
-   visibly slides to its new position. */
+   the whole .page -- the controls stay put; only the view toggle's own
+   .ind pill (its own transform/animation, untouched) visibly slides to its
+   new position. */
 export function calendarHtml() {
   frame = buildFrame();
   ensureYears();
-  if (S.searchOpen) return `<div class="page">${controls()}${secTitleBar()}${searchPage()}</div>`;
+  if (S.searchOpen) return `<div class="page">${controls()}${searchPage()}</div>`;
   const v = S.view === "yearly" ? yearly() : weeks(S.view);
-  return `<div class="page">${controls()}${secTitleBar()}<div class="content ${S.slide}">${v.past}${todayAnchor()}${v.future}</div></div>`;
+  return `<div class="page">${controls()}<div class="content ${S.slide}">${v.past}${todayAnchor()}${v.future}</div></div>`;
 }
 
 /* After the tab's HTML is in place: scroll, focus, clear one-shot state. */
@@ -323,21 +310,23 @@ export function afterCalendar(mn, before) {
   onScroll();
 }
 
-/* ---- F28: two round buttons, shown together once today (and so the
-   controls above it) are off screen -- up scrolls back to reveal them, down
-   jumps to today. Measured on screen: an animation's transform throws
-   offsetTop off. ---- */
+/* ---- F55: one fixed slot above "+", never two heights, never both
+   showing at once. Up (scrolled forward into the future, today is above
+   the visible area) and down (scrolled back into the past/loaded-older
+   data, today is below it) are mutually exclusive by scroll direction, not
+   two independently-toggled booleans any more. Measured on screen: an
+   animation's transform throws offsetTop off. ---- */
 export function onScroll() {
   const mn = document.getElementById("view"), t = document.getElementById("today");
   const up = document.querySelector(".fab.up"), down = document.querySelector(".fab.down");
   if (!mn || !up || !down) return;
-  updateSectionTitle(mn);
   if (!t) { up.classList.remove("show"); down.classList.remove("show"); return; }
   const r = t.getBoundingClientRect(), box = mn.getBoundingClientRect();
   const top = Math.max(box.top, 0), bottom = Math.min(box.bottom, window.innerHeight);
-  const offscreen = !(r.bottom > top + 60 && r.top < bottom);
-  up.classList.toggle("show", offscreen);
-  down.classList.toggle("show", offscreen);
+  const pastTop = r.bottom <= top + 60;    // today has scrolled up and out: show up (back to top)
+  const pastBottom = r.top >= bottom;      // today is still below the fold: show down (jump to today)
+  up.classList.toggle("show", pastTop);
+  down.classList.toggle("show", !pastTop && pastBottom);
 }
 
 /* F28: the up button -- scrolls back to the top of the list, revealing the
@@ -346,27 +335,6 @@ export function scrollToTop() {
   const mn = document.getElementById("view");
   if (!mn) return;
   mn.scrollTo({ top: 0, behavior: matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth" });
-}
-
-/* F26: the coarse (month, or year under Yearly) floating title, kept in
-   sync by the same scroll listener that already drives the up/down buttons
-   (F28) and load-older (F29) -- no second listener. The current section is
-   the last [data-sec] element (now just monthHead/yearHead -- one per
-   month or year, not one per card) whose top has reached the title's own
-   position -- a sticky "grouped list" header, done in JS because the
-   sections sit in a grid (Weekly's day cards), not one linear stack CSS
-   sticky alone could hand off between. */
-function updateSectionTitle(mn) {
-  const el = document.getElementById("secTitle");
-  if (!el) return;
-  if (S.searchOpen) { el.textContent = ""; return; }
-  const secs = mn.querySelectorAll("[data-sec]");
-  if (!secs.length) { el.textContent = ""; return; }
-  const ref = el.getBoundingClientRect().bottom || 0;
-  let cur = secs[0];
-  for (const s of secs) { if (s.getBoundingClientRect().top <= ref) cur = s; else break; }
-  const label = cur.dataset.sec;
-  if (el.textContent !== label) el.textContent = label;
 }
 
 /* Only a real scroll event calls this, never a draw. */

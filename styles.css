@@ -234,9 +234,10 @@ a.ticket{color:inherit;text-decoration:none}
    "load older" is no longer one of them (F29: it moved inline). */
 .fab{position:absolute;width:56px;height:56px;border-radius:var(--r-round);border:0;background:var(--accent);color:var(--accent-text);box-shadow:var(--shadow-raised);z-index:4;display:grid;place-items:center;padding:0}
 .fab.add{right:var(--sp-4);bottom:calc(var(--nav-h) + var(--sp-4) + env(safe-area-inset-bottom,0px));font-size:var(--fs-title-lg)}
-.fab.up,.fab.down{right:var(--sp-4);opacity:0;transform:translateY(8px);pointer-events:none;transition:opacity .18s var(--ease-standard),transform .18s var(--ease-standard)}
-.fab.up{bottom:calc(var(--nav-h) + var(--sp-4) + 56px + var(--sp-3) + env(safe-area-inset-bottom,0px))}
-.fab.down{bottom:calc(var(--nav-h) + var(--sp-4) + 112px + calc(var(--sp-3) * 2) + env(safe-area-inset-bottom,0px))}
+/* F55: one fixed slot, always the same distance above "+" -- up and down
+   share this single position (never two heights) and are shown mutually
+   exclusively (calendar.js's onScroll), never both at once. */
+.fab.up,.fab.down{right:var(--sp-4);bottom:calc(var(--nav-h) + var(--sp-4) + 56px + var(--sp-3) + env(safe-area-inset-bottom,0px));opacity:0;transform:translateY(8px);pointer-events:none;transition:opacity .18s var(--ease-standard),transform .18s var(--ease-standard)}
 .fab.up svg,.fab.down svg{width:22px;height:22px;stroke-width:2.5;transition:transform .18s var(--ease-standard)}
 .fab.up.show,.fab.down.show{opacity:1;transform:none;pointer-events:auto}
 .fab.down svg{transform:rotate(180deg)}
@@ -245,18 +246,12 @@ a.ticket{color:inherit;text-decoration:none}
 /* F36: matches Spoon's Trends chart button row (kave-food-app's
    .control-row) for spacing -- var(--sp-3), not --sp-2. */
 .ctl{display:flex;flex-wrap:wrap;align-items:center;gap:var(--sp-3);padding-bottom:var(--sp-3)}
-/* F26: the coarse floating title -- its own standalone sticky bar (not
-   living inside the now non-floating .ctl), the same typography as the
-   "WEEK 39" / "SEPTEMBER" / "FRI 25" pills it echoes (F9), just without
-   their pill background since it is a header bar, not a card label. Empty
-   while searching or before a first section has reached it (calendar.js's
-   updateSectionTitle leaves it blank then). */
-.sec-title{position:sticky;top:0;z-index:5;margin:0;padding:var(--sp-2) 0;background:var(--surface);font-size:var(--fs-meta);font-weight:var(--fw-medium);letter-spacing:var(--tracking-label);text-transform:uppercase;font-variant-numeric:tabular-nums;color:var(--text-dim)}
-.sec-title:empty,.sec-title.searching{display:none}
+/* F54: F26's sticky month/year title bar is removed entirely -- no more
+   .sec-title, in any view. */
 .page{display:flex;flex-direction:column;gap:var(--sp-3)}
 /* F34: only .content (the list) carries the swipe animation now -- the
-   controls and .sec-title above it (both outside .content) stay put, so a
-   swipe visibly moves just the list, not the whole screen. */
+   controls above it (outside .content) stay put, so a swipe visibly moves
+   just the list, not the whole screen. */
 .content{display:flex;flex-direction:column;gap:var(--sp-3)}
 /* room below the last card, so a jump can always bring its target to the top */
 .content::after{content:"";flex:none;height:50vh}
