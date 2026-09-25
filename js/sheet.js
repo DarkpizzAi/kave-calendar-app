@@ -95,15 +95,14 @@ function weekBody(m, f) {
 function stripName(e, f) { return e.owner !== f.me && e.owner !== "shared" ? who(e.owner) : ""; }
 
 function strip(e, f) {
-  /* F37: the line under the title is the status, then the guests with the
-     viewer's own name filtered out -- never "Isa · Apu" on Isa's phone. */
+  /* F67 (supersedes F37/F60): the line under the title is guests alone,
+     with the viewer's own name filtered out -- never "Isa · Apu" on Isa's
+     phone -- and never the status, which F39's pill above already carries,
+     guests or not. statusGuestsLine (cal-model.js, tested) is the one
+     place that rule lives. */
   /* F43: the "until Sun" day-span used to repeat here too, redundant with
      the date already named by the day this strip belongs to. */
-  /* F60: with no guests, this line is empty rather than falling back to the
-     bare status word -- that would duplicate F39's status pill above, in
-     the title itself. statusGuestsLine (cal-model.js, tested) is the one
-     place that rule lives. */
-  const statusGuests = statusGuestsLine(STATUS_LABEL[e.status], guestsExcludingViewer(e.guests, who(f.me)));
+  const statusGuests = statusGuestsLine(guestsExcludingViewer(e.guests, who(f.me)));
   const lines = [statusGuests].filter(Boolean);
   const name = stripName(e, f);
   /* F38: no inline add-task in this view -- a small checkbox glyph (F16)

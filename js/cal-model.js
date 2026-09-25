@@ -215,13 +215,27 @@ export function guestsExcludingViewer(guests, viewerName) {
     .join(", ");
 }
 
-/* F60: the single-day sheet's status/guests line under an event's title.
-   With no guests, F37's line used to fall back to the bare status word,
-   duplicating F39's status pill shown right above it in the header -- so
-   with no guests this line is empty, not the status alone; the status
-   still shows, once, in the pill. */
-export function statusGuestsLine(statusLabel, guestsText) {
-  return guestsText ? [statusLabel, guestsText].filter(Boolean).join(" · ") : "";
+/* F67 (supersedes F37/F60): the single-day sheet's line under an event's
+   title never repeats the status -- F39's pill above it already shows that,
+   guests or not. F60 only fixed the no-guests case (dropping the bare
+   status word); an event *with* guests still read "Planned · Mora, Charles"
+   here, duplicating the pill. So this line is guests alone, or empty --
+   the status parameter is gone entirely, not just its no-guests fallback. */
+export function statusGuestsLine(guestsText) {
+  return guestsText || "";
+}
+
+/* F61 (corrects F58/F12): the Yearly heat-strip squares must not respect
+   the category filter -- same reasoning as F20's "N plans", which already
+   reads from the unfiltered accessor. `on` here is meant to be
+   frame.onAll, not frame.on; the itemised lines below the squares are the
+   only thing that stays category-filtered (calendar.js passes frame.on
+   for those, unchanged). Pure so the fill rule is tested without a DOM. */
+export function heatFill(on, d, isCurrentMonth, me) {
+  const evs = on(d);
+  const mine = evs.some((e) => e.owner === me || e.owner === "shared");
+  if (isCurrentMonth) return mine ? "mine" : evs.length ? "other" : "";
+  return mine ? "future" : "";
 }
 
 const fold = (s) => String(s || "").toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");

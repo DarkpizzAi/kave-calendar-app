@@ -2,7 +2,7 @@ import { test, eq, ok } from "./run.js";
 import { weekRows, indexByDay, tappable, zoomWeekTarget, zoomMonthTarget, isAway, isBig, awayText,
   shouldLoadMore, nextCount, iconsOf, searchEvents, todaysCount, fullPastWeeks, fullPastMonths,
   backToTodayState, eventsInMonth, tripCityFor, defaultCity, hideCancelled,
-  hasOpenTodos, guestsExcludingViewer, statusGuestsLine } from "../js/cal-model.js";
+  hasOpenTodos, guestsExcludingViewer, statusGuestsLine, heatFill } from "../js/cal-model.js";
 import { readPrefs, byCategories } from "../js/prefs.js";
 
 const ev = (id, start, extra = {}) => ({ id, title: id, start, end: null, owner: "shared", status: "planned", activities: [], ...extra });
@@ -164,7 +164,7 @@ test("cal: eventsInMonth collects each unique event once across the month", () =
   const on = (d) => idx.get(d) || [];
   eq(eventsInMonth(on, "2026-10", 31).map((e) => e.id), ["drinks", "trip"]);
 });
-test("cal: F20 -- the plans count ignores category filters, unlike the heat-strip fill", () => {
+test("cal: F20/F61 -- the plans count and the heat-strip fill both ignore category filters; only the itemised lines below stay filtered", () => {
   const drinks = ev("drinks", "2026-10-05", { activities: [act("drinks")] });
   const trip = ev("trip", "2026-10-10", { activities: [act("transport")] });
   const all = [drinks, trip];
@@ -173,10 +173,10 @@ test("cal: F20 -- the plans count ignores category filters, unlike the heat-stri
   const onAll = (d) => (indexByDay(all).get(d) || []);
   const onFiltered = (d) => (indexByDay(filtered).get(d) || []);
   const count = eventsInMonth(onAll, "2026-10", 31).length;
-  const heatEvents = eventsInMonth(onFiltered, "2026-10", 31).length;
+  const itemisedLines = eventsInMonth(onFiltered, "2026-10", 31).length;
   eq(count, 2, "the count includes the hidden-category event");
-  eq(heatEvents, 1, "the heat-strip's own event list stays filtered");
-  ok(count !== heatEvents, "F20: count and heat-strip now disagree when a category is hidden");
+  eq(itemisedLines, 1, "the itemised lines below the squares stay filtered (F61 leaves this alone)");
+  ok(count !== itemisedLines, "the count/heat-strip source and the itemised-lines source now disagree when a category is hidden -- that's F61's whole point");
 });
 
 /* ---- F22: default city, trip-aware -- reuses isAway (Monthly's "away"
@@ -213,13 +213,34 @@ test("cal: guestsExcludingViewer drops the viewer's own name, case-insensitively
   eq(guestsExcludingViewer("Apu,  Jordi ,Isa", "Isa"), "Apu, Jordi", "extra whitespace around names is trimmed");
 });
 
-/* ---- F60: the day-sheet status/guests line is empty (not the bare status)
-   when there are no guests -- the status only shows once, in F39's pill. */
-test("cal: statusGuestsLine is empty with no guests, so the status pill above never duplicates", () => {
-  eq(statusGuestsLine("Planned", ""), "", "no guests -- nothing to show, the pill already carries the status");
-  eq(statusGuestsLine("Planned", "Apu, Jordi"), "Planned · Apu, Jordi");
-  eq(statusGuestsLine("", "Apu"), "Apu", "no status label, guests still show alone");
-  eq(statusGuestsLine("", ""), "");
+/* ---- F67 (supersedes F37/F60): the day-sheet's line under an event's
+   title never repeats the status -- F39's pill above it already carries
+   it, guests or not -- so this line is guests alone, or empty. */
+test("cal: statusGuestsLine never repeats the status -- guests alone, or empty", () => {
+  eq(statusGuestsLine(""), "", "no guests -- nothing to show, the pill already carries the status");
+  eq(statusGuestsLine("Apu, Jordi"), "Apu, Jordi", "guests alone, no 'Planned ·' prefix");
+  eq(statusGuestsLine(null), "");
+});
+
+/* ---- F61 (corrects F58/F12): the heat-strip fill reads from whatever
+   accessor is passed in -- calendar.js passes frame.onAll (unfiltered, the
+   same source "N plans" already uses), never frame.on (category-filtered),
+   so a hidden category's day still lights up. ---- */
+test("cal: heatFill colours a day from the given accessor, unfiltered by category when that accessor is unfiltered", () => {
+  const mine = ev("m", "2026-11-05", { owner: "isa" });
+  const other = ev("o", "2026-11-06", { owner: "hugo" });
+  const onAll = (d) => (d === "2026-11-05" ? [mine] : d === "2026-11-06" ? [other] : []);
+  eq(heatFill(onAll, "2026-11-05", true, "isa"), "mine", "current month, viewer's own event");
+  eq(heatFill(onAll, "2026-11-06", true, "isa"), "other", "current month, another person only");
+  eq(heatFill(onAll, "2026-11-07", true, "isa"), "", "current month, empty day");
+  eq(heatFill(onAll, "2026-11-05", false, "isa"), "future", "future month, viewer's own event -- accent fade");
+  eq(heatFill(onAll, "2026-11-06", false, "isa"), "", "future month, another person only -- unfilled, not a separate grey");
+  eq(heatFill(onAll, "2026-11-07", false, "isa"), "", "future month, empty day");
+  /* the point of F61: pass an accessor that ignores the category filter
+     (frame.onAll), and a hidden-category event still fills -- the caller
+     (calendar.js) is responsible for choosing onAll over on for this. */
+  const onFiltered = () => []; // simulates a category-hidden day under frame.on
+  eq(heatFill(onFiltered, "2026-11-05", true, "isa"), "", "if the caller passed the filtered accessor, the day would wrongly read empty -- onAll must be what's wired up in calendar.js");
 });
 
 /* ---- F38: does this event have at least one open to-do ---- */
