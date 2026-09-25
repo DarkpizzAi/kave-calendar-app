@@ -129,7 +129,7 @@ function renderSettings() {
 }
 
 /* The public address, the same wherever this copy runs (a PC, localhost) */
-const APP_URL = "https://darkpizzai.github.io/kave-compass-app/";
+const APP_URL = "https://darkpizzai.github.io/kave-calendar-app/";
 
 /* The two Settings sheets, as levels of the one sheet. */
 const VIEW_LABEL = { weekly: "Weekly", monthly: "Monthly", yearly: "Yearly" };

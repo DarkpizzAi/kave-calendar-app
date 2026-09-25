@@ -12,6 +12,13 @@ The repo, its GitHub Pages URL, and the `CACHE` name in `service-worker.js`
 are the deployment's identity. Renaming any of them moves the live URL and
 orphans every installed copy on every phone. There is no migration path.
 
+Renamed once, deliberately, on 2026-09-25 (Isa's request, the day after the
+first deploy): `kave-compass-app` became
+`kave-calendar-app`, like Spoon's `kave-food-app`. The live address is now
+https://darkpizzai.github.io/kave-calendar-app/ and the old one is a 404.
+The `CACHE` name still says `kave-compass`: it is the app's name, not the
+address, and changing it would only discard every phone's cache.
+
 ## Bump `VERSION` on every deploy
 
 In `service-worker.js`. **A token change counts as a deploy.** A stale
