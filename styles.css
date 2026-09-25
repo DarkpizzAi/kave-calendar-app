@@ -225,7 +225,7 @@ button:disabled { opacity: .5; cursor: default; }
 .todo-l.done{color:var(--text-dim);text-decoration:line-through}
 a.ticket{color:inherit;text-decoration:none}
 @media (prefers-reduced-motion: reduce){
-  .sfield,.sheet.in,.sheet.out,.shade.out,.slide-left,.slide-right,.views .ind,.sbody.out-up,.sbody.in-up,.sbody.out-down,.sbody.in-down{animation:none}
+  .sfield,.sheet.in,.sheet.out,.shade.out,.slide-left,.slide-right,.segment .seg-thumb,.sbody.out-up,.sbody.in-up,.sbody.out-down,.sbody.in-down{animation:none}
   .fab.up,.fab.down,.fab.up svg,.fab.down svg,.nav-icon{transition:none}
 }
 /* F28: three round buttons, all the same size (F15) -- add, and two above
@@ -270,18 +270,24 @@ a.ticket{color:inherit;text-decoration:none}
 @keyframes sr{from{transform:translateX(-18%);opacity:0}}
 .ctl2{display:flex;gap:var(--sp-3);align-items:center}
 .ctl.searching .ctl2{flex:1}
-/* the view switch: the selected pill is the soft accent and slides with the page */
-.views{position:relative;flex:1;display:flex;background:var(--surface-2);border-radius:var(--r-pill);padding:3px}
-/* F24: the tab indicator moves with the page it belongs to -- same timing.
-   F30: the selected pill is the accent colour, reversing section 3's
-   original "card colour, not accent" wording (Isa's explicit call, round
-   4) -- same construction as the day/week/month label pills' .on (F27). */
-.views .ind{position:absolute;top:3px;bottom:3px;left:3px;width:calc((100% - 6px) / 3);border-radius:var(--r-pill);background:var(--accent);box-shadow:var(--shadow-card);transform:translateX(calc(var(--i) * 100%));animation:ind var(--motion-base) var(--ease-drag)}
+/* F59: Spoon's real .segment/.seg-thumb/.segment button construction
+   (kave-food-app/styles.css, its Period + Group-by segmented control),
+   copied verbatim -- the same component Compass's view toggle has aimed
+   at, and missed, for two prior rounds (F30, F36). Adapted only where the
+   spec itself says to: three options, not two, so the thumb's width is
+   calc(33.33% - 3px), not calc(50% - 3px), and its translateX is 0/100/200%
+   -- driven here by --i (0, 1 or 2, set per render in calendar.js) rather
+   than three fixed [data-on] selectors, the same value at each step. */
+.segment{position:relative;display:flex;background:var(--surface-2);border-radius:var(--r-pill);padding:3px}
+.seg-thumb{position:absolute;top:3px;bottom:3px;left:3px;width:calc(33.33% - 3px);border-radius:var(--r-pill);background:var(--accent);box-shadow:var(--shadow-card);transform:translateX(calc(var(--i) * 100%));animation:ind var(--motion-base) var(--ease-drag)}
 @keyframes ind{from{transform:translateX(calc(var(--from) * 100%))}}
-/* F36: matches Spoon's "6 months / all time" toggle (.segment button)'s own
-   text size, --fs-ui, not --fs-meta. */
-.views button{position:relative;flex:1;border:0;background:none;padding:7px var(--sp-2);border-radius:var(--r-pill);font-size:var(--fs-ui)}
-.views button.on{font-weight:var(--fw-strong);color:var(--accent-text)}
+/* F36: matches Spoon's "6 months / all time" toggle's own text size,
+   --fs-ui, not --fs-meta. */
+.segment button{position:relative;z-index:1;flex:1 1 0;min-width:0;border:none;background:none;font:inherit;font-size:var(--fs-ui);font-weight:var(--fw-medium);color:var(--text-dim);padding:7px var(--sp-2);min-height:0;border-radius:var(--r-pill);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+/* F30/F59: the selected button's text is accent-text on the accent-filled
+   thumb -- Compass's toggle is a tablist (aria-selected), not Spoon's plain
+   toggle buttons (aria-pressed), so the same rule keys off aria-selected. */
+.segment button[aria-selected="true"]{color:var(--accent-text);font-weight:var(--fw-strong)}
 .ib{flex:none;width:40px;height:40px;border:0;border-radius:var(--r-round);background:var(--surface-2);color:var(--text-dim);display:grid;place-items:center;padding:0}
 .sfield{flex:1;display:flex;align-items:center;gap:var(--sp-2);height:40px;padding:0 var(--sp-1) 0 var(--sp-3);border-radius:var(--r-control);background:var(--surface-2);transform-origin:right center;animation:grow var(--motion-slow) var(--ease-sheet)}
 @keyframes grow{from{clip-path:inset(0 0 0 calc(100% - 40px) round var(--r-round))}to{clip-path:inset(0 0 0 0 round var(--r-control))}}
@@ -304,7 +310,9 @@ a.ticket{color:inherit;text-decoration:none}
 .rows li.note{column-gap:0}
 .rows.dated li.note{grid-template-columns:52px 0 minmax(0,1fr) auto;column-gap:var(--sp-2)}
 .rows li[data-act]{cursor:pointer;min-height:32px}
-.c-d{font-size:var(--fs-meta);color:var(--text-dim);font-variant-numeric:tabular-nums;white-space:nowrap}
+/* F57: the date is the same size as the event's own title text on that
+   line (c-t carries no font-size of its own, F36) -- no override here. */
+.c-d{color:var(--text-dim);font-variant-numeric:tabular-nums;white-space:nowrap}
 .c-i{font-size:15px;line-height:1;white-space:nowrap;letter-spacing:2px}
 /* F36: matches Spoon's "Worth watching" list-item text size -- .opp-name
    there carries no font-size of its own, reading at the plain body size;
@@ -373,7 +381,7 @@ a.ticket{color:inherit;text-decoration:none}
   .app-header{padding-inline:var(--sp-5)}
   .mn{padding:var(--sp-5) var(--sp-5) calc(var(--sp-7) * 2)}
   .ctl{flex-wrap:wrap;justify-content:flex-start}
-  .ctl .views{flex:none;width:380px}
+  .ctl .segment{flex:none;width:380px}
   .ctl.searching .ctl2{width:380px}
   .g3{grid-template-columns:repeat(7,minmax(0,1fr))}
   .day{min-height:110px}
@@ -424,13 +432,23 @@ a.ticket{color:inherit;text-decoration:none}
    font as the rest of the line, not a heading and not the chevron glyph. */
 .plans-line{margin:0;font-size:var(--fs-meta);color:var(--text-dim);background:none;border:0;padding:0;min-height:0;text-align:right;white-space:nowrap}
 
-/* ---- F12: the heat strip. Today is marked independent of fill; only the
-   current month is colour-coded (viewer's own event in the accent, an
-   other-person-only day in accent-soft); every other month's day is plain
-   grey, regardless of events. ---- */
+/* ---- F58 (revises F12/F31): the heat strip. Today is marked independent
+   of fill. Current month: the viewer's own or a joint event fills accent,
+   an other-person-only day fills accent-soft, empty is unfilled (the plain
+   .heat i background above, var(--surface-2)). Future months: the viewer's
+   own or a joint event fills a muted, darker "accent fade" (.future); every
+   other day (empty, or another person only) is unfilled -- the SAME empty
+   colour as the current month's, not a separate flatter grey (that was
+   F31's bug: every future square, including ones with no fill at all,
+   drew as one flat grey with nothing to tell them apart).
+   --accent-soft turned out to read as a PALE tint next to that empty fill,
+   not a dark one (checked live at 16px against .heat i.mine and the plain
+   empty square) -- so .future is a deliberately darkened accent, a one-off
+   kept out of the token system, the same reasoning F12's own open question
+   about --accent-soft already raised. */
 .heat i.mine{background:var(--accent)}
 .heat i.other{background:var(--accent-soft)}
-.heat i.grey{background:#8a8f9c}
+.heat i.future{background:color-mix(in srgb, var(--accent) 55%, var(--text) 25%)}
 .heat i.t{outline:2px solid var(--text);outline-offset:-2px}
 
 /* ---- F16: a tiny inline SVG checkbox glyph marks an event with open

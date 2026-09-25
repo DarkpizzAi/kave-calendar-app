@@ -109,8 +109,10 @@ function todayAnchor() {
    wording. */
 function controls() {
   const idx = VIEWS.indexOf(S.view), from = S.fromView == null ? idx : VIEWS.indexOf(S.fromView);
-  const views = `<div class="views" role="tablist"><span class="ind" style="--i:${idx};--from:${from}"></span>`
-    + VIEWS.map((v) => `<button role="tab" aria-selected="${S.view === v}" class="${S.view === v ? "on" : ""}" data-act="view" data-v="${v}">${v[0].toUpperCase() + v.slice(1)}</button>`).join("") + "</div>";
+  /* F59: Spoon's .segment/.seg-thumb construction, copied verbatim
+     (styles.css) -- .ind became .seg-thumb, .views became .segment. */
+  const views = `<div class="segment" role="tablist"><span class="seg-thumb" style="--i:${idx};--from:${from}"></span>`
+    + VIEWS.map((v) => `<button role="tab" aria-selected="${S.view === v}" data-act="view" data-v="${v}">${v[0].toUpperCase() + v.slice(1)}</button>`).join("") + "</div>";
   const detail = `<button class="ib" data-act="menu" aria-label="Detail level" aria-expanded="${S.menu}">${ICON.eye}</button>`;
   /* F29: "load older" is now one of three inline control buttons, sitting
      between detail and search, not a floating round button (F6's mechanism
@@ -211,10 +213,15 @@ function monthCard(y, mo) {
     const d = `${key}-${String(dd).padStart(2, "0")}`;
     const on = frame.on(d);
     for (const e of on) if (!evs.includes(e)) evs.push(e);
-    /* F12: only the current month is colour-coded (viewer's own event in the
-       accent, an other-person-only day in accent-soft); every other month's
-       square is plain grey. Today is marked independent of fill. */
-    const fill = !now ? "grey" : on.some((e) => e.owner === frame.me || e.owner === "shared") ? "mine" : on.length ? "other" : "";
+    /* F58 (revises F12/F31): the current month is colour-coded -- the
+       viewer's own or a joint event in the accent, an other-person-only day
+       in accent-soft. Future months are new: the viewer's own or a joint
+       event fills in a muted, darker "accent fade" (.future, CSS); every
+       other future square is empty, the same empty fill as the current
+       month's (no class at all -- "grey" no longer exists as a separate,
+       flatter colour). Today is marked independent of fill. */
+    const mine = on.some((e) => e.owner === frame.me || e.owner === "shared");
+    const fill = now ? (mine ? "mine" : on.length ? "other" : "") : mine ? "future" : "";
     cells += `<i class="${fill}${d === frame.today ? " t" : ""}"></i>`;
   }
   /* F10: a long weekend or opportunity that has already passed does not
@@ -225,6 +232,14 @@ function monthCard(y, mo) {
      the viewer's Yearly categories (prefs.js's byCategories, applied in
      buildFrame), whose default is now the real "big things" set. Toggling
      Categories in Settings genuinely changes what a month's card lists. */
+  /* F56: each plan line renders through the same row()/noteRowPlain() the
+     rest of the app uses -- no separate per-line colour/heat tint exists
+     here (checked: cls() only ever adds "grey" for partial-detail's other
+     person, unchanged everywhere else, "idea" and "cancelled", none of them
+     Yearly-specific). Confirmed live: a month card's lines are plain text,
+     same colours as Weekly/Monthly's own rows. F56 is a verification, not a
+     code change; F58 above is the actual bug it was seen alongside (the
+     heat-strip squares, not these lines). */
   const items = evs.map((e) => ({ d: e.start, html: row(e, true, true) }))
     .concat(lw.map((w) => ({ d: w.start, html: noteRowPlain(w.start, `${w.text}, ${w.names}`) })));
   /* F20: the count is unfiltered by category (frame.onAll), a partial
@@ -288,7 +303,7 @@ function ensureYears() {
    where it always was. F4: no more Today card, just its anchor. */
 /* F34: the swipe animation now applies only to .content (the list), not
    the whole .page -- the controls stay put; only the view toggle's own
-   .ind pill (its own transform/animation, untouched) visibly slides to its
+   .seg-thumb (its own transform/animation, untouched) visibly slides to its
    new position. */
 export function calendarHtml() {
   frame = buildFrame();
