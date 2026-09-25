@@ -11,7 +11,7 @@
    so the teardown has to live here to be able to break out of a stale shell.
 */
 
-const VERSION = "v1.0-rc1";
+const VERSION = "v1.0";
 const CACHE = `kave-compass-${VERSION}`;
 
 const IS_LOCAL_DEV = ["localhost", "127.0.0.1"].includes(self.location.hostname);
@@ -61,6 +61,7 @@ const SHELL = [
   "js/store.js",
   "js/theme.js",
   "js/sync.js",
+  "js/updates.js",
   "js/render.js",
   "js/wire.js",
   "js/pull-to-sync.js",

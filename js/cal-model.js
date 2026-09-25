@@ -6,14 +6,20 @@
 import { addDays, dayOfWeek, mondayOf, daysOf } from "./dates.js";
 import { firstWeekOf } from "./views.js";
 import { iconFor } from "./icons.js";
+import { applyDetail } from "./filter.js";
 
 const DOW = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
-const MON = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
 
-/* "Mon 21" in rows; another year's date says its month and year. */
+/* F62: "Mon 21" in rows -- weekday and day-of-month only, for every year,
+   not just the current one. Yearly's future-year cards used to append the
+   month (and year) here, "Fri 24 Sep 2027" instead of "Fri 24" -- but each
+   card already names its own month and year (monthCard's heading,
+   yearHead), so repeating it on every line was redundant, and the current
+   year's lines never did it. `thisYear` is unused now but kept in the
+   signature: every call site already threads frame.thisYear through, and
+   dropping the parameter buys nothing. */
 export function shortDate(day, thisYear) {
-  const base = `${DOW[dayOfWeek(day)]} ${Number(day.slice(8))}`;
-  return day.slice(0, 4) === thisYear ? base : `${base} ${MON[Number(day.slice(5, 7)) - 1]} ${day.slice(0, 4)}`;
+  return `${DOW[dayOfWeek(day)]} ${Number(day.slice(8))}`;
 }
 
 /* Weekly: day cards three a row (3, 3, 1), one row of seven when wide. */
@@ -41,7 +47,10 @@ export const zoomWeekTarget = (day) => mondayOf(day);
 export const zoomMonthTarget = (ym) => firstWeekOf(ym);
 
 const has = (e, types) => (e.activities || []).some((a) => types.includes(a.type));
-const AWAY = ["transport", "accommodation", "business-trip"];
+/* Also prefs.js's single source for Yearly's default-shown categories
+   (F17): the "who is away" set plus "visitor" is what Yearly always meant
+   by "big things", so it is exported rather than re-declared. */
+export const AWAY = ["transport", "accommodation", "business-trip"];
 
 /* Monthly's "who is away" line. */
 export const isAway = (e) => has(e, AWAY);
@@ -52,6 +61,12 @@ export function isBig(e) {
   return isAway(e) || has(e, ["visitor"]);
 }
 
+/* F35: a cancelled event is hidden outright in Weekly ("if I really don't
+   want to see them I'll delete them" is Isa's own escape hatch there); Monthly
+   and Yearly keep it visible, struck through instead (calendar.js's cls()
+   marks it, the CSS strikes only the title). */
+export const hideCancelled = (events, view) => (view === "weekly" ? events.filter((e) => e.status !== "cancelled") : events);
+
 /* An event's real last day: daysOf caps a span at 62 days and reads an end
    before the start as one day, so a typo'd end (2099) stretches nothing
    (final review M1). */
@@ -59,6 +74,18 @@ const lastDay = (e) => { const d = daysOf(e); return d.length ? d[d.length - 1] 
 export function lastEventDay(events) {
   return events.reduce((m, e) => { const l = lastDay(e); return l > m ? l : m; }, "");
 }
+
+/* F22: a new event defaults its city to Barcelona, unless its date falls
+   within a trip the person is already on -- reusing isAway (Monthly's own
+   "away" test, spec section 3) rather than a second definition of "trip".
+   `events` need not be pre-filtered: deleted events are skipped here. */
+export function tripCityFor(events, date) {
+  const e = events.find((ev) => !ev.deleted && isAway(ev) && daysOf(ev).includes(date));
+  return e && e.city ? e.city : null;
+}
+
+/* F22: the form's actual default -- Barcelona, unless a trip's city wins. */
+export const defaultCity = (events, date) => tripCityFor(events, date) || "barcelona";
 
 export function awayText(e, thisYear) {
   const who = e.owner === "shared" ? e.title : `${e.owner === "isa" ? "Isa" : "Hugo"} in ${e.title}`;
@@ -78,13 +105,24 @@ export const nextCount = (count, step, cap) => Math.min(cap, count + step);
 
 /* One rule for a finished drag, mouse or touch: a clear sideways swipe
    changes view, a pull down from the very top reveals See previous (and
-   syncs); anything else is an ordinary scroll. */
-export function gesture({ dx, dy, top, searching }) {
+   syncs); anything else is an ordinary scroll. F53: "the very top" only
+   counts as the true top -- scrollTop<=0 alone is not enough once "load
+   older" (F6/F29) has pulled earlier data in, because scrollTop 0 then sits
+   at the start of THAT older content, not at today's normal range. A pull
+   there must not arm; the down button (F28) is what collapses it back, and
+   only after that does a pull at the visual top mean anything again. */
+export function gesture({ dx, dy, top, searching, loadedOlder }) {
   if (searching) return null;
   if (Math.abs(dx) > 70 && Math.abs(dx) > 1.5 * Math.abs(dy)) return dx < 0 ? "next" : "prev";
-  if (top && dy > 60 && Math.abs(dy) > Math.abs(dx)) return "pull";
+  if (top && !loadedOlder && dy > 60 && Math.abs(dy) > Math.abs(dx)) return "pull";
   return null;
 }
+
+/* F53: whether the currently loaded content's visual top is still today's
+   normal range, or whether "load older" has moved it -- the same state
+   backToTodayState resets. Pure so gesture()'s arming condition and the
+   down button's own "is there anything to collapse" both read one answer. */
+export const hasLoadedOlder = (past) => Object.values(past).some(Boolean);
 
 /* See previous: reveal more of what is loaded, load the year before, or
    nothing, once kave-hub has no older year. */
@@ -106,11 +144,98 @@ export function pastMonths(today, floorYear, count) {
   return out;
 }
 
+/* F7: "See previous" / the floating "load older" button jump straight to 1
+   January of the current floor year in one go, instead of revealing a few
+   weeks or months at a time. */
+export function fullPastWeeks(thisMonday, floorYear) {
+  const floorMonday = mondayOf(floorYear + "-01-01");
+  return Math.max(0, Math.round((Date.parse(thisMonday) - Date.parse(floorMonday)) / 6048e5));
+}
+export function fullPastMonths(today, floorYear) {
+  return pastMonths(today, floorYear, 9999).length;
+}
+
+/* F7: "Back to today" discards whatever earlier years were loaded, so the
+   list is back to its normal range (this year on) and pull to refresh works
+   again -- the bug was old, loaded years sitting in the DOM state. */
+export function backToTodayState(thisYear) {
+  return { past: { weekly: 0, monthly: 0, yearly: 0 }, floor: thisYear, exhausted: false };
+}
+
+/* F3: the Calendar nav icon's badge. Minimal shows only the viewer's own
+   (and shared) events today; Partial and Full show both people's -- exactly
+   applyDetail's own "minimal drops theirs" rule, reused rather than
+   reinvented. `eventsToday` is undeduped by span (indexByDay already gives
+   one entry per day). */
+export function todaysCount(eventsToday, me, detail) {
+  return applyDetail(eventsToday.filter((e) => !e.deleted), me, detail).length;
+}
+
+/* F20: the Yearly month card's own unique-events-in-month collection,
+   pulled out so it can run once against the filtered index (the card's
+   body and the heat-strip, F12/F17, unaffected) and once against an
+   unfiltered-by-category index (the "N plans" count, which must match
+   what Monthly actually shows once you jump there -- Isa: category
+   filters are a Calendar display choice, not a count that should lie
+   about how many plans exist). `on` is a day -> events accessor, same
+   shape as a frame's `on`. */
+export function eventsInMonth(on, key, days) {
+  const out = [];
+  for (let dd = 1; dd <= days; dd++) {
+    const d = `${key}-${String(dd).padStart(2, "0")}`;
+    for (const e of on(d)) if (!out.includes(e)) out.push(e);
+  }
+  return out;
+}
+
 /* The emoji for an event, drawn for this viewer. A dated idea shows ❔. */
 export function iconsOf(e, viewer) {
   if (e.status === "idea") return ["❔"];
   const acts = e.activities && e.activities.length ? e.activities : [{ type: "none" }];
   return acts.map((a) => iconFor(a, e, viewer));
+}
+
+/* F16/F38: true when an event has at least one unchecked to-do -- the one
+   place this is decided, so the list row's icon (calendar.js) and the
+   single-day strip's icon (sheet.js) can never drift apart. */
+export function hasOpenTodos(e) {
+  return (e.checklist || []).some((c) => !c.done);
+}
+
+/* F37: the guests text with the viewer's own first name removed, so "Isa"
+   never appears in guests shown on Isa's own phone even if she is listed.
+   Guests is free text, comma-separated first names (spec section 1); a
+   case-insensitive whole-name match is removed, the rest rejoined. */
+export function guestsExcludingViewer(guests, viewerName) {
+  const vn = String(viewerName || "").trim().toLowerCase();
+  return String(guests || "")
+    .split(",")
+    .map((g) => g.trim())
+    .filter((g) => g && g.toLowerCase() !== vn)
+    .join(", ");
+}
+
+/* F67 (supersedes F37/F60): the single-day sheet's line under an event's
+   title never repeats the status -- F39's pill above it already shows that,
+   guests or not. F60 only fixed the no-guests case (dropping the bare
+   status word); an event *with* guests still read "Planned · Mora, Charles"
+   here, duplicating the pill. So this line is guests alone, or empty --
+   the status parameter is gone entirely, not just its no-guests fallback. */
+export function statusGuestsLine(guestsText) {
+  return guestsText || "";
+}
+
+/* F61 (corrects F58/F12): the Yearly heat-strip squares must not respect
+   the category filter -- same reasoning as F20's "N plans", which already
+   reads from the unfiltered accessor. `on` here is meant to be
+   frame.onAll, not frame.on; the itemised lines below the squares are the
+   only thing that stays category-filtered (calendar.js passes frame.on
+   for those, unchanged). Pure so the fill rule is tested without a DOM. */
+export function heatFill(on, d, isCurrentMonth, me) {
+  const evs = on(d);
+  const mine = evs.some((e) => e.owner === me || e.owner === "shared");
+  if (isCurrentMonth) return mine ? "mine" : evs.length ? "other" : "";
+  return mine ? "future" : "";
 }
 
 const fold = (s) => String(s || "").toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");

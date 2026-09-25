@@ -7,6 +7,7 @@ import { isValidDate, precision, compareDates } from "./dates.js";
 import { uid, safeUrl } from "./util.js";
 
 export const STATUSES = ["idea", "planned", "booked", "done", "cancelled"];
+export const STATUS_LABEL = { idea: "Idea", planned: "Planned", booked: "Booked", done: "Done", cancelled: "Cancelled" };
 export const PEOPLE = ["isa", "hugo"];
 export const OWNERS = ["isa", "hugo", "shared"];
 

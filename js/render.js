@@ -14,11 +14,12 @@ import { escapeHtml, copyText } from "./util.js";
 import { PALETTES, applyPalette, themeBootRan, paletteAccents, paletteSofts } from "./theme.js";
 import { status as syncStatus, checkToken } from "./sync.js";
 import { ICON } from "./chrome-icons.js";
-import { calendarHtml, afterCalendar, onScroll, backToToday } from "./calendar.js";
+import { calendarHtml, afterCalendar, onScroll, backToToday, todaysCount } from "./calendar.js";
 import { refreshSheet, openLevel, registerLevel } from "./sheet.js";
-import { readPrefs, isShown, toggleCategory, defaultsSummary, categoriesSummary, VIEW_NAMES, DETAIL_NAMES, STYLE_NAMES } from "./prefs.js";
+import { readPrefs, isShown, toggleCategory, resetCategories, defaultsSummary, categoriesSummary, VIEW_NAMES, DETAIL_NAMES, STYLE_NAMES } from "./prefs.js";
 import { CATEGORIES, iconFor } from "./icons.js";
 import { resetCalendarDefaults } from "./calendar.js";
+import { checkForUpdate, ensureVersionAsked, updateStatusLines, updateBusy, updateButtonText, updateReady } from "./updates.js";
 
 /* Sync of the events themselves, shown in Settings only (spec: the Calendar
    never shows sync state). Set by boot.js. */
@@ -48,8 +49,16 @@ export function setView(name) {
   if (!VIEWS[name]) return;
   if (name === current && name === "calendar") { backToToday(); return; }
   current = name;
+  /* F64: every tab switch lands scrolled to the top, filters visible.
+     Setting scrollTop here used to be undone right after: `firstDraw` was
+     reset to true on every switch, so afterCalendar's "before.first"
+     branch (render.js -> calendar.js) fired again and scrolled to #today
+     instead, which sits below the filter bar and section heading -- so
+     returning to Calendar always hid the controls, not just on first load.
+     firstDraw now stays whatever it already is (true only for the app's
+     genuine first render), so afterCalendar falls through to its literal
+     "mn.scrollTop = before.top" branch, which is the 0 set right here. */
   document.getElementById("view").scrollTop = 0;
-  firstDraw = true;
   render();
 }
 
@@ -105,6 +114,11 @@ function renderSettings() {
   const when = dataSync.at ? `${dataSync.state === "ok" ? "Last synced" : "Last tried"} at ${new Date(dataSync.at).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}.` : "";
   const tok = syncStatus.state === "idle" ? "" : `<p class="token-status">${escapeHtml(syncStatus.message)}</p>`;
   const diag = themeBootRan() ? "" : '<p class="token-status">Theme preload BLOCKED: recompute the CSP hash (see README)</p>';
+  /* F19: ported from Spoon (js/view-settings.js's checkForUpdate/updateState)
+     rather than invented fresh; the version line moves in here from the old
+     ad hoc swVersion postMessage, so there is one mechanism, not two. */
+  if (advancedOpen) ensureVersionAsked(render);
+  const updLines = updateStatusLines().map(([k, t]) => `<span class="sync-line ${k}"><i></i>${escapeHtml(t)}</span>`).join("");
 
   return `<div class="fields">
     ${field("Theme", theme, "Light and dark follow the phone.")}
@@ -121,7 +135,8 @@ function renderSettings() {
           "Stored on this device only, sent only to GitHub. Fine-grained, Contents: read and write on kave-hub.")}
         ${field('<label for="appLink">App link</label>', `<div class="token-row"><input id="appLink" type="text" value="${escapeHtml(APP_URL)}" readonly><button id="copyAppLink">Copy</button></div>`,
           "Open Compass on another device: copy this and send it to your phone.")}
-        ${field("About", `<p class="sync-line muted">Compass <span id="swVersion">checking version...</span></p>${diag}`,
+        ${field("About", `<div class="sync-status">${updLines}</div>`
+          + `<button id="updateBtn"${updateBusy() ? " disabled" : ""}>${escapeHtml(updateButtonText())}</button>${diag}`,
           "The household planner. Data in kave-hub; the mini PC runs the sweeps.")}
       </div>
     </div>
@@ -163,17 +178,27 @@ registerLevel("set-cats", {
       }).join("") + "</div>").join("");
     return `<p class="fhint">What ${me === "hugo" ? "Hugo" : "Isa"} sees in each view. Each of you picks your own; hiding a category deletes nothing.</p><div class="grid">${head}${rowsHtml}</div>`;
   },
+  bar: () => `<button class="act-btn" data-act="reset">Reset</button>`,
   onAction(b) {
-    const v = b.dataset.tickView, t = b.dataset.tickType, s = store.state.settings;
+    const s = store.state.settings;
+    if (b.dataset.act === "reset") {
+      store.setSetting("hiddenCategories", resetCategories(readPrefs(s)).hiddenCategories);
+      return;
+    }
+    const v = b.dataset.tickView, t = b.dataset.tickType;
     if (!v || !t || !s.me) return;
     store.setSetting("hiddenCategories", toggleCategory(readPrefs(s), s.me, v, t).hiddenCategories);
   },
 });
 
+/* F3: a today's-event-count badge on the Calendar nav icon, styled like the
+   shopping list's item-count badge (household-look.md, "The nav count
+   badge"): hidden entirely at zero rather than showing "0". */
 function renderNav() {
+  const count = todaysCount();
   return Object.entries(VIEWS).map(([id, label]) => `
     <button data-view="${escapeHtml(id)}" ${current === id ? 'aria-current="page"' : ""}>
-      <span class="nav-icon" aria-hidden="true">${ICON[id]}</span>
+      <span class="nav-icon" aria-hidden="true">${ICON[id]}${id === "calendar" && count ? `<span class="nav-badge">${count > 99 ? "99+" : count}</span>` : ""}</span>
       <span class="nav-label">${escapeHtml(label)}</span>
     </button>`).join("");
 }
@@ -202,8 +227,13 @@ export function render() {
     : current === "calendar" ? (blocked || calendarHtml()) : renderStub(current);
   main.classList.toggle("is-cal", current === "calendar" && !blocked);
   document.getElementById("nav").innerHTML = renderNav();
+  /* F28: two round buttons replace the single "Back to today" -- up (scroll
+     to top, revealing the now non-floating controls) and down (jump to
+     today, collapsing loaded-older data), the same icon mirrored via CSS.
+     F29 moved "load older" inline into the control row (calendar.js). */
   document.getElementById("fabs").innerHTML = current === "calendar" && !blocked
-    ? `<button class="fab to-today" data-fab="today" aria-label="Back to today">${ICON.up}</button>`
+    ? `<button class="fab up" data-fab="up" aria-label="Scroll to top">${ICON.up}</button>`
+      + `<button class="fab down" data-fab="down" aria-label="Back to today">${ICON.up}</button>`
       + `<button class="fab add" data-fab="add" aria-label="Add an event">${ICON.plus}</button>` : "";
   if (current === "calendar" && !blocked) { afterCalendar(main, before); firstDraw = false; }
   else onScroll();
@@ -256,19 +286,10 @@ function bindView() {
     });
   });
 
-  const ver = document.getElementById("swVersion");
-  if (ver) reportVersion(ver);
-}
-
-/* Ask the running service worker what VERSION it is. The app cannot know it
-   from its own source: the whole point is to catch the case where a stale
-   worker is serving an older shell than the one just deployed. */
-function reportVersion(node) {
-  if (!("serviceWorker" in navigator) || !navigator.serviceWorker.controller) {
-    node.textContent = "(not installed)";
-    return;
-  }
-  const ch = new MessageChannel();
-  ch.port1.onmessage = (e) => { node.textContent = (e.data && e.data.version) || "(unknown)"; };
-  navigator.serviceWorker.controller.postMessage({ type: "version" }, [ch.port2]);
+  const upd = document.getElementById("updateBtn");
+  if (upd) upd.addEventListener("click", () => {
+    if (upd.disabled) return;
+    if (updateReady()) { location.reload(); return; }
+    checkForUpdate(render);
+  });
 }

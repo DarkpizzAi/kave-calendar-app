@@ -14,9 +14,10 @@ import { escapeHtml as esc, safeUrl } from "./util.js";
 import { addDays, dayOfWeek } from "./dates.js";
 import { isoWeek } from "./views.js";
 import { holidayOn } from "./holidays.js";
-import { tappable, iconsOf, shortDate } from "./cal-model.js";
+import { tappable, iconsOf, hasOpenTodos, guestsExcludingViewer, statusGuestsLine } from "./cal-model.js";
 import { rows, frameNow, detailGrey, place } from "./calendar.js";
 import { ICON } from "./chrome-icons.js";
+import { STATUS_LABEL } from "./model.js";
 
 const LONGDOW = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"];
 const MONTHS = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
@@ -34,6 +35,14 @@ function afterAnim(el, fn, ms = 450) {
 
 let stack = [];
 let root = null;
+
+/* F21: the single day view's own "+", persisted the way the header bar
+   already persists (it lives in the sheet's fixed chrome, outside the
+   scrolling .sbody, exactly how the "+" fab stays on screen elsewhere in
+   the Calendar tab -- calendar.js/render.js's #fabs). view-event.js sets
+   this once, at boot, to avoid a circular import. */
+let dayAdd = null;
+export function setDayAdd(fn) { dayAdd = fn; }
 
 /* Other screens add their own levels (Settings: Calendar defaults,
    Categories; the event page and form): { title(level), body(level),
@@ -74,13 +83,37 @@ function weekBody(m, f) {
 /* Day level: no cards, a strip per event; a time and names say what they
    are, so no "When / Who / Where" labels. Layout A (title left, icons right,
    a chevron column) until Task 9c settles it. */
+/* F13: the icons sit on the same line as the disclosure chevron, vertically
+   centred with it -- both are now siblings of the (possibly multi-line)
+   title block in the same flex row, rather than the icons living inside the
+   title's own row, which left them centred on just that line instead of on
+   the chevron's. */
+/* F39: the person's name(s) sit before the title, the status pill after --
+   name, title, status, in that reading order. Named only when it isn't the
+   viewer's own event or a shared one, same condition the old second line
+   used. */
+function stripName(e, f) { return e.owner !== f.me && e.owner !== "shared" ? who(e.owner) : ""; }
+
 function strip(e, f) {
-  const lines = [[place(e), e.end && e.end !== e.start ? "until " + shortDate(e.end, f.thisYear) : ""].filter(Boolean).join(" · "),
-    e.guests || (e.owner !== f.me && e.owner !== "shared" ? who(e.owner) : "")].filter(Boolean);
+  /* F67 (supersedes F37/F60): the line under the title is guests alone,
+     with the viewer's own name filtered out -- never "Isa · Apu" on Isa's
+     phone -- and never the status, which F39's pill above already carries,
+     guests or not. statusGuestsLine (cal-model.js, tested) is the one
+     place that rule lives. */
+  /* F43: the "until Sun" day-span used to repeat here too, redundant with
+     the date already named by the day this strip belongs to. */
+  const statusGuests = statusGuestsLine(guestsExcludingViewer(e.guests, who(f.me)));
+  const lines = [statusGuests].filter(Boolean);
+  const name = stripName(e, f);
+  /* F38: no inline add-task in this view -- a small checkbox glyph (F16)
+     stands in for the whole to-do list, to the left of the category icons,
+     only when something is still unchecked. Adding a task stays on the
+     full event page. */
+  const todoIcon = hasOpenTodos(e) ? `<span class="todo-ic" aria-label="Open to-dos">${ICON.checkbox}</span>` : "";
   return `<section class="dsec layA${detailGrey(e) ? " greyw" : ""}" data-sact="event" data-id="${esc(e.id)}" role="button" tabindex="0">`
-    + `<div class="dmain"><div class="dhead"><h3>${esc(e.title)}</h3><span class="dicons">${iconsOf(e, f.me).map(esc).join("")}</span></div>`
-    + lines.map((l) => `<p class="dline">${esc(l)}</p>`).join("") + checklist(e) + tickets(e)
-    + `</div><span class="dchev">${ICON.chev}</span></section>`;
+    + `<div class="dmain"><h3>${name ? `${esc(name)} ` : ""}${esc(e.title)} <span class="flag soft">${esc(STATUS_LABEL[e.status] || "")}</span></h3>`
+    + lines.map((l) => `<p class="dline">${esc(l)}</p>`).join("") + tickets(e)
+    + `</div><span class="dicons">${todoIcon}${iconsOf(e, f.me).map(esc).join("")}</span><span class="dchev">${ICON.chev}</span></section>`;
 }
 function dayBody(d, f) {
   const evs = f.on(d), hol = holidayOn(d);
@@ -134,7 +167,9 @@ function draw(anim) {
   sh.className = `sheet lv-${l.kind}${anim === "" && sh.classList.contains("in") ? " in" : ""}`;
   sh.querySelector(".stitle").textContent = title(l);
   const def = custom[l.kind];
-  sh.querySelector(".bar-acts").innerHTML = def && def.bar ? def.bar(l) : "";
+  sh.querySelector(".bar-acts").innerHTML = l.kind === "day"
+    ? `<button class="sbtn" data-sact="newday" aria-label="Add an event">${ICON.plus}</button>`
+    : def && def.bar ? def.bar(l) : "";
   const stage = sh.querySelector(".sstage");
   const fresh = document.createElement("div");
   fresh.className = "sbody";
@@ -216,6 +251,13 @@ export function initSheet() {
     if (stack.length) up();
   });
   root.addEventListener("click", (e) => {
+    /* F21: the day level's own "+" is a .bar-acts button carrying
+       data-sact, unlike every registered level's own bar buttons (they
+       dispatch through onAction below by data-act instead) -- caught here,
+       ahead of that split, or the .bar-acts branch below would swallow it
+       looking for an onAction "day" never registers. */
+    const newDayBtn = e.target.closest('[data-sact="newday"]');
+    if (newDayBtn) { const l = stack[stack.length - 1]; if (dayAdd && l) dayAdd(l.d); return; }
     const barBtn = e.target.closest(".bar-acts button");
     const b = barBtn ? null : e.target.closest("[data-sact]");
     if (!b) {

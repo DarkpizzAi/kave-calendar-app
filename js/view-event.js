@@ -7,10 +7,11 @@
 
 import { escapeHtml as esc, safeUrl } from "./util.js";
 import { todayKey } from "./dates.js";
-import { newEvent, STATUSES } from "./model.js";
-import { CATEGORIES as MONEY, formatCents, shareOf, visibleCosts } from "./money.js";
+import { newEvent, STATUSES, STATUS_LABEL } from "./model.js";
+import { CATEGORIES as MONEY, formatCents, visibleCosts } from "./money.js";
 import { CATEGORIES, iconFor, categoryOf } from "./icons.js";
-import { readForm, costDefaults, canChangeCost, addTask, addCost, whenLine, mapsUrl } from "./event-form.js";
+import { readForm, costDefaults, canChangeCost, addTask, addCost, whenLine, mapsUrl, toDraft, costPayerText } from "./event-form.js";
+import { defaultCity } from "./cal-model.js";
 import { registerLevel, openLevel, replaceTop, back, closeAll, topLevel } from "./sheet.js";
 import { store } from "./store.js";
 import { ICON } from "./chrome-icons.js";
@@ -18,7 +19,6 @@ import { ICON } from "./chrome-icons.js";
 const MONEY_AZ = MONEY.map((c) => [c.slug, c.label]).sort((a, b) => a[1].localeCompare(b[1]));
 const MONEY_LABEL = Object.fromEntries(MONEY_AZ);
 const CURRENCIES = [["EUR", "€ EUR"], ["GBP", "£ GBP"], ["USD", "$ USD"], ["CHF", "CHF"], ["CZK", "Kč CZK"], ["MAD", "MAD"], ["MYR", "RM MYR"], ["VND", "₫ VND"]];
-const STATUS_LABEL = { idea: "Idea", planned: "Planned", booked: "Booked", done: "Done", cancelled: "Cancelled" };
 const OWNERS = [["shared", "Both of us"], ["isa", "Isa"], ["hugo", "Hugo"]];
 const RUNG = { estimate: ["estimate", "Estimate", "An estimate"], recorded: ["recorded", "Recorded", "Recorded by hand"],
   confirmed: ["confirmed", "Email", "Confirmed by the booking email"], locked: ["locked", "Bank", "Locked by the bank extract"] };
@@ -49,13 +49,15 @@ const select = (f, opts, cur, label) => `<select data-f="${f}" aria-label="${lab
   `<option value="${esc(v)}"${v === cur ? " selected" : ""}>${esc(l)}</option>`).join("")}</select>`;
 
 function costLine(k, removable) {
-  const [si, sh] = [shareOf(k, "isa"), shareOf(k, "hugo")];
-  const share = k.scope !== "shared" ? `personal to ${name(k.payer)}`
-    : si === sh ? `shared, ${formatCents(si, k.currency)} each` : `shared, Isa ${formatCents(si, k.currency)}, Hugo ${formatCents(sh, k.currency)}`;
+  /* F41: a cost entirely the viewer's own says nothing about who paid or
+     how it splits; only someone else's payer, or a shared split, is worth
+     a word. */
+  const payerText = costPayerText(k, me());
+  const meta = [MONEY_LABEL[k.category] || k.category, payerText].filter(Boolean).join(" · ");
   const [icon, word, long] = RUNG[k.state] || RUNG.recorded;
   return `<div class="cost${canChangeCost(k) ? "" : " fixed"}">`
     + `<div class="cleft"><p class="cname">${esc(k.name || MONEY_LABEL[k.category] || "Cost")}</p>`
-    + `<p class="cmeta">${esc(MONEY_LABEL[k.category] || k.category)} · ${name(k.payer)} paid · ${esc(share)}</p></div>`
+    + `<p class="cmeta">${esc(meta)}</p></div>`
     + `<div class="cright"><p class="camt">${esc(formatCents(k.amount, k.currency))}</p><p class="rung" title="${long}">${ICON[icon]}${word}</p></div>`
     + (removable && canChangeCost(k) ? `<button class="iconbtn" data-act="rmcost" data-k="${esc(k.id)}" aria-label="Remove this cost">${ICON.x}</button>` : "") + "</div>";
 }
@@ -76,7 +78,18 @@ function costEntry(c) {
 /* ---- the page, in Google Calendar's order ---- */
 function eventPage(e) {
   const acts = (e.activities || []).map((a) => categoryOf(a.type).label).join(", then ");
-  const when = `<p class="big">${esc(whenLine(e, thisYear()))}</p><p class="dim">${esc(STATUS_LABEL[e.status] || "")}${acts ? " · " + esc(acts) : ""}</p>`;
+  /* F40: the status is its own pill, under the title, not text on the date
+     line; F43: the date line keeps only the day, end day and times (the
+     "until Sun" span the day sheet shows belongs there, not repeated here).
+     F42: the event's type (its activities) gets its own line and icon,
+     after the date, instead of living in that removed second line. */
+  /* F68: an accent-filled pill, like Spoon's real recipe-page status pill
+     (kave-food-app/styles.css's .detail-tag: accent background,
+     accent-text, r-pill, fs-meta -- Compass's existing .flag.acc is the
+     same construction already) -- not the softer .flag.soft treatment F40
+     gave it. */
+  const statusPill = `<p class="flag acc status-pill">${esc(STATUS_LABEL[e.status] || "")}</p>`;
+  const when = `<p class="big">${esc(whenLine(e, thisYear()))}</p>`;
   const place = [e.venue, e.city && e.city[0].toUpperCase() + e.city.slice(1)].filter(Boolean).join(", ");
   const maps = mapsUrl(e.venue, e.city);
   const where = place ? `<p>${esc(place)}</p>${maps && e.venue ? `<a class="maps" href="${esc(maps)}" target="_blank" rel="noopener noreferrer">Open in Maps</a>` : ""}` : "";
@@ -90,20 +103,23 @@ function eventPage(e) {
   const addT = `<div class="newtodo"><span class="box empty" aria-hidden="true"></span>${input("task", pageTask.text, "Add a task", "text", "bare")}`
     + (pageTask.text.trim() ? `${choices("task-for", [["isa", "Isa"], ["hugo", "Hugo"], ["shared", "Both"]], pageTask.for)}<button class="primary" data-act="addtask">Add</button>` : "") + "</div>";
   const costs = visibleCosts(e.costs, me()).map((k) => costLine(k, false)).join("") + costEntry(pageCost || costDefaults(e, me()));
-  return group("clock", when, "When") + (where ? group("pin", where, "Where") : "") + group("people", who, "Who")
+  return statusPill + group("clock", when, "When") + (acts ? group("tag", `<p>${esc(acts)}</p>`, "Type") : "")
+    + (where ? group("pin", where, "Where") : "") + group("people", who, "Who")
     + (links ? group("link", links, "Tickets and links") : "")
     + section("To do", todos + addT) + section("Costs", costs)
     + (e.notes ? group("note", `<p>${esc(e.notes)}</p>`, "Notes") : "");
 }
 
 /* ---- the form: the same groups and icons ---- */
-function toDraft(e) {
-  return { ...JSON.parse(JSON.stringify(e)), refs: (e.bookingRefs || []).join(", "),
-    city: e.city ? e.city[0].toUpperCase() + e.city.slice(1) : "", newCost: null };
-}
-function blank() {
-  return { title: "", start: todayKey(), end: "", startTime: "", endTime: "", owner: "shared", status: "planned", activities: [],
-    city: "", venue: "", guests: "", notes: "", refs: "", links: [], checklist: [], costs: [], newCost: null };
+/* F22: a new event defaults its city to Barcelona, unless its day falls
+   inside a trip already on the calendar (tripCityFor, cal-model.js), in
+   which case that trip's city wins instead. `date` lets the day-level
+   sheet's own "+" (F21) default to the day it was opened from. */
+function blank(date) {
+  const start = date || todayKey();
+  const city = defaultCity(data.events(), start);
+  return { title: "", start, end: "", startTime: "", endTime: "", owner: "shared", status: "planned", activities: [],
+    city: city[0].toUpperCase() + city.slice(1), venue: "", guests: "", notes: "", refs: "", links: [], checklist: [], costs: [], newCost: null };
 }
 function activityForm(d) {
   const chips = d.activities.map((a, i) => `<span class="act">${esc(iconFor(a, d, me()))} ${esc(categoryOf(a.type).label)}`
@@ -116,21 +132,34 @@ function activityForm(d) {
   return (chips ? `<div class="acts">${chips}</div>` : "")
     + (picker ? pick : `<button class="add" data-act="addact">${ICON.plus} ${d.activities.length ? "Add what happens next" : "Add an activity"}</button>`);
 }
+/* F51: adding a to-do follows the same reveal pattern as "Add a cost" --
+   the dotted-plus icon on the left, the input in place, the rest (assignee,
+   Add) only once there is text. */
+function todoEntry(d) {
+  const text = d.newTodoText || "";
+  const head = `<div class="newline"><span class="plus" aria-hidden="true">${ICON.plus}</span>${input("todo-new", text, "Add a to-do", "text", "bare")}</div>`;
+  if (!text.trim()) return `<div class="newcost">${head}</div>`;
+  return `<div class="newcost">${head}<div class="line">${choices("todo-new-assignee", [["isa", "Isa"], ["hugo", "Hugo"]], d.newTodoAssignee)}`
+    + `<button class="primary" data-act="addtodo">Add</button></div></div>`;
+}
 function formPage(d) {
   return group("title", input("title", d.title, "Title", "text", "titlein"), "Title")
-    + group("clock", `<div class="line">${input("start", d.start, "Day", "date")}<span class="dim">to</span>${input("end", d.end || "", "End day", "date")}</div>`
-      + `<div class="line">${input("startTime", d.startTime || "", "Start time", "time")}<span class="dim">to</span>${input("endTime", d.endTime || "", "End time", "time")}</div>`
-      + `<p class="fhint">The end day and the times are optional.</p>${choices("status", STATUSES.map((s) => [s, STATUS_LABEL[s]]), d.status)}`, "When")
+    /* F45: one "to" label between the two rows, vertically centred, rather
+       than one repeated per row. */
+    + group("clock", `<div class="dt-row"><div class="dt-col">${input("start", d.start, "Day", "date")}${input("startTime", d.startTime || "", "Start time", "time")}</div>`
+      + `<span class="dt-to dim">to</span><div class="dt-col">${input("end", d.end || "", "End day", "date")}${input("endTime", d.endTime || "", "End time", "time")}</div></div>`
+      /* F47: "done" is not a useful status to pick by hand here; it stays a
+         real status (STATUS_LABEL, elsewhere) just not a choice in this form. */
+      + `<p class="fhint">The end day and the times are optional.</p>${choices("status", STATUSES.filter((s) => s !== "done").map((s) => [s, STATUS_LABEL[s]]), d.status)}`, "When")
     + group("tag", activityForm(d), "What")
     + group("pin", `${input("venue", d.venue, "Venue")}${input("city", d.city, "City")}`, "Where")
     + group("people", `${choices("owner", OWNERS, d.owner)}${input("guests", d.guests, "Guests, first names")}`, "Who")
     + group("link", d.links.map((l, i) => `<div class="line">${input("link-label-" + i, l.label, "Label, e.g. Resident Advisor")}${input("link-url-" + i, l.url, "https://...")}</div>`).join("")
       + `<button class="add" data-act="addlink">${ICON.plus} Add a link</button>${input("refs", d.refs, "Booking references, separated by commas")}`, "Tickets and links")
     + section("To do", d.checklist.map((c, i) => `<div class="line">${input("todo-" + i, c.text, "Something to do")}${choices("assignee-" + i, [["isa", "Isa"], ["hugo", "Hugo"]], c.assignee)}</div>`).join("")
-      + `<button class="add" data-act="addtodo">${ICON.plus} Add a to-do</button>`)
+      + todoEntry(d))
     + section("Costs", visibleCosts(d.costs, me()).map((k) => costLine(k, true)).join("") + costEntry(d.newCost || costDefaults(d, me())))
-    + group("note", `<textarea data-f="notes" rows="3" placeholder="Notes" aria-label="Notes">${esc(d.notes)}</textarea>`, "Notes")
-    + '<p class="fhint pad">A title and an exact day are all it needs.</p>';
+    + group("note", `<textarea data-f="notes" rows="3" placeholder="Notes" aria-label="Notes">${esc(d.notes)}</textarea>`, "Notes");
 }
 
 /* ---- saving ---- */
@@ -174,7 +203,15 @@ function onInput(t, l) {
   const v = t.value;
   if (needing === f) { needing = null; t.classList.remove("need"); }
   const onPage = l.kind === "event";
-  const redraw = (sel) => { refresh(); const i = document.querySelector(`#sheetRoot [data-f="${sel}"]`); if (i) { i.focus(); i.setSelectionRange(i.value.length, i.value.length); } };
+  /* F44 (second cause): refresh() is refreshSheet, deliberately a no-op
+     while a form ("edit"/"new") is open (review I2 -- a background sync
+     must never redraw an open form and close the keyboard). But typing the
+     first character of a name is a user-initiated reveal, same as tapping
+     a choice button already does (sheet.js's own click handler always
+     redraws after onAction, form or not) -- so it needs the same
+     unconditional redraw, not the guarded one. replaceTop redraws the
+     current level in place, with no history entry, whichever level it is. */
+  const redraw = (sel) => { const l = topLevel(); if (l) replaceTop(l); const i = document.querySelector(`#sheetRoot [data-f="${sel}"]`); if (i) { i.focus(); i.setSelectionRange(i.value.length, i.value.length); } };
   if (f === "task") {
     const had = !!pageTask.text.trim(); pageTask.text = v;
     if (had !== !!v.trim()) redraw("task");
@@ -192,6 +229,12 @@ function onInput(t, l) {
     return;
   }
   if (!draft) return;
+  if (f === "todo-new") {
+    const had = !!(draft.newTodoText || "").trim();
+    draft.newTodoText = v;
+    if (had !== !!v.trim()) redraw("todo-new");
+    return;
+  }
   if (f.startsWith("link-label-")) draft.links[Number(f.slice(11))].label = v;
   else if (f.startsWith("link-url-")) draft.links[Number(f.slice(9))].url = v;
   else if (f.startsWith("todo-")) draft.checklist[Number(f.slice(5))].text = v;
@@ -204,7 +247,7 @@ let refresh = () => {};
 function onAction(b, l) {
   const a = b.dataset.act, pick = b.dataset.pick;
   const e = l.kind === "event" ? find(l.id) : null;
-  if (a === "edit") { draft = toDraft(e); picker = null; openLevel({ kind: "edit", id: e.id }); return; }
+  if (a === "edit") { draft = toDraft(e); picker = null; barOpen = false; openLevel({ kind: "edit", id: e.id }); return; }
   if (a === "save") { saveForm(l); return; }
   if (a === "cancel") { draft = null; picker = null; back(); return; }
   if (a === "delete") {
@@ -236,6 +279,7 @@ function onAction(b, l) {
   if (!d) return;
   if (pick) {
     if (pick.startsWith("assignee-")) { const c = d.checklist[Number(pick.slice(9))]; c.assignee = c.assignee === b.dataset.v ? null : b.dataset.v; }
+    else if (pick === "todo-new-assignee") d.newTodoAssignee = d.newTodoAssignee === b.dataset.v ? null : b.dataset.v;
     else if (pick.startsWith("cost-")) { d.newCost = d.newCost || { ...costDefaults(d, me()) }; d.newCost[pick.slice(5)] = b.dataset.v; }
     else d[pick] = b.dataset.v;
   }
@@ -244,18 +288,26 @@ function onAction(b, l) {
   else if (a === "pickicon") { d.activities.push({ type: picker, icon: categoryOf(picker).icons[Number(b.dataset.i)].icon }); picker = null; }
   else if (a === "rmact") d.activities.splice(Number(b.dataset.i), 1);
   else if (a === "addlink") d.links.push({ label: "", url: "" });
-  else if (a === "addtodo") d.checklist.push({ id: "ck_" + Date.now().toString(36), text: "", done: false, assignee: null });
+  else if (a === "addtodo") {
+    const text = String(d.newTodoText || "").trim();
+    if (text) d.checklist.push({ id: "ck_" + Date.now().toString(36), text, done: false, assignee: d.newTodoAssignee || null });
+    d.newTodoText = ""; d.newTodoAssignee = null;
+  }
   else if (a === "rmcost") d.costs = d.costs.filter((k) => k.id !== b.dataset.k || !canChangeCost(k));
   else if (a === "addcost") {
     try { d.costs = addCost(d, d.newCost || costDefaults(d, me()), me(), new Date()).costs; d.newCost = null; }
     catch { need('[data-f="cost-amount"]'); }
   }
+  else if (a === "barmore") barOpen = !barOpen;
 }
 
-/* Save, Cancel, Delete are actions: the control radius, not pills. */
+/* F46: the bar collapses to Save plus a small reveal arrow; Cancel and
+   Delete stay hidden until it is tapped. */
+let barOpen = false;
 const formBar = (l) => '<button class="act-btn primary" data-act="save">' + (l.kind === "new" ? "Add" : "Save") + "</button>"
-  + '<button class="act-btn" data-act="cancel">Cancel</button>'
-  + (l.kind === "edit" ? '<button class="act-btn" data-act="delete">Delete</button>' : "");
+  + `<button class="sbtn reveal${barOpen ? " on" : ""}" data-act="barmore" aria-expanded="${barOpen}" aria-label="${barOpen ? "Hide more actions" : "More actions"}">${ICON.chev}</button>`
+  + `<span class="bar-more"${barOpen ? "" : " hidden"}><button class="act-btn" data-act="cancel">Cancel</button>`
+  + (l.kind === "edit" ? '<button class="act-btn" data-act="delete">Delete</button>' : "") + "</span>";
 
 export function initEvent(ctx) {
   data = ctx.data;
@@ -288,9 +340,10 @@ export function initEvent(ctx) {
 
 const currentId = () => (topLevel() || {}).id;
 
-/* The + button: an empty form. */
-export function newEventForm() {
+/* The + button: an empty form. F21: the day-level sheet's own "+" passes
+   that day, so the form (and F22's trip-aware default city) starts there. */
+export function newEventForm(date) {
   if (!me()) { banner("Choose who you are in Settings first."); return; }
-  draft = blank(); picker = null;
+  draft = blank(date); picker = null; barOpen = false;
   openLevel({ kind: "new" });
 }

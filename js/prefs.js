@@ -7,6 +7,7 @@
 
 import { CATEGORIES } from "./icons.js";
 import { PEOPLE } from "./model.js";
+import { AWAY } from "./cal-model.js";
 
 export const VIEW_NAMES = [["weekly", "Weekly"], ["monthly", "Monthly"], ["yearly", "Yearly"]];
 export const DETAIL_NAMES = [["full", "Full"], ["partial", "Partial"], ["minimal", "Minimal"]];
@@ -14,6 +15,17 @@ export const STYLE_NAMES = [["lines", "Icon and title"], ["icons", "Icons only"]
 const TYPES = CATEGORIES.map((c) => c.type);
 const oneOf = (list, v, fallback) => (list.some(([k]) => k === v) ? v : fallback);
 const labelOf = (list, v) => list.find(([k]) => k === v)[1];
+
+/* F17: Yearly's real filter is "big things" (trips away, visitors, business
+   trips; never birthdays, spec section 3) -- the same set Yearly's own
+   rendering (cal-model.js's AWAY, plus "visitor") already used, hard-coded,
+   with no path through here. That is the drift Isa found: this module's
+   stored defaults said "everything shows", while Yearly actually only ever
+   drew four categories. One list now, imported rather than re-declared, so
+   the Categories grid and the Calendar cannot disagree again. This becomes
+   the new default (Isa, 2026-09-25), not a return to "show everything". */
+export const YEARLY_DEFAULT_SHOWN = [...AWAY, "visitor"];
+const defaultHidden = (view) => (view === "yearly" ? TYPES.filter((t) => !YEARLY_DEFAULT_SHOWN.includes(t)) : []);
 
 /* Settings as stored -> clean preferences. Anything unexpected falls back. */
 export function readPrefs(settings) {
@@ -24,7 +36,7 @@ export function readPrefs(settings) {
     hiddenCategories[p] = {};
     for (const [v] of VIEW_NAMES) {
       const list = raw[p] && raw[p][v];
-      hiddenCategories[p][v] = Array.isArray(list) ? list.filter((t) => TYPES.includes(t)) : [];
+      hiddenCategories[p][v] = Array.isArray(list) ? list.filter((t) => TYPES.includes(t)) : defaultHidden(v);
     }
   }
   return {
@@ -33,6 +45,17 @@ export function readPrefs(settings) {
     cardStyle: oneOf(STYLE_NAMES, s.cardStyle, "lines"),
     hiddenCategories,
   };
+}
+
+/* F18: Reset restores these corrected defaults, not the old "everything on"
+   bug -- same set defaultHidden() already falls back to for stored junk. */
+export function resetCategories(prefs) {
+  const hiddenCategories = {};
+  for (const p of PEOPLE) {
+    hiddenCategories[p] = {};
+    for (const [v] of VIEW_NAMES) hiddenCategories[p][v] = defaultHidden(v);
+  }
+  return { ...prefs, hiddenCategories };
 }
 
 export function isShown(prefs, me, view, type) {

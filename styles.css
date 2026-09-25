@@ -45,7 +45,7 @@ h1, h2, h3 {
 /* ---------- header: the tab's name only, Spoon's rounded header ---------- */
 .app-header {
   flex: none;
-  padding: calc(var(--sp-4) + env(safe-area-inset-top, 0px)) var(--sp-4) var(--sp-2);
+  padding: calc(var(--sp-4) + env(safe-area-inset-top, 0px)) var(--sp-4) var(--sp-4);
 }
 .app-header h1 { font-size: var(--fs-display); }
 
@@ -157,7 +157,11 @@ button:disabled { opacity: .5; cursor: default; }
   display: flex; flex-direction: column; align-items: center; justify-content: center;
   gap: var(--sp-1); padding: 0; min-height: 0;
 }
-.nav-icon { display: grid; place-items: center; width: 52px; height: 30px; border-radius: var(--r-pill); transition: background var(--motion-base) var(--ease-standard); }
+.nav-icon { position: relative; display: grid; place-items: center; width: 52px; height: 30px; border-radius: var(--r-pill); transition: background var(--motion-base) var(--ease-standard); }
+/* F3: the Calendar's today's-event-count badge, exactly the nav count
+   badge rule in household-look.md -- position and size are fixed, not
+   invented per app. */
+.nav-badge { position: absolute; top: -3px; left: calc(50% + 8px); min-width: 16px; height: 16px; padding: 0 4px; border-radius: var(--r-pill); background: var(--accent); color: var(--accent-text); font-size: var(--fs-micro); font-weight: 600; font-variant-numeric: tabular-nums; display: grid; place-items: center; line-height: 1; }
 .bottom-nav svg { width: 24px; height: 24px; }
 .bottom-nav button[aria-current="page"] { color: var(--accent-ink); }
 .bottom-nav button[aria-current="page"] .nav-icon { background: var(--accent-soft); }
@@ -189,7 +193,15 @@ button:disabled { opacity: .5; cursor: default; }
 /* ================= Calendar (ported from prototype P4) ================= */
 .shell svg{width:18px;height:18px;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
 .shell button{font:inherit;color:inherit;cursor:pointer}
-.fab{color:var(--accent-text)}
+/* F63: `.shell button{color:inherit}` (one class + one element,
+   specificity 0,1,1) was quietly beating the plain `.fab{color:
+   var(--accent-text)}` below (0,1,0) -- so the "+", up and down buttons'
+   icons rendered in the ambient --text colour, inherited from .shell,
+   instead of --accent-text, failing the household look's accent-text-on-
+   accent contrast minimum (household-look.md's contrast table, 4.5:1).
+   `.shell .fab` (0,2,0) outranks `.shell button` on the classes column, so
+   it wins without an !important. */
+.shell .fab{color:var(--accent-text)}
 .fab.add svg{width:26px;height:26px;stroke-width:2.5}
 .mn .card{padding:var(--sp-3)}
 /* the gates before the Calendar: no token, then who am I */
@@ -221,35 +233,111 @@ button:disabled { opacity: .5; cursor: default; }
 .todo-l.done{color:var(--text-dim);text-decoration:line-through}
 a.ticket{color:inherit;text-decoration:none}
 @media (prefers-reduced-motion: reduce){
-  .sfield,.sheet.in,.sheet.out,.shade.out,.slide-left,.slide-right,.views .ind,.sbody.out-up,.sbody.in-up,.sbody.out-down,.sbody.in-down{animation:none}
-  .fab.to-today,.fab.to-today svg,.nav-icon{transition:none}
+  .sfield,.sheet.in,.sheet.out,.shade.out,.slide-left,.slide-right,.segment .seg-thumb,.sbody.out-up,.sbody.in-up,.sbody.out-down,.sbody.in-down{animation:none}
+  .fab.up,.fab.down,.fab.up svg,.fab.down svg,.nav-icon{transition:none}
 }
-/* two round buttons: add, and above it back to today (Spoon's to-top, a bare chevron) */
-.fab{position:absolute;right:var(--sp-4);width:56px;height:56px;border-radius:var(--r-round);border:0;background:var(--accent);color:var(--accent-text);box-shadow:var(--shadow-raised);z-index:4;display:grid;place-items:center;padding:0}
-.fab.add{bottom:calc(var(--nav-h) + var(--sp-4) + env(safe-area-inset-bottom,0px));font-size:var(--fs-title-lg)}
-.fab.to-today{width:44px;height:44px;right:calc(var(--sp-4) + 6px);bottom:calc(var(--nav-h) + var(--sp-4) + 56px + var(--sp-3) + env(safe-area-inset-bottom,0px));opacity:0;transform:translateY(8px);pointer-events:none;transition:opacity .18s var(--ease-standard),transform .18s var(--ease-standard)}
-.fab.to-today svg{width:22px;height:22px;stroke-width:2.5;transition:transform .18s var(--ease-standard)}
-.fab.to-today.show{opacity:1;transform:none;pointer-events:auto}
-.fab.to-today.down svg{transform:rotate(180deg)}
-/* the top block: Today card and the controls */
+/* F28: three round buttons, all the same size (F15) -- add, and two above
+   it, up (scroll to top) and down (jump to today, collapsing loaded-older
+   data), the same icon mirrored rather than two different shapes. F6's
+   "load older" is no longer one of them (F29: it moved inline). */
+/* F63: colour lives in the `.shell .fab` rule above, at a specificity that
+   actually beats `.shell button{color:inherit}` -- not repeated here. */
+.fab{position:absolute;width:56px;height:56px;border-radius:var(--r-round);border:0;background:var(--accent);box-shadow:var(--shadow-raised);z-index:4;display:grid;place-items:center;padding:0}
+.fab.add{right:var(--sp-4);bottom:calc(var(--nav-h) + var(--sp-4) + env(safe-area-inset-bottom,0px));font-size:var(--fs-title-lg)}
+/* F55: one fixed slot, always the same distance above "+" -- up and down
+   share this single position (never two heights) and are shown mutually
+   exclusively (calendar.js's onScroll), never both at once. */
+.fab.up,.fab.down{right:var(--sp-4);bottom:calc(var(--nav-h) + var(--sp-4) + 56px + var(--sp-3) + env(safe-area-inset-bottom,0px));opacity:0;transform:translateY(8px);pointer-events:none;transition:opacity .18s var(--ease-standard),transform .18s var(--ease-standard)}
+.fab.up svg,.fab.down svg{width:22px;height:22px;stroke-width:2.5;transition:transform .18s var(--ease-standard)}
+.fab.up.show,.fab.down.show{opacity:1;transform:none;pointer-events:auto}
+.fab.down svg{transform:rotate(180deg)}
+/* F28: the control row scrolls with the page again (F5 reversed). */
 .top{display:flex;flex-direction:column;gap:var(--sp-3)}
-.ctl{position:relative;display:flex;align-items:center;gap:var(--sp-2)}
-.page{display:flex;flex-direction:column;gap:var(--sp-3)}
+/* F36: matches Spoon's Trends chart button row (kave-food-app's
+   .control-row) for spacing -- var(--sp-3), not --sp-2. */
+/* F66: .ctl (the filter bar) is a direct child of .page, which already
+   puts var(--sp-3) between it and .content -- the section heading is
+   .content's first child. This rule's own padding-bottom:var(--sp-3)
+   stacked on top of that flex gap, doubling the step to 24px where the
+   household's standard control-row-to-content gap is one sp-3 (12px). No
+   new value: just the duplicate removed. */
+/* F65: gap between the segmented toggle and the round icon buttons is a
+   deliberate one-off 6px, tighter than the spacing grid's --sp-2 (8px) --
+   for a row of controls this closely related, per the approved round-6
+   mock-up (calendar/mockups/round-6-filterbar.html). Not --sp-3 (12px,
+   used elsewhere for control-row-to-content spacing) and not --sp-2. */
+.ctl{display:flex;flex-wrap:wrap;align-items:center;gap:6px;width:100%}
+/* F54: F26's sticky month/year title bar is removed entirely -- no more
+   .sec-title, in any view. */
+/* F71: tighter again than F66's fix -- .page's gap is the only space
+   between .ctl (the filter/toggle row) and .content's first child (the
+   section heading). Measured live before this change: 12px (var(--sp-3),
+   F66's fix). Isa wants it closer still; 6px (F65's own deliberate
+   closely-related-controls one-off) read as too tight for a control row to
+   a full heading below it -- checked live, half of --sp-3 (var(--sp-2),
+   8px) reads as tight but not cramped, so that's what's used here. */
+.page{display:flex;flex-direction:column;gap:var(--sp-2)}
+/* F34: only .content (the list) carries the swipe animation now -- the
+   controls above it (outside .content) stay put, so a swipe visibly moves
+   just the list, not the whole screen. */
+.content{display:flex;flex-direction:column;gap:var(--sp-3)}
 /* room below the last card, so a jump can always bring its target to the top */
-.page::after{content:"";flex:none;height:50vh}
-.slide-left{animation:sl var(--motion-slow) var(--ease-sheet)}
-.slide-right{animation:sr var(--motion-slow) var(--ease-sheet)}
-@keyframes sl{from{transform:translateX(40%);opacity:0}}
-@keyframes sr{from{transform:translateX(-40%);opacity:0}}
-.ctl2{display:flex;gap:var(--sp-2);align-items:center}
+.content::after{content:"";flex:none;height:50vh}
+/* F24: matches the sheet's own depth animation (F14) in quality --
+   --motion-base and --ease-drag, the token built for a drag-released
+   transition, rather than --motion-slow and --ease-sheet (280ms, the
+   vertical sheet's own curve, borrowed for this and reading as sluggish for
+   a sideways flick). A shorter travel distance (18% instead of 40%) is the
+   other half of "insufficiently fluid": at 40% the incoming page arrives
+   from further off-screen than the finger just travelled, which is what
+   read as a slow, disconnected snap rather than a continuation of the
+   swipe. */
+.slide-left{animation:sl var(--motion-base) var(--ease-drag);will-change:transform,opacity}
+.slide-right{animation:sr var(--motion-base) var(--ease-drag);will-change:transform,opacity}
+@keyframes sl{from{transform:translateX(18%);opacity:0}}
+@keyframes sr{from{transform:translateX(-18%);opacity:0}}
+.ctl2{display:flex;gap:6px;align-items:center}
 .ctl.searching .ctl2{flex:1}
-/* the view switch: the selected pill is the soft accent and slides with the page */
-.views{position:relative;flex:1;display:flex;background:var(--surface-2);border-radius:var(--r-pill);padding:3px}
-.views .ind{position:absolute;top:3px;bottom:3px;left:3px;width:calc((100% - 6px) / 3);border-radius:var(--r-pill);background:var(--panel);box-shadow:var(--shadow-card);transform:translateX(calc(var(--i) * 100%));animation:ind var(--motion-slow) var(--ease-sheet)}
+/* F59: Spoon's real .segment/.seg-thumb/.segment button construction
+   (kave-food-app/styles.css, its Period + Group-by segmented control),
+   copied verbatim -- the same component Compass's view toggle has aimed
+   at, and missed, for two prior rounds (F30, F36). Adapted only where the
+   spec itself says to: three options, not two, so the thumb's width is
+   calc(33.33% - 3px), not calc(50% - 3px), and its translateX is 0/100/200%
+   -- driven here by --i (0, 1 or 2, set per render in calendar.js) rather
+   than three fixed [data-on] selectors, the same value at each step. */
+/* F69: display:grid with three equal 1fr columns, not flex. Flex's
+   flex:1 1 0 + min-width:0 (Spoon's own construction, F59) actively let a
+   segment shrink below its own label's width, so "Monthly" -- the longest
+   of the three -- truncated to "Mont..." at 375px while "Weekly"/"Yearly"
+   stayed full width. Grid's 1fr tracks default to an auto (content) floor:
+   equal fr tracks are still sized equal to each other, but that shared
+   size is bumped up to whatever the widest cell (Monthly) actually needs,
+   so no cell can truncate and all three stay the same width. */
+/* F65: --ctl-h is the one thing that makes the toggle and the round icon
+   buttons equal by construction instead of by two numbers that happen to
+   match and then drift -- which is exactly what happened: .segment
+   measured 39px live, .ib measured 44px, because a global touch-target
+   min-height:44px rule was silently overriding .ib's own height:40px. Per
+   the approved round-6 mock-up. */
+:root{--ctl-h:40px}
+.segment{position:relative;display:grid;grid-template-columns:repeat(3,1fr);height:var(--ctl-h);background:var(--surface-2);border-radius:var(--r-pill);padding:3px}
+.seg-thumb{position:absolute;top:3px;bottom:3px;left:3px;width:calc(33.33% - 3px);border-radius:var(--r-pill);background:var(--accent);box-shadow:var(--shadow-card);transform:translateX(calc(var(--i) * 100%));animation:ind var(--motion-base) var(--ease-drag)}
 @keyframes ind{from{transform:translateX(calc(var(--from) * 100%))}}
-.views button{position:relative;flex:1;border:0;background:none;padding:7px var(--sp-2);border-radius:var(--r-pill);font-size:var(--fs-meta)}
-.views button.on{font-weight:var(--fw-strong)}
-.ib{flex:none;width:40px;height:40px;border:0;border-radius:var(--r-round);background:var(--surface-2);color:var(--text-dim);display:grid;place-items:center;padding:0}
+/* F36: matches Spoon's "6 months / all time" toggle's own text size,
+   --fs-ui, not --fs-meta. */
+/* F69: no flex/min-width/overflow-ellipsis any more -- .segment is a grid
+   now, and grid items stretch to fill their (equal) column with no
+   truncation needed. */
+.segment button{position:relative;z-index:1;border:none;background:none;font:inherit;font-size:var(--fs-ui);font-weight:var(--fw-medium);color:var(--text-dim);padding:7px var(--sp-2);min-height:0;border-radius:var(--r-pill);white-space:nowrap}
+/* F30/F59: the selected button's text is accent-text on the accent-filled
+   thumb -- Compass's toggle is a tablist (aria-selected), not Spoon's plain
+   toggle buttons (aria-pressed), so the same rule keys off aria-selected. */
+.segment button[aria-selected="true"]{color:var(--accent-text);font-weight:var(--fw-strong)}
+/* F65: both height and min-height set explicitly, from the same --ctl-h
+   custom property that .segment reads -- the actual fix, so no ambient
+   touch-target rule can push .ib taller than the toggle again. */
+.ib{flex:none;width:var(--ctl-h);height:var(--ctl-h);min-height:var(--ctl-h);border:0;border-radius:var(--r-round);background:var(--surface-2);color:var(--text-dim);display:grid;place-items:center;padding:0}
 .sfield{flex:1;display:flex;align-items:center;gap:var(--sp-2);height:40px;padding:0 var(--sp-1) 0 var(--sp-3);border-radius:var(--r-control);background:var(--surface-2);transform-origin:right center;animation:grow var(--motion-slow) var(--ease-sheet)}
 @keyframes grow{from{clip-path:inset(0 0 0 calc(100% - 40px) round var(--r-round))}to{clip-path:inset(0 0 0 0 round var(--r-control))}}
 .sfield .si{display:grid;color:var(--text-dim)}
@@ -261,18 +349,8 @@ a.ticket{color:inherit;text-decoration:none}
 .opt{border:0;text-align:left;padding:8px var(--sp-3);border-radius:var(--r-pill);background:var(--surface-2)}
 .opt.on{background:var(--accent);color:var(--accent-text);font-weight:var(--fw-strong)}
 .mh{margin:0;color:var(--text-dim);font-size:var(--fs-meta)}
-/* Today card: accent, "Today", what, where, when, tickets; tap opens today */
-.todayc{border-radius:var(--r-card);padding:var(--sp-4);display:flex;flex-direction:column;gap:var(--sp-3);cursor:pointer;background:var(--accent);color:var(--accent-text)}
-.tbig{margin:0;font-size:var(--fs-title-lg);font-weight:var(--fw-strong);letter-spacing:var(--tracking-heading);line-height:1}
-.thol{margin:-4px 0 0;font-size:var(--fs-meta);font-weight:var(--fw-medium)}
-.titem{display:grid;grid-template-columns:auto minmax(0,1fr);column-gap:var(--sp-3);align-items:center}
-.ticons{font-size:22px;line-height:1;display:flex;align-items:center;gap:2px}
-.tbody{display:flex;flex-direction:column;gap:2px;min-width:0}
-.ttitle{margin:0;font-size:var(--fs-body);font-weight:var(--fw-strong)}
-.tmeta{margin:0;font-size:var(--fs-meta);opacity:.85}
-.tticket{align-self:flex-start;margin-top:var(--sp-1);border:1.5px solid currentColor;border-radius:var(--r-pill);padding:1px var(--sp-2);font-size:var(--fs-meta);font-weight:var(--fw-medium)}
-/* labels: the ALL CAPS corner label that names a card (P1 finding 12) */
-.lbl{font-size:var(--fs-meta);font-weight:var(--fw-medium);letter-spacing:var(--tracking-label);text-transform:uppercase;font-variant-numeric:tabular-nums;color:var(--text)}
+/* F4: the Today card is gone; #today is a bare, invisible scroll anchor. */
+#today{display:block;height:0}
 .chev{width:14px;height:14px;stroke-width:2.5;vertical-align:-2px;margin-left:2px;color:var(--text-dim)}
 /* rows: the icon cell is as wide as the row's own icons; dates share one column */
 .rows{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:5px;min-width:0}
@@ -281,47 +359,54 @@ a.ticket{color:inherit;text-decoration:none}
 .rows li.note{column-gap:0}
 .rows.dated li.note{grid-template-columns:52px 0 minmax(0,1fr) auto;column-gap:var(--sp-2)}
 .rows li[data-act]{cursor:pointer;min-height:32px}
-.c-d{font-size:var(--fs-meta);color:var(--text-dim);font-variant-numeric:tabular-nums;white-space:nowrap}
+/* F57: the date is the same size as the event's own title text on that
+   line (c-t carries no font-size of its own, F36) -- no override here. */
+.c-d{color:var(--text-dim);font-variant-numeric:tabular-nums;white-space:nowrap}
 .c-i{font-size:15px;line-height:1;white-space:nowrap;letter-spacing:2px}
-.c-t{overflow:hidden;white-space:nowrap;text-overflow:ellipsis;font-size:var(--fs-meta)}
+/* F36: matches Spoon's "Worth watching" list-item text size -- .opp-name
+   there carries no font-size of its own, reading at the plain body size;
+   same here, no override (was --fs-meta, reading too small). */
+.c-t{overflow:hidden;white-space:nowrap;text-overflow:ellipsis}
 .grey .c-i,.ic.grey{filter:grayscale(1);opacity:.45}
 .grey .c-t{color:var(--text-dim)}
+/* F35: Monthly and Yearly keep a cancelled event, title struck through only
+   (Weekly never draws one here -- hideCancelled in calendar.js). */
+.cancelled .c-t{text-decoration:line-through}
 .idea .c-i,.ic.idea{opacity:.45}
-.todo{width:7px;height:7px;border-radius:var(--r-round);background:currentColor}
 .flag{display:inline-block;border-radius:var(--r-pill);padding:1px var(--sp-2);font-size:var(--fs-meta);font-weight:var(--fw-medium);max-width:100%;overflow:hidden;text-overflow:ellipsis;vertical-align:middle}
 .flag.acc{background:var(--accent);color:var(--accent-text)}
 .flag.soft{background:var(--accent-soft);color:var(--text)}
 /* weekly */
 .month{margin:var(--sp-3) 0 0;font-size:var(--fs-title-lg);font-weight:var(--fw-strong);letter-spacing:var(--tracking-heading);line-height:var(--lh-title)}
 .week{display:flex;flex-direction:column;gap:var(--sp-2);margin-bottom:var(--sp-2)}
-.wk{align-self:flex-start;border:0;background:none;padding:var(--sp-1) 0;color:var(--text-dim);cursor:pointer}
 .g3{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:var(--sp-2);align-items:stretch}
 .day{background:var(--panel);border-radius:var(--r-card);min-height:84px;padding:var(--sp-2);display:flex;flex-direction:column;gap:var(--sp-2);min-width:0;border:2px solid transparent;cursor:pointer}
 .day.today{border-color:var(--accent)}
-.dl{align-self:flex-start;padding:1px var(--sp-2);margin-left:calc(-1 * var(--sp-1));border-radius:var(--r-pill)}
-.dl.on{background:var(--accent);color:var(--accent-text);font-weight:var(--fw-strong)}
 .icons{display:flex;flex-wrap:wrap;gap:4px;font-size:18px;line-height:1.15}
-.reveal{border:0;background:transparent;color:var(--text-dim);font-size:var(--fs-ui);padding:9px 0;border-radius:var(--r-control)}
-/* monthly and yearly cards */
-.wcard,.mcard{background:var(--panel);border-radius:var(--r-card);padding:var(--sp-3);display:flex;flex-direction:column;gap:var(--sp-2);border:2px solid transparent;cursor:pointer}
+/* monthly and yearly cards. F11: the month card itself is no longer a tap
+   target (only its "N plans" line is), so it takes no pointer cursor. */
+.wcard,.mcard{background:var(--panel);border-radius:var(--r-card);padding:var(--sp-3);display:flex;flex-direction:column;gap:var(--sp-2);border:2px solid transparent}
+.wcard{cursor:pointer}
 .wcard.now,.mcard.now{border-color:var(--accent)}
 .wh{display:flex;gap:var(--sp-2);align-items:center;flex-wrap:wrap}
 .away{margin:0;display:grid;grid-template-columns:20px minmax(0,1fr);column-gap:var(--sp-2);font-size:var(--fs-meta);background:var(--surface-2);border-radius:var(--r-control);padding:var(--sp-1) var(--sp-2)}
 .away.grey{color:var(--text-dim)}
 .mh{margin:0;display:flex;justify-content:space-between;align-items:center}
-.cnt{color:var(--text-dim);font-size:var(--fs-meta)}
 .heat{display:grid;grid-template-columns:repeat(var(--n),minmax(0,1fr));gap:2px}
 .heat i{height:16px;border-radius:2px;background:var(--surface-2)}
-.heat i.on{background:var(--accent)}
-.heat i.we{box-shadow:inset 0 -3px 0 var(--rule-strong)}
-.heat i.hol{box-shadow:inset 0 -3px 0 var(--accent)}
-.heat i.on.we,.heat i.on.hol{box-shadow:none}
-.heat i.t{outline:2px solid var(--text);outline-offset:-2px}
+/* F74: the .mcard's flex gap (--sp-2) between the heat-strip and the event
+   lines below it read as too tight (checked live). Give that one pairing
+   extra breathing room without touching the rest of the card's rhythm. */
+.mcard .heat + .rows{margin-top:var(--sp-2)}
 /* search */
 .hint{margin:0;color:var(--text-dim);font-size:var(--fs-meta)}
 .card{background:var(--panel);border-radius:var(--r-card);padding:var(--sp-3)}
 /* the sheet: header taps and swipes close; each level looks different */
-.shade{position:absolute;inset:0;background:var(--bg);opacity:.6;z-index:7}
+/* F32: the backdrop must not darken the page's own header above it -- it
+   used to be inset:0 of .shell (position:relative), covering .app-header
+   too; now it starts where .sheet itself does (top:56px, matching), so the
+   page header stays undarkened. */
+.shade{position:absolute;left:0;right:0;bottom:0;top:56px;background:var(--bg);opacity:.6;z-index:7}
 .sbar{flex:none;background:var(--accent-soft);border-radius:var(--r-sheet);padding:var(--sp-5) var(--sp-4) var(--sp-4);position:relative;touch-action:none;cursor:pointer}
 .grab{position:absolute;top:8px;left:50%;transform:translateX(-50%);width:36px;height:4px;border-radius:var(--r-pill);background:var(--text-dim);opacity:.5}
 .stitle{margin:0;font-size:var(--fs-title-lg);font-weight:var(--fw-strong);letter-spacing:var(--tracking-heading);line-height:1.2}
@@ -348,41 +433,99 @@ a.ticket{color:inherit;text-decoration:none}
 @media (min-width: 900px){
   .app-header{padding-inline:var(--sp-5)}
   .mn{padding:var(--sp-5) var(--sp-5) calc(var(--sp-7) * 2)}
-  .ctl{flex-wrap:wrap;justify-content:flex-start}
-  .ctl .views{flex:none;width:380px}
+  /* F65: below this breakpoint .ctl spans the full phone width (width:100%,
+     set unconditionally); above it, per the approved round-6 mock-up, it
+     stops stretching and settles to the left instead -- reusing this
+     existing wide-screen breakpoint (already used just below for .segment's
+     own fixed width), not a second invented one. */
+  .ctl{flex-wrap:wrap;justify-content:flex-start;width:auto;max-width:518px}
+  .ctl .segment{flex:none;width:380px}
   .ctl.searching .ctl2{width:380px}
   .g3{grid-template-columns:repeat(7,minmax(0,1fr))}
   .day{min-height:110px}
   .fab.add{right:var(--sp-6)}
-  .fab.to-today{right:calc(var(--sp-6) + 6px)}
+  .fab.up,.fab.down{right:var(--sp-6)}
 }
 /* day level (P2 feedback): no cards, sections on the sheet like a recipe */
 .sheet.lv-day .sbody{padding:0;gap:0}
 .dpage{display:flex;flex-direction:column}
 .dhol{margin:0;padding:var(--sp-3) var(--sp-4);font-weight:var(--fw-medium);color:var(--text-dim)}
-.dsec{padding:var(--sp-4);border-top:1px solid var(--rule);display:flex;flex-direction:column;gap:var(--sp-2);cursor:pointer}
-.dpage > .dsec:first-child{border-top:0}
-.dhead{display:flex;gap:var(--sp-3);align-items:center}
-.dhead h3{margin:0;font-size:var(--fs-title);font-weight:var(--fw-strong);letter-spacing:var(--tracking-heading)}
-.dhead .chev{margin-left:auto;width:18px;height:18px}
 .dpage > .hint{padding:var(--sp-4)}
-/* day strips with room, a closing rule (layout A until Task 9c) */
+/* day strips with room, a closing rule (layout A until Task 9c). F13: the
+   icons are a sibling of the title block, in the same row as the chevron,
+   so .dsec's own align-items:center keeps all three vertically centred on
+   one another regardless of how many lines the title block wraps to. */
 .dpage{padding-bottom:var(--sp-7)}
 .dsec{display:flex;flex-direction:row;align-items:center;gap:var(--sp-3);padding:var(--sp-5) var(--sp-4);border-top:1px solid var(--rule)}
 .dpage > .dsec:first-child{border-top:0}
 .dpage > .dsec:last-of-type{border-bottom:1px solid var(--rule)}
 .dmain{flex:1;min-width:0;display:flex;flex-direction:column;gap:var(--sp-2)}
-.dhead{display:flex;align-items:flex-start;justify-content:space-between;gap:var(--sp-3)}
-.dhead h3,.dmain > h3{margin:0;font-size:var(--fs-title);font-weight:var(--fw-strong);letter-spacing:var(--tracking-heading)}
+.dmain > h3{margin:0;font-size:var(--fs-title);font-weight:var(--fw-strong);letter-spacing:var(--tracking-heading)}
 .dicons{flex:none;font-size:24px;line-height:1;display:flex;gap:2px}
 .dline{margin:0}
 .dline + .dline{color:var(--text-dim)}
-.dchev{flex:none;align-self:center;display:grid;place-items:center;color:var(--text-dim)}
+.dchev{flex:none;display:grid;place-items:center;color:var(--text-dim)}
 .dchev .chev{width:20px;height:20px;margin:0}
 .day.empty,.lrow.empty,.wcard.empty{cursor:default}
 .wh .away{display:inline-block;margin:0;padding:1px var(--sp-2);border-radius:var(--r-pill);background:var(--surface-2);font-size:var(--fs-meta)}
-.hintrow .c-t{color:var(--accent-ink);font-weight:var(--fw-medium)}
-[data-week],[data-month],#today{scroll-margin-top:var(--sp-4)}
+/* F70: a jump (e.g. Yearly's "N plans >") lands the target week at the top
+   of Monthly, but the month heading sits just above that week in the flow
+   and was landing flush against, or even partly behind, the header (measured
+   live: heading top 22px above the header's own bottom edge, i.e. hidden
+   under it). scroll-margin-top only pads the scrolled-to element itself, so
+   it has to clear the header by enough to also clear the heading above it --
+   measured live, the heading sits ~38px above its week row, so sp-4 (16px)
+   plus that plus a comfortable visible gap lands here; not a spacing-scale
+   step, a one-off scroll offset. */
+[data-week],[data-month],#today{scroll-margin-top:60px}
+
+/* ---- F9: one typography for every card label ("FRI 25", "WEEK 39",
+   "SEPTEMBER"). F27 removed the pill from every card except the current
+   day/week/month; F73 removes it from the current card too, so .lbl-pill
+   never carries a fill or border of its own any more -- it reads
+   identically to .lbl-plain whether or not a card earns .on. Only the
+   card's own accent border (elsewhere) still marks the current card. ---- */
+.lbl-pill,.lbl-plain{display:inline-block;align-self:flex-start;font-size:var(--fs-meta);font-weight:var(--fw-medium);letter-spacing:var(--tracking-label);text-transform:uppercase;font-variant-numeric:tabular-nums;color:var(--text);border-radius:var(--r-pill);padding:2px var(--sp-2);border:1px solid transparent}
+/* F8/F27: Weekly's "WEEK 39" divider is never a tap target and never gets
+   the pill treatment, current week or not -- .lbl-plain, not .lbl-pill, so
+   there is no .on to accidentally apply. */
+.wk{cursor:default}
+
+/* ---- F10: the year heading, big and once, like Monthly's big month
+   heading; no border on the heading itself (Isa's correction). ---- */
+.year-big{font-size:var(--fs-display);font-weight:var(--fw-strong);letter-spacing:var(--tracking-heading);margin:var(--sp-3) 0 0;display:block}
+/* F11: "N plans >" is the only tap target into Monthly, set in the same
+   font as the rest of the line, not a heading and not the chevron glyph. */
+.plans-line{margin:0;font-size:var(--fs-meta);color:var(--text-dim);background:none;border:0;padding:0;min-height:0;text-align:right;white-space:nowrap}
+
+/* ---- F58 (revises F12/F31): the heat strip. Today is marked independent
+   of fill. Current month: an other-person-only day fills accent-soft,
+   empty is unfilled (the plain .heat i background above, var(--surface-2)).
+   Future months: the viewer's own or a joint event fills a muted, darker
+   "accent fade" (.future); every other day (empty, or another person only)
+   is unfilled -- the SAME empty colour as the current month's, not a
+   separate flatter grey (that was F31's bug: every future square, including
+   ones with no fill at all, drew as one flat grey with nothing to tell them
+   apart).
+   --accent-soft turned out to read as a PALE tint next to that empty fill,
+   not a dark one (checked live at 16px against .heat i.mine and the plain
+   empty square) -- so .future is a deliberately darkened accent, a one-off
+   kept out of the token system, the same reasoning F12's own open question
+   about --accent-soft already raised.
+   F72: the current month's own/joint fill (.mine) now uses the SAME muted
+   accent fade as .future, not the brighter full --accent -- one consistent
+   look across the whole Yearly grid, current month included. Only this
+   fill colour changed; heatFill()'s "mine"/"other"/"future" labels and the
+   other-person / empty-day logic are untouched. */
+.heat i.mine{background:color-mix(in srgb, var(--accent) 55%, var(--text) 25%)}
+.heat i.other{background:var(--accent-soft)}
+.heat i.future{background:color-mix(in srgb, var(--accent) 55%, var(--text) 25%)}
+.heat i.t{outline:2px solid var(--text);outline-offset:-2px}
+
+/* ---- F16: a tiny inline SVG checkbox glyph marks an event with open
+   to-dos, replacing the plain dot (never an emoji). ---- */
+.todo-ic{display:inline-flex;color:var(--text-dim);vertical-align:-2px}
+.todo-ic svg{width:13px;height:13px;stroke-width:2.5}
 
 /* ================= The event page and form (round 2) =================
    After Google Calendar: a group per kind of information, a line icon on
@@ -397,9 +540,14 @@ a.ticket{color:inherit;text-decoration:none}
 .bar-acts .act-btn{min-height:40px;padding:8px var(--sp-3);border-radius:var(--r-control);background:var(--surface);font-weight:500}
 .bar-acts .act-btn.primary,#sheetRoot button.primary{background:var(--accent);color:var(--accent-text)}
 .sheet.lv-event .sbody,.sheet.lv-edit .sbody,.sheet.lv-new .sbody{padding:0 0 var(--sp-7);gap:0}
-.grp{display:grid;grid-template-columns:24px minmax(0,1fr);column-gap:var(--sp-4);padding:var(--sp-4);border-top:1px solid var(--rule)}
+/* F50: the icon column used to stretch to the group's full height (grid's
+   default align-items), then get nudged down 2px -- close for a one-line
+   group, visibly off for anything taller. align-items:start keeps the icon
+   at the top of its own column; the icon itself centres in a box the height
+   of one text line, so it lines up with the first line specifically. */
+.grp{display:grid;grid-template-columns:24px minmax(0,1fr);column-gap:var(--sp-4);align-items:start;padding:var(--sp-4);border-top:1px solid var(--rule)}
 .grp:first-child{border-top:0}
-.gic{color:var(--text-dim);padding-top:2px}
+.gic{color:var(--text-dim);display:flex;align-items:center;height:calc(var(--fs-body) * var(--lh-base));padding-top:0}
 .gic svg{width:22px;height:22px;stroke-width:1.8}
 .gbody{display:flex;flex-direction:column;align-items:flex-start;gap:var(--sp-2);min-width:0}
 .gbody p{margin:0;font-size:var(--fs-body)}
@@ -407,6 +555,18 @@ a.ticket{color:inherit;text-decoration:none}
 .dim{color:var(--text-dim)}
 .pad{padding:var(--sp-4)}
 .grp.sec{grid-template-columns:minmax(0,1fr);row-gap:var(--sp-2)}
+/* F40: the status pill sits directly under the title, above the first
+   group, so it is not wrapped in .grp's icon/body grid. */
+.status-pill{align-self:flex-start;margin:var(--sp-4) var(--sp-4) 0}
+/* F45: one "to" label between the day/time columns, vertically centred. */
+.dt-row{display:grid;grid-template-columns:1fr auto 1fr;align-items:center;gap:var(--sp-2);width:100%}
+.dt-col{display:flex;flex-direction:column;gap:var(--sp-2);min-width:0}
+.dt-to{align-self:center}
+/* F46: the bar collapses to Save plus a small reveal arrow; Cancel and
+   Delete stay hidden (see [hidden]) until it opens. */
+.bar-acts .sbtn.reveal svg{transition:transform var(--motion-base) var(--ease-standard)}
+.bar-acts .sbtn.reveal.on svg{transform:rotate(90deg)}
+.bar-more{display:flex;gap:var(--sp-2)}
 .sh{margin:0;font-size:var(--fs-lede);font-weight:600;letter-spacing:var(--tracking-heading);line-height:var(--lh-title)}
 .maps{color:var(--text);font-size:var(--fs-ui)}
 .ticket{display:inline-flex;align-items:center;gap:var(--sp-1);background:var(--surface-2);color:var(--text);text-decoration:none;border-radius:var(--r-pill);padding:6px var(--sp-3);font-size:var(--fs-ui)}

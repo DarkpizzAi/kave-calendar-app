@@ -53,6 +53,24 @@ test("data: ensureYear shows the cache before the network answers", async () => 
   ok(data.loadedYears().includes("2026"));
 });
 
+test("F31: a year cached with events as a keyed object, not an array, still shows (not silently dropped)", async () => {
+  const { local, data } = setup();
+  /* a legacy or corrupt cache shape: an id-keyed map instead of the array
+     sync.js always writes. Before the fix, view()'s mergeEvents(cached, ...)
+     threw synchronously on cached.map, the rejection was swallowed by
+     calendar.js's ensureYear().catch(() => {}), and the year's events never
+     reached data.events() -- the real cause behind F31's blank heat-strip. */
+  local.setYear("2026", { events: { c: base("c", "2026-09-05") }, sha: "s", etag: "e" });
+  await data.ensureYear("2026");
+  eq(data.events().map((e) => e.id), ["c"]);
+});
+test("F31: a year cached with events as null or a string reads as empty, not a throw", async () => {
+  const { local, data } = setup();
+  local.setYear("2026", { events: null, sha: "s", etag: "e" });
+  await data.ensureYear("2026");
+  eq(data.events(), []);
+});
+
 /* ---- final review fixes ---- */
 test("review C1: an event moved to another year and back, with a sync in between, is still there", async () => {
   /* the move's marker must reach the server first: in the queue alone the

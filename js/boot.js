@@ -13,8 +13,8 @@ import { wire, showBanner } from "./wire.js";
 import { initPullToSync } from "./pull-to-sync.js";
 import { appData } from "./data.js";
 import { store } from "./store.js";
-import { initCalendar, backToToday, closeMenus } from "./calendar.js";
-import { initSheet, back, sheetOpen, refreshSheet } from "./sheet.js";
+import { initCalendar, backToToday, closeMenus, scrollToTop } from "./calendar.js";
+import { initSheet, back, sheetOpen, refreshSheet, setDayAdd } from "./sheet.js";
 import { initEvent, newEventForm } from "./view-event.js";
 
 initTheme();
@@ -43,17 +43,21 @@ async function syncNow() {
 actions.sync = syncNow;
 initSheet();
 initEvent({ data, refresh: refreshSheet });
+setDayAdd(newEventForm); // F21: the day-level sheet's own "+"
 initCalendar({ data, render, isCalendar, sync: syncNow });
 render();
 syncNow();
 document.addEventListener("visibilitychange", () => { if (document.visibilityState === "visible") syncNow(); });
 window.addEventListener("online", syncNow);
 
-/* The two round buttons. "+" arrives with the event form (round 2). */
+/* F28: the three round buttons -- "+", up (scroll to top) and down (back to
+   today, collapsing loaded-older data). "Load older" (F29) moved inline
+   into the control row and is bound there, in calendar.js's own onClick. */
 document.getElementById("fabs").addEventListener("click", (e) => {
   const b = e.target.closest("[data-fab]");
   if (!b) return;
-  if (b.dataset.fab === "today") backToToday();
+  if (b.dataset.fab === "up") scrollToTop();
+  else if (b.dataset.fab === "down") backToToday();
   else newEventForm();
 });
 

@@ -10,11 +10,13 @@
 import { escapeHtml as esc } from "./util.js";
 import { addDays, dayOfWeek, mondayOf, todayKey } from "./dates.js";
 import { isoWeek, monthOfWeek, loadRange, freeWeekendSaturday, longWeekends } from "./views.js";
-import { HOLIDAYS, holidayOn } from "./holidays.js";
+import { HOLIDAYS } from "./holidays.js";
 import { applyDetail } from "./filter.js";
 import { store } from "./store.js";
-import { indexByDay, weekRows, tappable, zoomWeekTarget, zoomMonthTarget, isAway, isBig, awayText,
-  shouldLoadMore, nextCount, iconsOf, searchEvents, shortDate, seePrevious, pastMonths, gesture, lastEventDay } from "./cal-model.js";
+import { indexByDay, weekRows, tappable, zoomWeekTarget, zoomMonthTarget, isAway, awayText,
+  shouldLoadMore, nextCount, iconsOf, searchEvents, shortDate, pastMonths, gesture, lastEventDay,
+  fullPastWeeks, fullPastMonths, backToTodayState, todaysCount as cmTodaysCount, eventsInMonth, hideCancelled,
+  hasLoadedOlder, hasOpenTodos, heatFill } from "./cal-model.js";
 import { openLevel, sheetOpen } from "./sheet.js";
 import { ICON } from "./chrome-icons.js";
 import { readPrefs, byCategories } from "./prefs.js";
@@ -29,7 +31,7 @@ const WIDE = "(min-width: 900px)";
 const S = {
   view: null, detail: null, fromView: null, slide: "",
   past: { weekly: 0, monthly: 0, yearly: 0 }, future: { weekly: 10, monthly: 10, yearly: 15 },
-  revealPrev: false, searchOpen: false, query: "", menu: false,
+  searchOpen: false, query: "", menu: false,
   scrollTo: null, keepAnchor: false, pending: false,
   /* older years, loaded on demand: the oldest year shown, and whether
      kave-hub has anything older */
@@ -51,65 +53,88 @@ function buildFrame() {
   const today = todayKey();
   const thisYear = today.slice(0, 4);
   /* the detail level first, then the viewer's categories for this view */
-  const shown = applyDetail(byCategories(ctx.data.events(), readPrefs(store.state.settings), me, S.view), me, S.detail);
-  const grey = new Set(shown.filter((x) => x.grey).map((x) => x.event.id));
-  const events = shown.map((x) => x.event);
+  const detailed = applyDetail(byCategories(ctx.data.events(), readPrefs(store.state.settings), me, S.view), me, S.detail);
+  const grey = new Set(detailed.filter((x) => x.grey).map((x) => x.event.id));
+  /* F35: Weekly hides a cancelled event outright; Monthly and Yearly keep it
+     (struck through, cls() below). */
+  const events = hideCancelled(detailed.map((x) => x.event), S.view);
   const idx = indexByDay(events);
   const last = lastEventDay(events);
   if (!S.floor) S.floor = thisYear;
   const range = loadRange(today, last, S.floor);
+  /* F20: "N plans" must not respect the category filters (the heat-strip
+     fill still does, F17/F12 unaffected) -- an index built with detail
+     applied but no category filtering, so the count matches what Monthly
+     will actually show once you jump there. */
+  const allEvents = applyDetail(ctx.data.events(), me, S.detail).map((x) => x.event);
+  const allIdx = indexByDay(allEvents);
   return { me, style, today, thisYear, events, idx, grey, range,
-    on: (d) => idx.get(d) || [], thisMonday: mondayOf(today), firstMonday: mondayOf(range.min) };
+    on: (d) => idx.get(d) || [], onAll: (d) => allIdx.get(d) || [],
+    thisMonday: mondayOf(today), firstMonday: mondayOf(range.min) };
 }
 
 /* ---- pieces ---- */
 const icons = (e) => iconsOf(e, frame.me);
-const cls = (e) => `${frame.grey.has(e.id) ? "grey" : ""}${e.status === "idea" ? " idea" : ""}`;
+/* F35: Monthly and Yearly keep a cancelled event visible, title struck
+   through; Weekly never sees one here at all (hideCancelled in buildFrame). */
+const cls = (e) => `${frame.grey.has(e.id) ? "grey" : ""}${e.status === "idea" ? " idea" : ""}${e.status === "cancelled" ? " cancelled" : ""}`;
 
 function row(e, withDate, click) {
   const ic = icons(e);
   return `<li class="${cls(e)}" style="--n:${ic.length}"${click ? ` data-act="event" data-id="${esc(e.id)}"` : ""}>`
     + (withDate ? `<span class="c-d">${esc(shortDate(e.start, frame.thisYear))}</span>` : "")
     + `<span class="c-i">${ic.map(esc).join("")}</span><span class="c-t">${esc(e.title)}</span>`
-    + ((e.checklist || []).some((c) => !c.done) ? '<span class="todo" aria-label="Open to-dos"></span>' : "") + "</li>";
+    + (hasOpenTodos(e) ? `<span class="todo-ic" aria-label="Open to-dos">${ICON.checkbox}</span>` : "") + "</li>";
 }
 const list = (items, dated) => (items ? `<ul class="rows${dated ? " dated" : ""}">${items}</ul>` : "");
 export const rows = (evs, dated, click) => list(evs.map((e) => row(e, dated, click)).join(""), dated);
 const noteRow = (d, text) => `<li class="note" style="--n:0"><span class="c-d">${esc(shortDate(d, frame.thisYear))}</span><span class="c-i"></span><span class="c-t"><span class="flag acc">${esc(text)}</span></span></li>`;
-const hintRow = (d, text) => `<li class="hintrow" style="--n:1"><span class="c-d">${esc(shortDate(d, frame.thisYear))}</span><span class="c-i">🔍</span><span class="c-t">${esc(text)}</span></li>`;
+/* F10: a long weekend line is now a normal event line -- Other's icon (📌),
+   no accent-ink, nothing special. */
+const noteRowPlain = (d, text) => `<li style="--n:1"><span class="c-d">${esc(shortDate(d, frame.thisYear))}</span><span class="c-i">📌</span><span class="c-t">${esc(text)}</span></li>`;
 const iconSpans = (e) => icons(e).map((g) => `<span class="ic ${cls(e)}">${esc(g)}</span>`).join("");
 const sortByDay = (items) => items.sort((a, b) => (a.d < b.d ? -1 : a.d > b.d ? 1 : 0)).map((x) => x.html).join("");
 
-/* ---- Today card ---- */
+/* ---- Today (F4: the Today card is gone; a bare anchor keeps the scroll
+   machinery -- Back to today, onScroll's visibility check -- working at the
+   same spot in the list, between the past and the future). ---- */
 const place = (e) => [e.venue, e.city && e.city[0].toUpperCase() + e.city.slice(1)].filter(Boolean).join(", ");
-function todayCard() {
-  const evs = frame.on(frame.today);
-  const hol = holidayOn(frame.today);
-  const items = evs.map((e) => `<div class="titem"><span class="ticons">${icons(e).map(esc).join("")}</span><div class="tbody">`
-    + `<p class="ttitle">${esc(e.title)}</p>${place(e) ? `<p class="tmeta">${esc(place(e))}</p>` : ""}`
-    + ((e.links || []).length ? `<span class="tticket">🎟 ${esc(e.links[0].label)}</span>` : "") + "</div></div>").join("");
-  return `<section id="today" class="todayc" data-act="day" data-d="${frame.today}" role="button" tabindex="0">`
-    + `<p class="tbig">Today</p>${hol ? `<p class="thol">Bank holiday: ${esc(hol)}</p>` : ""}`
-    + (items || '<p class="tmeta">No events planned for today</p>') + "</section>";
+function todayAnchor() {
+  return `<span id="today" aria-hidden="true"></span>`;
 }
 
-/* ---- control row ---- */
+/* ---- control row ----
+   F28: the view toggle, detail and search controls stop floating -- this
+   row scrolls away with the page again, same as section 3's original
+   wording. */
 function controls() {
   const idx = VIEWS.indexOf(S.view), from = S.fromView == null ? idx : VIEWS.indexOf(S.fromView);
-  const views = `<div class="views" role="tablist"><span class="ind" style="--i:${idx};--from:${from}"></span>`
-    + VIEWS.map((v) => `<button role="tab" aria-selected="${S.view === v}" class="${S.view === v ? "on" : ""}" data-act="view" data-v="${v}">${v[0].toUpperCase() + v.slice(1)}</button>`).join("") + "</div>";
+  /* F59: Spoon's .segment/.seg-thumb construction, copied verbatim
+     (styles.css) -- .ind became .seg-thumb, .views became .segment. */
+  const views = `<div class="segment" role="tablist"><span class="seg-thumb" style="--i:${idx};--from:${from}"></span>`
+    + VIEWS.map((v) => `<button role="tab" aria-selected="${S.view === v}" data-act="view" data-v="${v}">${v[0].toUpperCase() + v.slice(1)}</button>`).join("") + "</div>";
   const detail = `<button class="ib" data-act="menu" aria-label="Detail level" aria-expanded="${S.menu}">${ICON.eye}</button>`;
+  /* F29: "load older" is now one of three inline control buttons, sitting
+     between detail and search, not a floating round button (F6's mechanism
+     is unchanged, only where its trigger sits); its icon is an archive box. */
+  const older = showLoadOlder() ? `<button class="ib" data-act="older" aria-label="Load older years">${ICON.older}</button>` : "";
   const search = S.searchOpen
     ? `<div class="sfield"><span class="si">${ICON.search}</span><input id="q" type="search" placeholder="Search every event" value="${esc(S.query)}" autocomplete="off"><button class="clr" data-act="closesearch" aria-label="Close search">${ICON.x}</button></div>`
     : `<button class="ib" data-act="search" aria-label="Search">${ICON.search}</button>`;
   const menu = S.menu ? `<div class="menu"><p class="mt">Detail level</p>${[["full", "Full"], ["partial", "Partial"], ["minimal", "Minimal"]]
     .map(([k, l]) => `<button class="opt${S.detail === k ? " on" : ""}" data-act="detail" data-v="${k}">${l}</button>`).join("")}`
     + '<p class="mh">Full: both of you. Partial: the other person greyed. Minimal: yours and shared only.</p></div>' : "";
-  return `<div class="ctl${S.searchOpen ? " searching" : ""}">${S.searchOpen ? "" : views}<div class="ctl2">${S.searchOpen ? "" : detail}${search}</div>${menu}</div>`;
+  return `<div class="ctl${S.searchOpen ? " searching" : ""}">${S.searchOpen ? "" : views}<div class="ctl2">${S.searchOpen ? "" : detail + older}${search}</div>${menu}</div>`;
 }
 
 /* ---- Weekly and Monthly: runs of weeks ---- */
-const monthHead = (d) => `<h3 class="month">${MONTHS[Number(d.slice(5, 7)) - 1]}${d.slice(0, 4) !== frame.thisYear ? " " + d.slice(0, 4) : ""}</h3>`;
+/* F54: this heading used to also be F26's sticky-title section boundary
+   (data-sec); F26 is fully reverted, so it is back to being just the plain,
+   non-sticky "September" heading, drawn once per month. */
+const monthHead = (d) => {
+  const label = `${MONTHS[Number(d.slice(5, 7)) - 1]}${d.slice(0, 4) !== frame.thisYear ? " " + d.slice(0, 4) : ""}`;
+  return `<h3 class="month">${esc(label)}</h3>`;
+};
 const weekLabel = (m) => `WEEK ${isoWeek(m)}`;
 
 function dayCard(d) {
@@ -117,13 +142,18 @@ function dayCard(d) {
   const body = frame.style === "icons" ? `<div class="icons">${evs.map(iconSpans).join("")}</div>` : rows(evs, false, false);
   const tap = tappable(evs) ? ` role="button" tabindex="0" data-act="day" data-d="${d}"` : "";
   const isToday = d === frame.today;
+  const label = `${DOW[dayOfWeek(d)]} ${Number(d.slice(8))}`;
   return `<div class="day${isToday ? " today" : ""}${evs.length ? "" : " empty"}"${tap}>`
-    + `<span class="lbl dl${isToday ? " on" : ""}">${DOW[dayOfWeek(d)]} ${Number(d.slice(8))}</span>${body}</div>`;
+    + `<span class="lbl-pill${isToday ? " on" : ""}">${label}</span>${body}</div>`;
 }
+/* F8: Weekly keeps its "WEEK 39" heading, but it is no longer a tap target
+   (F11 removed the jump it gave); it must match Monthly's card label
+   exactly, so it shares the same .lbl-pill construction (F9), minus the
+   pill itself (F27: this one line never gets the pill treatment). */
 function weekRow(m) {
   const days = [0, 1, 2, 3, 4, 5, 6].map((k) => addDays(m, k));
   const grid = weekRows(days, matchMedia(WIDE).matches).map((r) => r.map(dayCard).join("")).join("");
-  return `<section class="week" data-week="${m}"><button class="lbl wk" data-act="zoomweek" data-m="${m}">${weekLabel(m)}${ICON.chev}</button>`
+  return `<section class="week" data-week="${m}"><span class="lbl-plain wk">${weekLabel(m)}</span>`
     + `<div class="g3">${grid}</div></section>`;
 }
 function weekEvents(m) {
@@ -139,8 +169,11 @@ function weekCard(m) {
   if (sat) items.push({ d: sat, html: noteRow(sat, "Free weekend") });
   const now = m <= frame.today && frame.today <= addDays(m, 6);
   const tap = tappable(evs) ? ` data-act="week" data-m="${m}" role="button" tabindex="0"` : "";
+  /* F27: only the current week's label keeps the pill, filled accent; every
+     other week's is plain text, no pill, no border (.lbl-pill carries no
+     background of its own any more -- only .on does, CSS). */
   return `<div class="wcard${now ? " now" : ""}${evs.length ? "" : " empty"}" data-week="${m}"${tap}>`
-    + `<div class="wh"><span class="lbl">${weekLabel(m)}</span>`
+    + `<div class="wh"><span class="lbl-pill${now ? " on" : ""}">${weekLabel(m)}</span>`
     + away.map((e) => `<span class="away${frame.grey.has(e.id) ? " grey" : ""}">${esc(icons(e)[0])} ${esc(awayText(e, frame.thisYear))}</span>`).join("")
     + "</div>" + list(sortByDay(items), true) + "</div>";
 }
@@ -156,43 +189,88 @@ function weekBlocks(from, count, kind) {
   }
   return out;
 }
-const prevBtn = () => '<button class="reveal" data-act="prev">See previous</button>';
+/* F6: "See previous" is no longer inline text in the list; it is the
+   floating "load older" button that sits with the floating controls
+   (drawn in calendarHtml/controls). */
 function weeks(kind) {
   const from = addDays(frame.thisMonday, -7 * S.past[kind]);
-  const next = seePrevious({ from, firstMonday: frame.firstMonday, exhausted: S.exhausted });
-  return { past: (S.revealPrev && next !== "none" ? prevBtn() : "") + weekBlocks(from, S.past[kind], kind),
+  return { past: weekBlocks(from, S.past[kind], kind),
     future: weekBlocks(frame.thisMonday, S.future[kind], kind) };
 }
 
 /* ---- Yearly: a card per month ---- */
 const ymOf = (y, mo) => `${y}-${String(mo + 1).padStart(2, "0")}`;
 const daysIn = (y, mo) => new Date(Date.UTC(y, mo + 1, 0)).getUTCDate();
+/* F10: the year heading is big, once, like Monthly's big month heading. Isa's
+   correction in the mock-up round: the year heading itself takes no border
+   -- only the current month's card does, the same accent outline as
+   Weekly's today-card and Monthly's current-week card. */
+const yearHead = (y) => `<p class="year-big">${y}</p>`;
 function monthCard(y, mo) {
-  const key = ymOf(y, mo), n = daysIn(y, mo);
+  const key = ymOf(y, mo), n = daysIn(y, mo), now = key === frame.today.slice(0, 7);
   const evs = []; let cells = "";
   for (let dd = 1; dd <= n; dd++) {
     const d = `${key}-${String(dd).padStart(2, "0")}`;
     const on = frame.on(d);
     for (const e of on) if (!evs.includes(e)) evs.push(e);
-    cells += `<i class="${on.length ? "on" : ""}${dayOfWeek(d) >= 5 ? " we" : ""}${HOLIDAYS[d] ? " hol" : ""}${d === frame.today ? " t" : ""}"></i>`;
+    /* F58 (revises F12/F31), corrected by F61: the current month is
+       colour-coded -- the viewer's own or a joint event in the accent, an
+       other-person-only day in accent-soft. Future months: the viewer's
+       own or a joint event fills in a muted, darker "accent fade"
+       (.future, CSS); every other future square is empty, the same empty
+       fill as the current month's (no class at all -- "grey" no longer
+       exists as a separate, flatter colour). Today is marked independent
+       of fill.
+       F61: the fill reads from frame.onAll (unfiltered), the same source
+       "N plans" below already uses (F20) -- only evs, the itemised lines
+       above, stays built from frame.on (filtered). Squares must colour in
+       every plan, hidden categories included. */
+    const fill = heatFill(frame.onAll, d, now, frame.me);
+    cells += `<i class="${fill}${d === frame.today ? " t" : ""}"></i>`;
   }
-  const lw = longWeekends(HOLIDAYS, key + "-01", `${key}-${n}`, frame.on).filter((w) => w.start.slice(0, 7) === key || w.end.slice(0, 7) === key);
-  const items = evs.filter(isBig).map((e) => ({ d: e.start, html: row(e, true, true) }))
-    .concat(lw.map((w) => ({ d: w.start, html: hintRow(w.start, `${w.text}, ${w.names}`) })));
-  const now = key === frame.today.slice(0, 7);
-  return `<div class="mcard${now ? " now" : ""}" data-act="zoommonth" data-ym="${key}" data-month="${key}">`
-    + `<p class="mh"><span class="lbl">${MONTHS[mo].toUpperCase()}${String(y) !== frame.thisYear ? " " + y : ""}${ICON.chev}</span>`
-    + `<span class="cnt">${evs.length} plan${evs.length === 1 ? "" : "s"}</span></p>`
+  /* F10: a long weekend or opportunity that has already passed does not
+     show; the line is a normal event line (no 🔍, no accent-ink). */
+  const lw = longWeekends(HOLIDAYS, key + "-01", `${key}-${n}`, frame.on)
+    .filter((w) => (w.start.slice(0, 7) === key || w.end.slice(0, 7) === key) && w.end >= frame.today);
+  /* F17: no second, hard-coded gate here any more -- evs already carries only
+     the viewer's Yearly categories (prefs.js's byCategories, applied in
+     buildFrame), whose default is now the real "big things" set. Toggling
+     Categories in Settings genuinely changes what a month's card lists. */
+  /* F56: each plan line renders through the same row()/noteRowPlain() the
+     rest of the app uses -- no separate per-line colour/heat tint exists
+     here (checked: cls() only ever adds "grey" for partial-detail's other
+     person, unchanged everywhere else, "idea" and "cancelled", none of them
+     Yearly-specific). Confirmed live: a month card's lines are plain text,
+     same colours as Weekly/Monthly's own rows. F56 is a verification, not a
+     code change; F58 above is the actual bug it was seen alongside (the
+     heat-strip squares, not these lines). */
+  const items = evs.map((e) => ({ d: e.start, html: row(e, true, true) }))
+    .concat(lw.map((w) => ({ d: w.start, html: noteRowPlain(w.start, `${w.text}, ${w.names}`) })));
+  /* F20: the count is unfiltered by category (frame.onAll), a partial
+     revert of F17 -- it has to match what Monthly will show once you jump
+     there. The heat-strip fill above is unaffected, still built from
+     frame.on (filtered). */
+  const plansCount = eventsInMonth(frame.onAll, key, n).length;
+  /* F11: the month heading is plain text, no chevron, not a tap target; "N
+     plans" plus a literal ">" is the only jump into Monthly. */
+  /* F27: only the current month's card label keeps the pill (accent). */
+  return `<div class="mcard${now ? " now" : ""}" data-month="${key}">`
+    + `<p class="mh"><span class="lbl-pill${now ? " on" : ""}">${MONTHS[mo].toUpperCase()}</span>`
+    + `<button class="plans-line" data-act="zoommonth" data-ym="${key}">${plansCount} plan${plansCount === 1 ? "" : "s"} &gt;</button></p>`
     + `<div class="heat" style="--n:${n}" aria-hidden="true">${cells}</div>` + list(sortByDay(items), true) + "</div>";
 }
 function yearly() {
   const y0 = Number(frame.thisYear), m0 = Number(frame.today.slice(5, 7)) - 1;
   const shown = pastMonths(frame.today, S.floor, S.past.yearly);
-  const more = pastMonths(frame.today, S.floor, S.past.yearly + 1).length > shown.length;
-  let past = S.revealPrev && (more || !S.exhausted) ? prevBtn() : "";
-  for (const ym of shown) past += monthCard(Number(ym.slice(0, 4)), Number(ym.slice(5, 7)) - 1);
-  let future = "";
+  let past = "", pastYear = null;
+  for (const ym of shown) {
+    const y = Number(ym.slice(0, 4));
+    if (y !== pastYear) { past += yearHead(y); pastYear = y; }
+    past += monthCard(y, Number(ym.slice(5, 7)) - 1);
+  }
+  let future = "", curYear = pastYear;
   for (let y = y0, mo = m0, n = 0; ymOf(y, mo) + "-01" <= frame.range.max && n < S.future.yearly; n++) {
+    if (y !== curYear) { future += yearHead(y); curYear = y; }
     future += monthCard(y, mo);
     if (++mo === 12) { mo = 0; y++; }
   }
@@ -222,13 +300,21 @@ function ensureYears() {
   }
 }
 
-/* ---- the tab ---- */
+/* ---- the tab ----
+   F28: the control row scrolls with the page again (F5 reversed). F54: F26's
+   sticky month/year title is gone entirely -- the big per-section heading
+   (monthHead/yearHead) is the only heading now, drawn once, non-sticky,
+   where it always was. F4: no more Today card, just its anchor. */
+/* F34: the swipe animation now applies only to .content (the list), not
+   the whole .page -- the controls stay put; only the view toggle's own
+   .seg-thumb (its own transform/animation, untouched) visibly slides to its
+   new position. */
 export function calendarHtml() {
   frame = buildFrame();
   ensureYears();
   if (S.searchOpen) return `<div class="page">${controls()}${searchPage()}</div>`;
   const v = S.view === "yearly" ? yearly() : weeks(S.view);
-  return `<div class="page ${S.slide}">${v.past}${todayCard()}${controls()}${v.future}</div>`;
+  return `<div class="page">${controls()}<div class="content ${S.slide}">${v.past}${todayAnchor()}${v.future}</div></div>`;
 }
 
 /* After the tab's HTML is in place: scroll, focus, clear one-shot state. */
@@ -243,16 +329,31 @@ export function afterCalendar(mn, before) {
   onScroll();
 }
 
-/* ---- "Back to today": shown once today is off screen, points towards it.
-   Measured on screen: an animation's transform throws offsetTop off. ---- */
+/* ---- F55: one fixed slot above "+", never two heights, never both
+   showing at once. Up (scrolled forward into the future, today is above
+   the visible area) and down (scrolled back into the past/loaded-older
+   data, today is below it) are mutually exclusive by scroll direction, not
+   two independently-toggled booleans any more. Measured on screen: an
+   animation's transform throws offsetTop off. ---- */
 export function onScroll() {
-  const mn = document.getElementById("view"), t = document.getElementById("today"), b = document.querySelector(".to-today");
-  if (!mn || !b) return;
-  if (!t) { b.classList.remove("show"); return; }
+  const mn = document.getElementById("view"), t = document.getElementById("today");
+  const up = document.querySelector(".fab.up"), down = document.querySelector(".fab.down");
+  if (!mn || !up || !down) return;
+  if (!t) { up.classList.remove("show"); down.classList.remove("show"); return; }
   const r = t.getBoundingClientRect(), box = mn.getBoundingClientRect();
   const top = Math.max(box.top, 0), bottom = Math.min(box.bottom, window.innerHeight);
-  b.classList.toggle("show", !(r.bottom > top + 60 && r.top < bottom));
-  b.classList.toggle("down", r.top >= bottom);
+  const pastTop = r.bottom <= top + 60;    // today has scrolled up and out: show up (back to top)
+  const pastBottom = r.top >= bottom;      // today is still below the fold: show down (jump to today)
+  up.classList.toggle("show", pastTop);
+  down.classList.toggle("show", !pastTop && pastBottom);
+}
+
+/* F28: the up button -- scrolls back to the top of the list, revealing the
+   (now non-floating) controls again. */
+export function scrollToTop() {
+  const mn = document.getElementById("view");
+  if (!mn) return;
+  mn.scrollTo({ top: 0, behavior: matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth" });
 }
 
 /* Only a real scroll event calls this, never a draw. */
@@ -296,28 +397,29 @@ async function loadAllOlder() {
   for (let i = 0; i < 15 && !S.exhausted; i++) if (!(await loadOlder())) break;
   if (S.searchOpen) ctx.render();
 }
-async function showPrevious() {
-  const step = S.view === "yearly" ? 3 : 4;
+/* F7: one tap loads straight to 1 January of the floor year (the range
+   already starts there); a further tap once that is fully shown loads the
+   year before it from kave-hub, then reveals that too, in one go each time. */
+async function loadOlderFull() {
   if (S.view === "yearly") {
-    const more = pastMonths(frame.today, S.floor, S.past.yearly + 1).length > S.past.yearly;
-    if (!more && !(await loadOlder())) { ctx.render(); return; }
-    S.past.yearly = pastMonths(frame.today, S.floor, S.past.yearly + step).length;
+    const need = fullPastMonths(frame.today, S.floor);
+    if (S.past.yearly < need) { S.past.yearly = need; S.keepAnchor = true; ctx.render(); return; }
+    if (!(await loadOlder())) { ctx.render(); return; }
+    S.past.yearly = fullPastMonths(frame.today, S.floor);
   } else {
-    const from = addDays(frame.thisMonday, -7 * S.past[S.view]);
-    const next = seePrevious({ from, firstMonday: frame.firstMonday, exhausted: S.exhausted });
-    if (next === "none" || (next === "older" && !(await loadOlder()))) { ctx.render(); return; }
-    const floorMonday = mondayOf(S.floor + "-01-01");
-    const most = Math.round((Date.parse(frame.thisMonday) - Date.parse(floorMonday)) / 6048e5);
-    S.past[S.view] = Math.min(most, S.past[S.view] + step);
+    const need = fullPastWeeks(frame.thisMonday, S.floor);
+    if (S.past[S.view] < need) { S.past[S.view] = need; S.keepAnchor = true; ctx.render(); return; }
+    if (!(await loadOlder())) { ctx.render(); return; }
+    S.past[S.view] = fullPastWeeks(frame.thisMonday, S.floor);
   }
-  S.revealPrev = false; S.keepAnchor = true;
+  S.keepAnchor = true;
   ctx.render();
 }
 
 function setView(v, target) {
   if (v === S.view && !target) return;
   S.slide = VIEWS.indexOf(v) > VIEWS.indexOf(S.view) ? "slide-left" : v === S.view ? "" : "slide-right";
-  S.fromView = S.view; S.view = v; S.revealPrev = false; S.menu = false;
+  S.fromView = S.view; S.view = v; S.menu = false;
   if (target) {
     const need = Math.round((Date.parse(frame.thisMonday) - Date.parse(target)) / 6048e5);
     if (need > 0) S.past[v] = Math.max(S.past[v], need + 1);
@@ -325,6 +427,23 @@ function setView(v, target) {
     S.scrollTo = `[data-week="${target}"]`;
   }
   ctx.render();
+}
+
+/* F29: "load older" is now an inline control button (drawn in controls()
+   above, not with the round buttons); hidden while searching, where it
+   makes no sense. */
+export const showLoadOlder = () => !S.searchOpen;
+export { loadOlderFull };
+
+/* F3: the nav icon's badge. Independent of whatever view is drawn (the
+   badge shows even before the Calendar has been opened this session), so it
+   reads straight from the data instance rather than the last-built frame. */
+export function todaysCount() {
+  if (!ctx || !store.state.settings.me) return 0;
+  const detail = S.detail || (["full", "partial", "minimal"].includes(store.state.settings.defaultDetail) ? store.state.settings.defaultDetail : "full");
+  const today = todayKey();
+  const idx = indexByDay(ctx.data.events());
+  return cmTodaysCount(idx.get(today) || [], store.state.settings.me, detail);
 }
 
 function onClick(e) {
@@ -340,7 +459,9 @@ function onClick(e) {
   else if (a === "detail") { S.detail = b.dataset.v; S.menu = false; ctx.render(); }
   else if (a === "search") { S.searchOpen = true; S.menu = false; ctx.render(); loadAllOlder(); }
   else if (a === "closesearch") { S.searchOpen = false; S.query = ""; ctx.render(); }
-  else if (a === "prev") showPrevious();
+  /* F29: "load older" is now one of the inline control buttons, not a
+     floating round button; same loadOlderFull mechanism (F6/F7). */
+  else if (a === "older") loadOlderFull();
   else if (a === "zoomweek") { e.stopPropagation(); setView("monthly", zoomWeekTarget(b.dataset.m)); }
   else if (a === "zoommonth") setView("monthly", zoomMonthTarget(b.dataset.ym));
   else if (a === "day") openLevel({ kind: "day", d: b.dataset.d });
@@ -350,8 +471,17 @@ function onClick(e) {
   e.preventDefault();
 }
 
+/* F7/F28: the down button -- jumps to today and discards whatever earlier
+   data "load older" pulled in, so the list is back to its normal range and
+   pull to refresh (F53) works again. */
 export function backToToday() {
   const t = document.getElementById("today");
+  if (frame && hasLoadedOlder(S.past)) {
+    Object.assign(S, backToTodayState(frame.thisYear));
+    S.scrollTo = "#today";
+    ctx.render();
+    return;
+  }
   if (t) t.scrollIntoView({ block: "start", behavior: matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth" });
 }
 
@@ -387,23 +517,25 @@ export function initCalendar(c) {
   const start = (x, y) => { g = ctx.isCalendar() && !sheetOpen() ? { x, y, top: mn.scrollTop <= 0 } : null; };
   const end = (x, y) => {
     if (!g) return;
-    const act = gesture({ dx: x - g.x, dy: y - g.y, top: g.top, searching: S.searchOpen });
+    const act = gesture({ dx: x - g.x, dy: y - g.y, top: g.top, searching: S.searchOpen, loadedOlder: hasLoadedOlder(S.past) });
     g = null;
     if (act === "next" || act === "prev") {
       const i = VIEWS.indexOf(S.view) + (act === "next" ? 1 : -1);
       if (i >= 0 && i < VIEWS.length) { swallowClick(); setView(VIEWS[i]); }
     } else if (act === "pull") {
-      /* one pull does both: reveals See previous and syncs (quietly) */
+      /* F53: only reachable once the true top is today's own range again
+         (gesture() itself refuses to arm otherwise); the down button (F28)
+         is what gets a person back here after loading older data. */
       ctx.sync();
-      if (!S.revealPrev) { S.revealPrev = true; ctx.render(); }
     }
   };
   mn.addEventListener("pointerdown", (e) => { if (e.pointerType !== "touch") start(e.clientX, e.clientY); });
   document.addEventListener("pointerup", (e) => { if (e.pointerType !== "touch") end(e.clientX, e.clientY); });
   mn.addEventListener("touchstart", (e) => { if (e.touches.length === 1) start(e.touches[0].clientX, e.touches[0].clientY); }, { passive: true });
   mn.addEventListener("touchend", (e) => { const t = e.changedTouches[0]; if (t) end(t.clientX, t.clientY); }, { passive: true });
+  /* F53: a wheel "pull" (desktop) obeys the same true-top rule. */
   mn.addEventListener("wheel", (e) => {
-    if (ctx.isCalendar() && mn.scrollTop <= 0 && e.deltaY < -30 && !S.revealPrev && !S.searchOpen) { S.revealPrev = true; ctx.render(); }
+    if (ctx.isCalendar() && mn.scrollTop <= 0 && !hasLoadedOlder(S.past) && e.deltaY < -30 && !S.searchOpen) ctx.sync();
   }, { passive: true });
 }
 
