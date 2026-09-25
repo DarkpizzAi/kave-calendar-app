@@ -14,7 +14,7 @@ import { escapeHtml, copyText } from "./util.js";
 import { PALETTES, applyPalette, themeBootRan, paletteAccents, paletteSofts } from "./theme.js";
 import { status as syncStatus, checkToken } from "./sync.js";
 import { ICON } from "./chrome-icons.js";
-import { calendarHtml, afterCalendar, onScroll, backToToday, showLoadOlder, todaysCount } from "./calendar.js";
+import { calendarHtml, afterCalendar, onScroll, backToToday, todaysCount } from "./calendar.js";
 import { refreshSheet, openLevel, registerLevel } from "./sheet.js";
 import { readPrefs, isShown, toggleCategory, resetCategories, defaultsSummary, categoriesSummary, VIEW_NAMES, DETAIL_NAMES, STYLE_NAMES } from "./prefs.js";
 import { CATEGORIES, iconFor } from "./icons.js";
@@ -219,9 +219,13 @@ export function render() {
     : current === "calendar" ? (blocked || calendarHtml()) : renderStub(current);
   main.classList.toggle("is-cal", current === "calendar" && !blocked);
   document.getElementById("nav").innerHTML = renderNav();
+  /* F28: two round buttons replace the single "Back to today" -- up (scroll
+     to top, revealing the now non-floating controls) and down (jump to
+     today, collapsing loaded-older data), the same icon mirrored via CSS.
+     F29 moved "load older" inline into the control row (calendar.js). */
   document.getElementById("fabs").innerHTML = current === "calendar" && !blocked
-    ? `<button class="fab to-today" data-fab="today" aria-label="Back to today">${ICON.up}</button>`
-      + (showLoadOlder() ? `<button class="fab older" data-fab="older" aria-label="Load older years">${ICON.older}</button>` : "")
+    ? `<button class="fab up" data-fab="up" aria-label="Scroll to top">${ICON.up}</button>`
+      + `<button class="fab down" data-fab="down" aria-label="Back to today">${ICON.up}</button>`
       + `<button class="fab add" data-fab="add" aria-label="Add an event">${ICON.plus}</button>` : "";
   if (current === "calendar" && !blocked) { afterCalendar(main, before); firstDraw = false; }
   else onScroll();

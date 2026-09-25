@@ -100,13 +100,24 @@ export const nextCount = (count, step, cap) => Math.min(cap, count + step);
 
 /* One rule for a finished drag, mouse or touch: a clear sideways swipe
    changes view, a pull down from the very top reveals See previous (and
-   syncs); anything else is an ordinary scroll. */
-export function gesture({ dx, dy, top, searching }) {
+   syncs); anything else is an ordinary scroll. F53: "the very top" only
+   counts as the true top -- scrollTop<=0 alone is not enough once "load
+   older" (F6/F29) has pulled earlier data in, because scrollTop 0 then sits
+   at the start of THAT older content, not at today's normal range. A pull
+   there must not arm; the down button (F28) is what collapses it back, and
+   only after that does a pull at the visual top mean anything again. */
+export function gesture({ dx, dy, top, searching, loadedOlder }) {
   if (searching) return null;
   if (Math.abs(dx) > 70 && Math.abs(dx) > 1.5 * Math.abs(dy)) return dx < 0 ? "next" : "prev";
-  if (top && dy > 60 && Math.abs(dy) > Math.abs(dx)) return "pull";
+  if (top && !loadedOlder && dy > 60 && Math.abs(dy) > Math.abs(dx)) return "pull";
   return null;
 }
+
+/* F53: whether the currently loaded content's visual top is still today's
+   normal range, or whether "load older" has moved it -- the same state
+   backToTodayState resets. Pure so gesture()'s arming condition and the
+   down button's own "is there anything to collapse" both read one answer. */
+export const hasLoadedOlder = (past) => Object.values(past).some(Boolean);
 
 /* See previous: reveal more of what is loaded, load the year before, or
    nothing, once kave-hub has no older year. */

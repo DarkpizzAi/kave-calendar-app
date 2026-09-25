@@ -94,7 +94,7 @@ test("review I2: a sync never redraws an open form (the keyboard would close)", 
   eq([refreshable({ kind: "edit" }), refreshable({ kind: "new" }), refreshable({ kind: "event" }), refreshable(null)], [false, false, true, false]);
 });
 
-import { gesture } from "../js/cal-model.js";
+import { gesture, hasLoadedOlder } from "../js/cal-model.js";
 test("review I6: one gesture rule for mouse and touch (swipe sideways, pull at the top)", () => {
   eq(gesture({ dx: -120, dy: 10, top: false, searching: false }), "next");
   eq(gesture({ dx: 120, dy: -10, top: true, searching: false }), "prev");
@@ -102,6 +102,13 @@ test("review I6: one gesture rule for mouse and touch (swipe sideways, pull at t
   eq(gesture({ dx: 5, dy: 90, top: false, searching: false }), null, "a pull away from the top is a scroll");
   eq(gesture({ dx: -120, dy: 10, top: false, searching: true }), null, "no swipes while searching");
   eq(gesture({ dx: 80, dy: 70, top: false, searching: false }), null, "diagonal is a scroll");
+});
+test("cal: F53 -- a pull only arms at the true top, not once load older has moved it", () => {
+  eq(gesture({ dx: 5, dy: 90, top: true, searching: false, loadedOlder: false }), "pull");
+  eq(gesture({ dx: 5, dy: 90, top: true, searching: false, loadedOlder: true }), null,
+    "scrollTop<=0 after load older sits at the older content's own top, not today's range");
+  eq(hasLoadedOlder({ weekly: 0, monthly: 0, yearly: 0 }), false);
+  eq(hasLoadedOlder({ weekly: 3, monthly: 0, yearly: 0 }), true);
 });
 
 /* ---- deferred minors from the final review ---- */

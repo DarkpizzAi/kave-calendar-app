@@ -15,7 +15,8 @@ import { applyDetail } from "./filter.js";
 import { store } from "./store.js";
 import { indexByDay, weekRows, tappable, zoomWeekTarget, zoomMonthTarget, isAway, awayText,
   shouldLoadMore, nextCount, iconsOf, searchEvents, shortDate, pastMonths, gesture, lastEventDay,
-  fullPastWeeks, fullPastMonths, backToTodayState, todaysCount as cmTodaysCount, eventsInMonth, hideCancelled } from "./cal-model.js";
+  fullPastWeeks, fullPastMonths, backToTodayState, todaysCount as cmTodaysCount, eventsInMonth, hideCancelled,
+  hasLoadedOlder } from "./cal-model.js";
 import { openLevel, sheetOpen } from "./sheet.js";
 import { ICON } from "./chrome-icons.js";
 import { readPrefs, byCategories } from "./prefs.js";
@@ -102,30 +103,48 @@ function todayAnchor() {
   return `<span id="today" aria-hidden="true"></span>`;
 }
 
-/* ---- control row ---- */
+/* ---- control row ----
+   F28: the view toggle, detail and search controls stop floating -- this
+   row scrolls away with the page again, same as section 3's original
+   wording. F26's month/year title is no longer drawn inside it (its own
+   standalone sticky bar, secTitle() below). */
 function controls() {
   const idx = VIEWS.indexOf(S.view), from = S.fromView == null ? idx : VIEWS.indexOf(S.fromView);
   const views = `<div class="views" role="tablist"><span class="ind" style="--i:${idx};--from:${from}"></span>`
     + VIEWS.map((v) => `<button role="tab" aria-selected="${S.view === v}" class="${S.view === v ? "on" : ""}" data-act="view" data-v="${v}">${v[0].toUpperCase() + v.slice(1)}</button>`).join("") + "</div>";
   const detail = `<button class="ib" data-act="menu" aria-label="Detail level" aria-expanded="${S.menu}">${ICON.eye}</button>`;
+  /* F29: "load older" is now one of three inline control buttons, sitting
+     between detail and search, not a floating round button (F6's mechanism
+     is unchanged, only where its trigger sits); its icon is an archive box. */
+  const older = showLoadOlder() ? `<button class="ib" data-act="older" aria-label="Load older years">${ICON.older}</button>` : "";
   const search = S.searchOpen
     ? `<div class="sfield"><span class="si">${ICON.search}</span><input id="q" type="search" placeholder="Search every event" value="${esc(S.query)}" autocomplete="off"><button class="clr" data-act="closesearch" aria-label="Close search">${ICON.x}</button></div>`
     : `<button class="ib" data-act="search" aria-label="Search">${ICON.search}</button>`;
   const menu = S.menu ? `<div class="menu"><p class="mt">Detail level</p>${[["full", "Full"], ["partial", "Partial"], ["minimal", "Minimal"]]
     .map(([k, l]) => `<button class="opt${S.detail === k ? " on" : ""}" data-act="detail" data-v="${k}">${l}</button>`).join("")}`
     + '<p class="mh">Full: both of you. Partial: the other person greyed. Minimal: yours and shared only.</p></div>' : "";
-  /* F23: the current section's label floats just below the controls, inside
-     the same sticky block (so it moves as one with them, no separate top
-     offset to keep in sync) and takes over from the previous one as the list
-     scrolls (onScroll/updateSectionTitle, the same scroll-tracking already
-     driving "Back to today" and "load older"). Empty while searching or
-     before the first section has scrolled under it (CSS hides it then). */
-  return `<div class="ctl${S.searchOpen ? " searching" : ""}">${S.searchOpen ? "" : views}<div class="ctl2">${S.searchOpen ? "" : detail}${search}</div>${menu}`
-    + `<p class="sec-title" id="secTitle" aria-hidden="true"></p></div>`;
+  return `<div class="ctl${S.searchOpen ? " searching" : ""}">${S.searchOpen ? "" : views}<div class="ctl2">${S.searchOpen ? "" : detail + older}${search}</div>${menu}</div>`;
+}
+
+/* ---- F26: the coarse, standalone sticky title -- the month name under
+   Weekly and Monthly, the year under Yearly. Its own small bar, not living
+   inside the (now non-floating, F28) control row, so it can keep floating
+   on its own as the list scrolls; the same scroll-tracking that already
+   drove "Back to today" and F29's load-older keeps it current
+   (updateSectionTitle). Empty while searching (CSS hides it then). */
+function secTitleBar() {
+  return `<p class="sec-title${S.searchOpen ? " searching" : ""}" id="secTitle" aria-hidden="true"></p>`;
 }
 
 /* ---- Weekly and Monthly: runs of weeks ---- */
-const monthHead = (d) => `<h3 class="month">${MONTHS[Number(d.slice(5, 7)) - 1]}${d.slice(0, 4) !== frame.thisYear ? " " + d.slice(0, 4) : ""}</h3>`;
+/* F26: the month heading is the section boundary the sticky title (F26,
+   secTitleBar above) tracks -- one per month, not one per day/week card, so
+   "October" only takes over from "September" when the list actually
+   scrolls into October. */
+const monthHead = (d) => {
+  const label = `${MONTHS[Number(d.slice(5, 7)) - 1]}${d.slice(0, 4) !== frame.thisYear ? " " + d.slice(0, 4) : ""}`;
+  return `<h3 class="month" data-sec="${esc(label)}">${esc(label)}</h3>`;
+};
 const weekLabel = (m) => `WEEK ${isoWeek(m)}`;
 
 function dayCard(d) {
@@ -133,20 +152,18 @@ function dayCard(d) {
   const body = frame.style === "icons" ? `<div class="icons">${evs.map(iconSpans).join("")}</div>` : rows(evs, false, false);
   const tap = tappable(evs) ? ` role="button" tabindex="0" data-act="day" data-d="${d}"` : "";
   const isToday = d === frame.today;
-  /* F23: Weekly's floating section title is the day name -- each day card is
-     the section boundary here (the "WEEK NN" pill above the grid, F8, stays
-     put; it is not a tap target and not a scroll section on its own). */
   const label = `${DOW[dayOfWeek(d)]} ${Number(d.slice(8))}`;
-  return `<div class="day${isToday ? " today" : ""}${evs.length ? "" : " empty"}" data-sec="${esc(label)}"${tap}>`
+  return `<div class="day${isToday ? " today" : ""}${evs.length ? "" : " empty"}"${tap}>`
     + `<span class="lbl-pill${isToday ? " on" : ""}">${label}</span>${body}</div>`;
 }
 /* F8: Weekly keeps its "WEEK 39" heading, but it is no longer a tap target
    (F11 removed the jump it gave); it must match Monthly's card label
-   exactly, so it shares the same .lbl-pill construction (F9). */
+   exactly, so it shares the same .lbl-pill construction (F9), minus the
+   pill itself (F27: this one line never gets the pill treatment). */
 function weekRow(m) {
   const days = [0, 1, 2, 3, 4, 5, 6].map((k) => addDays(m, k));
   const grid = weekRows(days, matchMedia(WIDE).matches).map((r) => r.map(dayCard).join("")).join("");
-  return `<section class="week" data-week="${m}"><span class="lbl-pill wk">${weekLabel(m)}</span>`
+  return `<section class="week" data-week="${m}"><span class="lbl-plain wk">${weekLabel(m)}</span>`
     + `<div class="g3">${grid}</div></section>`;
 }
 function weekEvents(m) {
@@ -162,9 +179,11 @@ function weekCard(m) {
   if (sat) items.push({ d: sat, html: noteRow(sat, "Free weekend") });
   const now = m <= frame.today && frame.today <= addDays(m, 6);
   const tap = tappable(evs) ? ` data-act="week" data-m="${m}" role="button" tabindex="0"` : "";
-  /* F23: Monthly's floating section title is "Week NN", the card's own label. */
-  return `<div class="wcard${now ? " now" : ""}${evs.length ? "" : " empty"}" data-week="${m}" data-sec="${esc(weekLabel(m))}"${tap}>`
-    + `<div class="wh"><span class="lbl-pill">${weekLabel(m)}</span>`
+  /* F27: only the current week's label keeps the pill, filled accent; every
+     other week's is plain text, no pill, no border (.lbl-pill carries no
+     background of its own any more -- only .on does, CSS). */
+  return `<div class="wcard${now ? " now" : ""}${evs.length ? "" : " empty"}" data-week="${m}"${tap}>`
+    + `<div class="wh"><span class="lbl-pill${now ? " on" : ""}">${weekLabel(m)}</span>`
     + away.map((e) => `<span class="away${frame.grey.has(e.id) ? " grey" : ""}">${esc(icons(e)[0])} ${esc(awayText(e, frame.thisYear))}</span>`).join("")
     + "</div>" + list(sortByDay(items), true) + "</div>";
 }
@@ -195,8 +214,9 @@ const daysIn = (y, mo) => new Date(Date.UTC(y, mo + 1, 0)).getUTCDate();
 /* F10: the year heading is big, once, like Monthly's big month heading. Isa's
    correction in the mock-up round: the year heading itself takes no border
    -- only the current month's card does, the same accent outline as
-   Weekly's today-card and Monthly's current-week card. */
-const yearHead = (y) => `<p class="year-big">${y}</p>`;
+   Weekly's today-card and Monthly's current-week card. F26: it is also
+   Yearly's section boundary for the sticky title (the year, not a month). */
+const yearHead = (y) => `<p class="year-big" data-sec="${y}">${y}</p>`;
 function monthCard(y, mo) {
   const key = ymOf(y, mo), n = daysIn(y, mo), now = key === frame.today.slice(0, 7);
   const evs = []; let cells = "";
@@ -227,10 +247,9 @@ function monthCard(y, mo) {
   const plansCount = eventsInMonth(frame.onAll, key, n).length;
   /* F11: the month heading is plain text, no chevron, not a tap target; "N
      plans" plus a literal ">" is the only jump into Monthly. */
-  /* F23: Yearly's floating section title is the month name (title case; the
-     pill above shows the same text uppercase via CSS, F9). */
-  return `<div class="mcard${now ? " now" : ""}" data-month="${key}" data-sec="${esc(MONTHS[mo])}">`
-    + `<p class="mh"><span class="lbl-pill">${MONTHS[mo].toUpperCase()}</span>`
+  /* F27: only the current month's card label keeps the pill (accent). */
+  return `<div class="mcard${now ? " now" : ""}" data-month="${key}">`
+    + `<p class="mh"><span class="lbl-pill${now ? " on" : ""}">${MONTHS[mo].toUpperCase()}</span>`
     + `<button class="plans-line" data-act="zoommonth" data-ym="${key}">${plansCount} plan${plansCount === 1 ? "" : "s"} &gt;</button></p>`
     + `<div class="heat" style="--n:${n}" aria-hidden="true">${cells}</div>` + list(sortByDay(items), true) + "</div>";
 }
@@ -276,16 +295,16 @@ function ensureYears() {
 }
 
 /* ---- the tab ----
-   F5: the control row floats, pinned to the top of the screen through
-   scroll (content moves behind it); it is now always the page's first
-   element so it can stick, rather than sitting between the past and the
-   future. F4: no more Today card, just its anchor. */
+   F28: the control row scrolls with the page again (F5 reversed); F26's
+   title is its own standalone sticky bar, drawn right after it so it is the
+   thing that keeps floating once the controls themselves scroll away. F4:
+   no more Today card, just its anchor. */
 export function calendarHtml() {
   frame = buildFrame();
   ensureYears();
-  if (S.searchOpen) return `<div class="page">${controls()}${searchPage()}</div>`;
+  if (S.searchOpen) return `<div class="page">${controls()}${secTitleBar()}${searchPage()}</div>`;
   const v = S.view === "yearly" ? yearly() : weeks(S.view);
-  return `<div class="page ${S.slide}">${controls()}${v.past}${todayAnchor()}${v.future}</div>`;
+  return `<div class="page ${S.slide}">${controls()}${secTitleBar()}${v.past}${todayAnchor()}${v.future}</div>`;
 }
 
 /* After the tab's HTML is in place: scroll, focus, clear one-shot state. */
@@ -300,26 +319,39 @@ export function afterCalendar(mn, before) {
   onScroll();
 }
 
-/* ---- "Back to today": shown once today is off screen, points towards it.
-   Measured on screen: an animation's transform throws offsetTop off. ---- */
+/* ---- F28: two round buttons, shown together once today (and so the
+   controls above it) are off screen -- up scrolls back to reveal them, down
+   jumps to today. Measured on screen: an animation's transform throws
+   offsetTop off. ---- */
 export function onScroll() {
-  const mn = document.getElementById("view"), t = document.getElementById("today"), b = document.querySelector(".to-today");
-  if (!mn || !b) return;
+  const mn = document.getElementById("view"), t = document.getElementById("today");
+  const up = document.querySelector(".fab.up"), down = document.querySelector(".fab.down");
+  if (!mn || !up || !down) return;
   updateSectionTitle(mn);
-  if (!t) { b.classList.remove("show"); return; }
+  if (!t) { up.classList.remove("show"); down.classList.remove("show"); return; }
   const r = t.getBoundingClientRect(), box = mn.getBoundingClientRect();
   const top = Math.max(box.top, 0), bottom = Math.min(box.bottom, window.innerHeight);
-  b.classList.toggle("show", !(r.bottom > top + 60 && r.top < bottom));
-  b.classList.toggle("down", r.top >= bottom);
+  const offscreen = !(r.bottom > top + 60 && r.top < bottom);
+  up.classList.toggle("show", offscreen);
+  down.classList.toggle("show", offscreen);
 }
 
-/* F23: the floating section title, kept in sync by the same scroll
-   listener that already drives "Back to today" and "load older" (no
-   second listener). The current section is the last [data-sec] element
-   (a day card, a week card or a month card) whose top has reached the
-   title's own position -- a sticky "grouped list" header, done in JS
-   because the sections sit in a grid (Weekly's day cards), not one
-   linear stack CSS sticky alone could hand off between. */
+/* F28: the up button -- scrolls back to the top of the list, revealing the
+   (now non-floating) controls again. */
+export function scrollToTop() {
+  const mn = document.getElementById("view");
+  if (!mn) return;
+  mn.scrollTo({ top: 0, behavior: matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth" });
+}
+
+/* F26: the coarse (month, or year under Yearly) floating title, kept in
+   sync by the same scroll listener that already drives the up/down buttons
+   (F28) and load-older (F29) -- no second listener. The current section is
+   the last [data-sec] element (now just monthHead/yearHead -- one per
+   month or year, not one per card) whose top has reached the title's own
+   position -- a sticky "grouped list" header, done in JS because the
+   sections sit in a grid (Weekly's day cards), not one linear stack CSS
+   sticky alone could hand off between. */
 function updateSectionTitle(mn) {
   const el = document.getElementById("secTitle");
   if (!el) return;
@@ -406,8 +438,9 @@ function setView(v, target) {
   ctx.render();
 }
 
-/* F6: the floating "load older" button (rendered with the other round
-   buttons in render.js); hidden while searching, where it makes no sense. */
+/* F29: "load older" is now an inline control button (drawn in controls()
+   above, not with the round buttons); hidden while searching, where it
+   makes no sense. */
 export const showLoadOlder = () => !S.searchOpen;
 export { loadOlderFull };
 
@@ -435,6 +468,9 @@ function onClick(e) {
   else if (a === "detail") { S.detail = b.dataset.v; S.menu = false; ctx.render(); }
   else if (a === "search") { S.searchOpen = true; S.menu = false; ctx.render(); loadAllOlder(); }
   else if (a === "closesearch") { S.searchOpen = false; S.query = ""; ctx.render(); }
+  /* F29: "load older" is now one of the inline control buttons, not a
+     floating round button; same loadOlderFull mechanism (F6/F7). */
+  else if (a === "older") loadOlderFull();
   else if (a === "zoomweek") { e.stopPropagation(); setView("monthly", zoomWeekTarget(b.dataset.m)); }
   else if (a === "zoommonth") setView("monthly", zoomMonthTarget(b.dataset.ym));
   else if (a === "day") openLevel({ kind: "day", d: b.dataset.d });
@@ -444,11 +480,12 @@ function onClick(e) {
   e.preventDefault();
 }
 
-/* F7: discard whatever earlier data "load older" pulled in, so the list is
-   back to its normal range and pull to refresh works again. */
+/* F7/F28: the down button -- jumps to today and discards whatever earlier
+   data "load older" pulled in, so the list is back to its normal range and
+   pull to refresh (F53) works again. */
 export function backToToday() {
   const t = document.getElementById("today");
-  if (frame && Object.values(S.past).some(Boolean)) {
+  if (frame && hasLoadedOlder(S.past)) {
     Object.assign(S, backToTodayState(frame.thisYear));
     S.scrollTo = "#today";
     ctx.render();
@@ -489,15 +526,15 @@ export function initCalendar(c) {
   const start = (x, y) => { g = ctx.isCalendar() && !sheetOpen() ? { x, y, top: mn.scrollTop <= 0 } : null; };
   const end = (x, y) => {
     if (!g) return;
-    const act = gesture({ dx: x - g.x, dy: y - g.y, top: g.top, searching: S.searchOpen });
+    const act = gesture({ dx: x - g.x, dy: y - g.y, top: g.top, searching: S.searchOpen, loadedOlder: hasLoadedOlder(S.past) });
     g = null;
     if (act === "next" || act === "prev") {
       const i = VIEWS.indexOf(S.view) + (act === "next" ? 1 : -1);
       if (i >= 0 && i < VIEWS.length) { swallowClick(); setView(VIEWS[i]); }
     } else if (act === "pull") {
-      /* F7: pulling to refresh just syncs; loading older data is now the
-         floating "load older" button's job (F6), so the DOM it left behind
-         never interferes with this gesture again. */
+      /* F53: only reachable once the true top is today's own range again
+         (gesture() itself refuses to arm otherwise); the down button (F28)
+         is what gets a person back here after loading older data. */
       ctx.sync();
     }
   };
@@ -505,8 +542,9 @@ export function initCalendar(c) {
   document.addEventListener("pointerup", (e) => { if (e.pointerType !== "touch") end(e.clientX, e.clientY); });
   mn.addEventListener("touchstart", (e) => { if (e.touches.length === 1) start(e.touches[0].clientX, e.touches[0].clientY); }, { passive: true });
   mn.addEventListener("touchend", (e) => { const t = e.changedTouches[0]; if (t) end(t.clientX, t.clientY); }, { passive: true });
+  /* F53: a wheel "pull" (desktop) obeys the same true-top rule. */
   mn.addEventListener("wheel", (e) => {
-    if (ctx.isCalendar() && mn.scrollTop <= 0 && e.deltaY < -30 && !S.searchOpen) ctx.sync();
+    if (ctx.isCalendar() && mn.scrollTop <= 0 && !hasLoadedOlder(S.past) && e.deltaY < -30 && !S.searchOpen) ctx.sync();
   }, { passive: true });
 }
 

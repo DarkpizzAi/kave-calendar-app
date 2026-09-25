@@ -9,9 +9,9 @@ export const ICON = {
   x: svg('<path d="M18 6 6 18M6 6l12 12"/>'),
   chev: svg('<path d="m9 6 6 6-6 6"/>', "chev"),
   up: svg('<path d="m6 15 6-6 6 6"/>'),
-  /* F6: the floating "load older" button -- a double chevron down, distinct
-     from "Back to today"'s single up chevron */
-  older: svg('<path d="m6 9 6 6 6-6M6 3l6 6 6-6"/>'),
+  /* F29: "load older" is one of the inline control buttons; an archive box
+     ("a box of evidence", Isa), replacing the old double-chevron. */
+  older: svg('<rect x="3" y="4" width="18" height="5" rx="1"/><path d="M5 9v9a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V9M10 13h4"/>'),
   check: svg('<path d="m5 12 5 5L20 7"/>'),
   /* F16: a tiny checkbox glyph marks an event with open to-dos in list rows,
      never an emoji or a plain dot */

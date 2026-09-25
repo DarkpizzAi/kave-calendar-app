@@ -226,30 +226,31 @@ button:disabled { opacity: .5; cursor: default; }
 a.ticket{color:inherit;text-decoration:none}
 @media (prefers-reduced-motion: reduce){
   .sfield,.sheet.in,.sheet.out,.shade.out,.slide-left,.slide-right,.views .ind,.sbody.out-up,.sbody.in-up,.sbody.out-down,.sbody.in-down{animation:none}
-  .fab.to-today,.fab.to-today svg,.nav-icon{transition:none}
+  .fab.up,.fab.down,.fab.up svg,.fab.down svg,.nav-icon{transition:none}
 }
-/* three round buttons, all the same size (F15): add, back to today above it,
-   and F6's "load older" on the opposite corner */
+/* F28: three round buttons, all the same size (F15) -- add, and two above
+   it, up (scroll to top) and down (jump to today, collapsing loaded-older
+   data), the same icon mirrored rather than two different shapes. F6's
+   "load older" is no longer one of them (F29: it moved inline). */
 .fab{position:absolute;width:56px;height:56px;border-radius:var(--r-round);border:0;background:var(--accent);color:var(--accent-text);box-shadow:var(--shadow-raised);z-index:4;display:grid;place-items:center;padding:0}
 .fab.add{right:var(--sp-4);bottom:calc(var(--nav-h) + var(--sp-4) + env(safe-area-inset-bottom,0px));font-size:var(--fs-title-lg)}
-.fab.to-today{right:var(--sp-4);bottom:calc(var(--nav-h) + var(--sp-4) + 56px + var(--sp-3) + env(safe-area-inset-bottom,0px));opacity:0;transform:translateY(8px);pointer-events:none;transition:opacity .18s var(--ease-standard),transform .18s var(--ease-standard)}
-.fab.to-today svg{width:22px;height:22px;stroke-width:2.5;transition:transform .18s var(--ease-standard)}
-.fab.to-today.show{opacity:1;transform:none;pointer-events:auto}
-.fab.to-today.down svg{transform:rotate(180deg)}
-.fab.older{left:var(--sp-4);bottom:calc(var(--nav-h) + var(--sp-4) + env(safe-area-inset-bottom,0px))}
-/* F5: the control row floats, pinned to the top through scroll; content
-   scrolls behind it rather than the row scrolling with the page. */
+.fab.up,.fab.down{right:var(--sp-4);opacity:0;transform:translateY(8px);pointer-events:none;transition:opacity .18s var(--ease-standard),transform .18s var(--ease-standard)}
+.fab.up{bottom:calc(var(--nav-h) + var(--sp-4) + 56px + var(--sp-3) + env(safe-area-inset-bottom,0px))}
+.fab.down{bottom:calc(var(--nav-h) + var(--sp-4) + 112px + calc(var(--sp-3) * 2) + env(safe-area-inset-bottom,0px))}
+.fab.up svg,.fab.down svg{width:22px;height:22px;stroke-width:2.5;transition:transform .18s var(--ease-standard)}
+.fab.up.show,.fab.down.show{opacity:1;transform:none;pointer-events:auto}
+.fab.down svg{transform:rotate(180deg)}
+/* F28: the control row scrolls with the page again (F5 reversed). */
 .top{display:flex;flex-direction:column;gap:var(--sp-3)}
-.ctl{position:sticky;top:0;z-index:5;background:var(--surface);padding-bottom:var(--sp-3);display:flex;flex-wrap:wrap;align-items:center;gap:var(--sp-2)}
-/* F23: the floating section title -- same sticky block as the controls (so
-   it moves with them, no separate top offset to keep in sync), the same
-   typography as the "WEEK 39" / "SEPTEMBER" / "FRI 25" pills it echoes
-   (F9), just without their pill background since it is a header bar, not a
-   card label. Empty while searching or before a first section has reached
-   it (calendar.js's updateSectionTitle leaves it blank then). */
-.sec-title{flex-basis:100%;margin:0;font-size:var(--fs-meta);font-weight:var(--fw-medium);letter-spacing:var(--tracking-label);text-transform:uppercase;font-variant-numeric:tabular-nums;color:var(--text-dim)}
-.sec-title:empty{display:none}
-.ctl.searching .sec-title{display:none}
+.ctl{display:flex;flex-wrap:wrap;align-items:center;gap:var(--sp-2);padding-bottom:var(--sp-3)}
+/* F26: the coarse floating title -- its own standalone sticky bar (not
+   living inside the now non-floating .ctl), the same typography as the
+   "WEEK 39" / "SEPTEMBER" / "FRI 25" pills it echoes (F9), just without
+   their pill background since it is a header bar, not a card label. Empty
+   while searching or before a first section has reached it (calendar.js's
+   updateSectionTitle leaves it blank then). */
+.sec-title{position:sticky;top:0;z-index:5;margin:0;padding:var(--sp-2) 0;background:var(--surface);font-size:var(--fs-meta);font-weight:var(--fw-medium);letter-spacing:var(--tracking-label);text-transform:uppercase;font-variant-numeric:tabular-nums;color:var(--text-dim)}
+.sec-title:empty,.sec-title.searching{display:none}
 .page{display:flex;flex-direction:column;gap:var(--sp-3)}
 /* room below the last card, so a jump can always bring its target to the top */
 .page::after{content:"";flex:none;height:50vh}
@@ -368,8 +369,7 @@ a.ticket{color:inherit;text-decoration:none}
   .g3{grid-template-columns:repeat(7,minmax(0,1fr))}
   .day{min-height:110px}
   .fab.add{right:var(--sp-6)}
-  .fab.to-today{right:var(--sp-6)}
-  .fab.older{left:var(--sp-6)}
+  .fab.up,.fab.down{right:var(--sp-6)}
 }
 /* day level (P2 feedback): no cards, sections on the sheet like a recipe */
 .sheet.lv-day .sbody{padding:0;gap:0}
@@ -395,12 +395,17 @@ a.ticket{color:inherit;text-decoration:none}
 .wh .away{display:inline-block;margin:0;padding:1px var(--sp-2);border-radius:var(--r-pill);background:var(--surface-2);font-size:var(--fs-meta)}
 [data-week],[data-month],#today{scroll-margin-top:var(--sp-4)}
 
-/* ---- F9: one pill construction for every card label ("FRI 25", "WEEK 39",
-   "SEPTEMBER"), sized to its own text only, never a fixed or minimum width
-   (household-look.md, Shape). Today's own fills with the accent. ---- */
-.lbl-pill{display:inline-block;align-self:flex-start;font-size:var(--fs-meta);font-weight:var(--fw-medium);letter-spacing:var(--tracking-label);text-transform:uppercase;font-variant-numeric:tabular-nums;background:var(--surface-2);color:var(--text);border-radius:var(--r-pill);padding:2px var(--sp-2)}
-.lbl-pill.on{background:var(--accent);color:var(--accent-text);font-weight:var(--fw-strong)}
-/* F8: Weekly's "WEEK 39" is no longer a tap target */
+/* ---- F9: one typography for every card label ("FRI 25", "WEEK 39",
+   "SEPTEMBER"). F27: only the current day/week/month keeps the pill behind
+   it (filled accent, an accent border); every other card's label is plain
+   text, no pill, no border -- .lbl-pill alone (no .on) now carries no
+   background or border of its own, so it reads identically to .lbl-plain
+   until a card earns .on. ---- */
+.lbl-pill,.lbl-plain{display:inline-block;align-self:flex-start;font-size:var(--fs-meta);font-weight:var(--fw-medium);letter-spacing:var(--tracking-label);text-transform:uppercase;font-variant-numeric:tabular-nums;color:var(--text);border-radius:var(--r-pill);padding:2px var(--sp-2);border:1px solid transparent}
+.lbl-pill.on{background:var(--accent);color:var(--accent-text);font-weight:var(--fw-strong);border-color:var(--accent)}
+/* F8/F27: Weekly's "WEEK 39" divider is never a tap target and never gets
+   the pill treatment, current week or not -- .lbl-plain, not .lbl-pill, so
+   there is no .on to accidentally apply. */
 .wk{cursor:default}
 
 /* ---- F10: the year heading, big and once, like Monthly's big month
