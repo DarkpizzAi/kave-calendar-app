@@ -83,7 +83,12 @@ function eventPage(e) {
      "until Sun" span the day sheet shows belongs there, not repeated here).
      F42: the event's type (its activities) gets its own line and icon,
      after the date, instead of living in that removed second line. */
-  const statusPill = `<p class="flag soft status-pill">${esc(STATUS_LABEL[e.status] || "")}</p>`;
+  /* F68: an accent-filled pill, like Spoon's real recipe-page status pill
+     (kave-food-app/styles.css's .detail-tag: accent background,
+     accent-text, r-pill, fs-meta -- Compass's existing .flag.acc is the
+     same construction already) -- not the softer .flag.soft treatment F40
+     gave it. */
+  const statusPill = `<p class="flag acc status-pill">${esc(STATUS_LABEL[e.status] || "")}</p>`;
   const when = `<p class="big">${esc(whenLine(e, thisYear()))}</p>`;
   const place = [e.venue, e.city && e.city[0].toUpperCase() + e.city.slice(1)].filter(Boolean).join(", ");
   const maps = mapsUrl(e.venue, e.city);
