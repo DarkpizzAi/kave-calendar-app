@@ -1,12 +1,18 @@
 import { test, eq, ok } from "./run.js";
 import { weekRows, indexByDay, tappable, zoomWeekTarget, zoomMonthTarget, isAway, isBig, awayText,
   shouldLoadMore, nextCount, iconsOf, searchEvents, todaysCount, fullPastWeeks, fullPastMonths,
-  backToTodayState, eventsInMonth, tripCityFor, defaultCity } from "../js/cal-model.js";
+  backToTodayState, eventsInMonth, tripCityFor, defaultCity, hideCancelled } from "../js/cal-model.js";
 import { readPrefs, byCategories } from "../js/prefs.js";
 
 const ev = (id, start, extra = {}) => ({ id, title: id, start, end: null, owner: "shared", status: "planned", activities: [], ...extra });
 const act = (type, icon) => ({ type, icon });
 
+test("cal: F35 -- a cancelled event is hidden in Weekly, kept (for a struck-through title) in Monthly and Yearly", () => {
+  const list = [ev("live", "2026-10-01"), ev("dead", "2026-10-01", { status: "cancelled" })];
+  eq(hideCancelled(list, "weekly").map((e) => e.id), ["live"]);
+  eq(hideCancelled(list, "monthly").map((e) => e.id), ["live", "dead"]);
+  eq(hideCancelled(list, "yearly").map((e) => e.id), ["live", "dead"]);
+});
 test("cal: week rows are 3-3-1 on a phone, 7 when wide", () => {
   const days = ["a", "b", "c", "d", "e", "f", "g"];
   eq(weekRows(days, false), [["a", "b", "c"], ["d", "e", "f"], ["g"]]);

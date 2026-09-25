@@ -15,7 +15,7 @@ import { applyDetail } from "./filter.js";
 import { store } from "./store.js";
 import { indexByDay, weekRows, tappable, zoomWeekTarget, zoomMonthTarget, isAway, awayText,
   shouldLoadMore, nextCount, iconsOf, searchEvents, shortDate, pastMonths, gesture, lastEventDay,
-  fullPastWeeks, fullPastMonths, backToTodayState, todaysCount as cmTodaysCount, eventsInMonth } from "./cal-model.js";
+  fullPastWeeks, fullPastMonths, backToTodayState, todaysCount as cmTodaysCount, eventsInMonth, hideCancelled } from "./cal-model.js";
 import { openLevel, sheetOpen } from "./sheet.js";
 import { ICON } from "./chrome-icons.js";
 import { readPrefs, byCategories } from "./prefs.js";
@@ -52,9 +52,11 @@ function buildFrame() {
   const today = todayKey();
   const thisYear = today.slice(0, 4);
   /* the detail level first, then the viewer's categories for this view */
-  const shown = applyDetail(byCategories(ctx.data.events(), readPrefs(store.state.settings), me, S.view), me, S.detail);
-  const grey = new Set(shown.filter((x) => x.grey).map((x) => x.event.id));
-  const events = shown.map((x) => x.event);
+  const detailed = applyDetail(byCategories(ctx.data.events(), readPrefs(store.state.settings), me, S.view), me, S.detail);
+  const grey = new Set(detailed.filter((x) => x.grey).map((x) => x.event.id));
+  /* F35: Weekly hides a cancelled event outright; Monthly and Yearly keep it
+     (struck through, cls() below). */
+  const events = hideCancelled(detailed.map((x) => x.event), S.view);
   const idx = indexByDay(events);
   const last = lastEventDay(events);
   if (!S.floor) S.floor = thisYear;
@@ -72,7 +74,9 @@ function buildFrame() {
 
 /* ---- pieces ---- */
 const icons = (e) => iconsOf(e, frame.me);
-const cls = (e) => `${frame.grey.has(e.id) ? "grey" : ""}${e.status === "idea" ? " idea" : ""}`;
+/* F35: Monthly and Yearly keep a cancelled event visible, title struck
+   through; Weekly never sees one here at all (hideCancelled in buildFrame). */
+const cls = (e) => `${frame.grey.has(e.id) ? "grey" : ""}${e.status === "idea" ? " idea" : ""}${e.status === "cancelled" ? " cancelled" : ""}`;
 
 function row(e, withDate, click) {
   const ic = icons(e);
