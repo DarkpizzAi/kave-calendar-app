@@ -19,6 +19,7 @@ import { refreshSheet, openLevel, registerLevel } from "./sheet.js";
 import { readPrefs, isShown, toggleCategory, resetCategories, defaultsSummary, categoriesSummary, VIEW_NAMES, DETAIL_NAMES, STYLE_NAMES } from "./prefs.js";
 import { CATEGORIES, iconFor } from "./icons.js";
 import { resetCalendarDefaults } from "./calendar.js";
+import { checkForUpdate, ensureVersionAsked, updateStatusLines, updateBusy, updateButtonText, updateReady } from "./updates.js";
 
 /* Sync of the events themselves, shown in Settings only (spec: the Calendar
    never shows sync state). Set by boot.js. */
@@ -105,6 +106,11 @@ function renderSettings() {
   const when = dataSync.at ? `${dataSync.state === "ok" ? "Last synced" : "Last tried"} at ${new Date(dataSync.at).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}.` : "";
   const tok = syncStatus.state === "idle" ? "" : `<p class="token-status">${escapeHtml(syncStatus.message)}</p>`;
   const diag = themeBootRan() ? "" : '<p class="token-status">Theme preload BLOCKED: recompute the CSP hash (see README)</p>';
+  /* F19: ported from Spoon (js/view-settings.js's checkForUpdate/updateState)
+     rather than invented fresh; the version line moves in here from the old
+     ad hoc swVersion postMessage, so there is one mechanism, not two. */
+  if (advancedOpen) ensureVersionAsked(render);
+  const updLines = updateStatusLines().map(([k, t]) => `<span class="sync-line ${k}"><i></i>${escapeHtml(t)}</span>`).join("");
 
   return `<div class="fields">
     ${field("Theme", theme, "Light and dark follow the phone.")}
@@ -121,7 +127,8 @@ function renderSettings() {
           "Stored on this device only, sent only to GitHub. Fine-grained, Contents: read and write on kave-hub.")}
         ${field('<label for="appLink">App link</label>', `<div class="token-row"><input id="appLink" type="text" value="${escapeHtml(APP_URL)}" readonly><button id="copyAppLink">Copy</button></div>`,
           "Open Compass on another device: copy this and send it to your phone.")}
-        ${field("About", `<p class="sync-line muted">Compass <span id="swVersion">checking version...</span></p>${diag}`,
+        ${field("About", `<div class="sync-status">${updLines}</div>`
+          + `<button id="updateBtn"${updateBusy() ? " disabled" : ""}>${escapeHtml(updateButtonText())}</button>${diag}`,
           "The household planner. Data in kave-hub; the mini PC runs the sweeps.")}
       </div>
     </div>
@@ -267,19 +274,10 @@ function bindView() {
     });
   });
 
-  const ver = document.getElementById("swVersion");
-  if (ver) reportVersion(ver);
-}
-
-/* Ask the running service worker what VERSION it is. The app cannot know it
-   from its own source: the whole point is to catch the case where a stale
-   worker is serving an older shell than the one just deployed. */
-function reportVersion(node) {
-  if (!("serviceWorker" in navigator) || !navigator.serviceWorker.controller) {
-    node.textContent = "(not installed)";
-    return;
-  }
-  const ch = new MessageChannel();
-  ch.port1.onmessage = (e) => { node.textContent = (e.data && e.data.version) || "(unknown)"; };
-  navigator.serviceWorker.controller.postMessage({ type: "version" }, [ch.port2]);
+  const upd = document.getElementById("updateBtn");
+  if (upd) upd.addEventListener("click", () => {
+    if (upd.disabled) return;
+    if (updateReady()) { location.reload(); return; }
+    checkForUpdate(render);
+  });
 }
