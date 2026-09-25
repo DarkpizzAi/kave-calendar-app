@@ -110,7 +110,14 @@ function controls() {
   const menu = S.menu ? `<div class="menu"><p class="mt">Detail level</p>${[["full", "Full"], ["partial", "Partial"], ["minimal", "Minimal"]]
     .map(([k, l]) => `<button class="opt${S.detail === k ? " on" : ""}" data-act="detail" data-v="${k}">${l}</button>`).join("")}`
     + '<p class="mh">Full: both of you. Partial: the other person greyed. Minimal: yours and shared only.</p></div>' : "";
-  return `<div class="ctl${S.searchOpen ? " searching" : ""}">${S.searchOpen ? "" : views}<div class="ctl2">${S.searchOpen ? "" : detail}${search}</div>${menu}</div>`;
+  /* F23: the current section's label floats just below the controls, inside
+     the same sticky block (so it moves as one with them, no separate top
+     offset to keep in sync) and takes over from the previous one as the list
+     scrolls (onScroll/updateSectionTitle, the same scroll-tracking already
+     driving "Back to today" and "load older"). Empty while searching or
+     before the first section has scrolled under it (CSS hides it then). */
+  return `<div class="ctl${S.searchOpen ? " searching" : ""}">${S.searchOpen ? "" : views}<div class="ctl2">${S.searchOpen ? "" : detail}${search}</div>${menu}`
+    + `<p class="sec-title" id="secTitle" aria-hidden="true"></p></div>`;
 }
 
 /* ---- Weekly and Monthly: runs of weeks ---- */
@@ -122,8 +129,12 @@ function dayCard(d) {
   const body = frame.style === "icons" ? `<div class="icons">${evs.map(iconSpans).join("")}</div>` : rows(evs, false, false);
   const tap = tappable(evs) ? ` role="button" tabindex="0" data-act="day" data-d="${d}"` : "";
   const isToday = d === frame.today;
-  return `<div class="day${isToday ? " today" : ""}${evs.length ? "" : " empty"}"${tap}>`
-    + `<span class="lbl-pill${isToday ? " on" : ""}">${DOW[dayOfWeek(d)]} ${Number(d.slice(8))}</span>${body}</div>`;
+  /* F23: Weekly's floating section title is the day name -- each day card is
+     the section boundary here (the "WEEK NN" pill above the grid, F8, stays
+     put; it is not a tap target and not a scroll section on its own). */
+  const label = `${DOW[dayOfWeek(d)]} ${Number(d.slice(8))}`;
+  return `<div class="day${isToday ? " today" : ""}${evs.length ? "" : " empty"}" data-sec="${esc(label)}"${tap}>`
+    + `<span class="lbl-pill${isToday ? " on" : ""}">${label}</span>${body}</div>`;
 }
 /* F8: Weekly keeps its "WEEK 39" heading, but it is no longer a tap target
    (F11 removed the jump it gave); it must match Monthly's card label
@@ -147,7 +158,8 @@ function weekCard(m) {
   if (sat) items.push({ d: sat, html: noteRow(sat, "Free weekend") });
   const now = m <= frame.today && frame.today <= addDays(m, 6);
   const tap = tappable(evs) ? ` data-act="week" data-m="${m}" role="button" tabindex="0"` : "";
-  return `<div class="wcard${now ? " now" : ""}${evs.length ? "" : " empty"}" data-week="${m}"${tap}>`
+  /* F23: Monthly's floating section title is "Week NN", the card's own label. */
+  return `<div class="wcard${now ? " now" : ""}${evs.length ? "" : " empty"}" data-week="${m}" data-sec="${esc(weekLabel(m))}"${tap}>`
     + `<div class="wh"><span class="lbl-pill">${weekLabel(m)}</span>`
     + away.map((e) => `<span class="away${frame.grey.has(e.id) ? " grey" : ""}">${esc(icons(e)[0])} ${esc(awayText(e, frame.thisYear))}</span>`).join("")
     + "</div>" + list(sortByDay(items), true) + "</div>";
@@ -211,7 +223,9 @@ function monthCard(y, mo) {
   const plansCount = eventsInMonth(frame.onAll, key, n).length;
   /* F11: the month heading is plain text, no chevron, not a tap target; "N
      plans" plus a literal ">" is the only jump into Monthly. */
-  return `<div class="mcard${now ? " now" : ""}" data-month="${key}">`
+  /* F23: Yearly's floating section title is the month name (title case; the
+     pill above shows the same text uppercase via CSS, F9). */
+  return `<div class="mcard${now ? " now" : ""}" data-month="${key}" data-sec="${esc(MONTHS[mo])}">`
     + `<p class="mh"><span class="lbl-pill">${MONTHS[mo].toUpperCase()}</span>`
     + `<button class="plans-line" data-act="zoommonth" data-ym="${key}">${plansCount} plan${plansCount === 1 ? "" : "s"} &gt;</button></p>`
     + `<div class="heat" style="--n:${n}" aria-hidden="true">${cells}</div>` + list(sortByDay(items), true) + "</div>";
@@ -287,11 +301,32 @@ export function afterCalendar(mn, before) {
 export function onScroll() {
   const mn = document.getElementById("view"), t = document.getElementById("today"), b = document.querySelector(".to-today");
   if (!mn || !b) return;
+  updateSectionTitle(mn);
   if (!t) { b.classList.remove("show"); return; }
   const r = t.getBoundingClientRect(), box = mn.getBoundingClientRect();
   const top = Math.max(box.top, 0), bottom = Math.min(box.bottom, window.innerHeight);
   b.classList.toggle("show", !(r.bottom > top + 60 && r.top < bottom));
   b.classList.toggle("down", r.top >= bottom);
+}
+
+/* F23: the floating section title, kept in sync by the same scroll
+   listener that already drives "Back to today" and "load older" (no
+   second listener). The current section is the last [data-sec] element
+   (a day card, a week card or a month card) whose top has reached the
+   title's own position -- a sticky "grouped list" header, done in JS
+   because the sections sit in a grid (Weekly's day cards), not one
+   linear stack CSS sticky alone could hand off between. */
+function updateSectionTitle(mn) {
+  const el = document.getElementById("secTitle");
+  if (!el) return;
+  if (S.searchOpen) { el.textContent = ""; return; }
+  const secs = mn.querySelectorAll("[data-sec]");
+  if (!secs.length) { el.textContent = ""; return; }
+  const ref = el.getBoundingClientRect().bottom || 0;
+  let cur = secs[0];
+  for (const s of secs) { if (s.getBoundingClientRect().top <= ref) cur = s; else break; }
+  const label = cur.dataset.sec;
+  if (el.textContent !== label) el.textContent = label;
 }
 
 /* Only a real scroll event calls this, never a draw. */
