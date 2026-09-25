@@ -12,7 +12,9 @@ export const PERSON_ICONS = {
 };
 
 export const CATEGORIES = [
-  { type: "live-music", label: "Live music", icons: [{ icon: "🎶" }, { icon: "💿", note: "DJ set" }, { icon: "🎸", note: "rock" }, { icon: "🎻", note: "classical" }] },
+  /* F33: the CD icon (💿) is gone; the music notes (🎶) were already the
+     first/default icon and stay it. */
+  { type: "live-music", label: "Live music", icons: [{ icon: "🎶" }, { icon: "🎸", note: "rock" }, { icon: "🎻", note: "classical" }] },
   { type: "clubbing", label: "Clubbing", icons: [{ icon: "🪩" }, { icon: "dancing" }] },
   { type: "drinks", label: "Drinks", icons: [{ icon: "🍸" }, { icon: "🍺" }, { icon: "🍷" }, { icon: "🥂" }, { icon: "🍹" }, { icon: "🍻", note: "pre-drinks" }] },
   { type: "eating", label: "Eating out", icons: [{ icon: "🍽" }, { icon: "🍝" }, { icon: "🍣" }, { icon: "🍕" }, { icon: "🥘" }, { icon: "🌮" }, { icon: "🥞", note: "brunch" }, { icon: "☕", note: "coffee" }] },

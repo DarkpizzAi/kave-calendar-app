@@ -81,7 +81,9 @@ test("detail levels: full, partial greys the other person, minimal hides them", 
 
 /* ---- icons ---- */
 test("the catalogue from round 1b, and person icons follow the viewer", () => {
-  ok(CATEGORIES.find((c) => c.type === "live-music").icons.some((i) => i.icon === "💿"));
+  /* F33: the CD icon is gone from the catalogue; 🎶 stays the default */
+  eq(CATEGORIES.find((c) => c.type === "live-music").icons[0].icon, "🎶");
+  ok(!CATEGORIES.find((c) => c.type === "live-music").icons.some((i) => i.icon === "💿"));
   ok(!CATEGORIES.find((c) => c.type === "party"));
   const run = { type: "sport", icon: "running" };
   eq([iconFor(run, { owner: "shared" }, "isa"), iconFor(run, { owner: "shared" }, "hugo"), iconFor(run, { owner: "hugo" }, "isa")], ["🏃‍♀️", "🏃‍♂️", "🏃‍♂️"]);
