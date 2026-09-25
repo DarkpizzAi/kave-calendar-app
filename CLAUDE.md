@@ -93,10 +93,10 @@ deliberately.
 
 ## Work in progress
 
-Sub-project A (the Calendar and the event record) is being built on branch
-**`compass-a`**, not merged because `main` deploys. The design decisions,
-the plan and the handoff for a new chat live in the private kave-hub repo:
-read "Current design at a glance" at the top of
+Sub-project A (the Calendar, the event screen, Settings) was merged to
+`main` and deployed on 2026-09-25 (v0.12). Rounds of real use on both phones
+follow (plan Task 14). The design decisions, the plan and the handoff for a
+new chat live in the private kave-hub repo: read
 `docs/superpowers/specs/2026-09-24-compass-a-core-design.md` first, then the
 "Handoff for a new chat" section of
 `docs/superpowers/plans/2026-09-24-compass-a-core.md`.
