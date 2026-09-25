@@ -269,7 +269,14 @@ a.ticket{color:inherit;text-decoration:none}
 .ctl{display:flex;flex-wrap:wrap;align-items:center;gap:6px;width:100%}
 /* F54: F26's sticky month/year title bar is removed entirely -- no more
    .sec-title, in any view. */
-.page{display:flex;flex-direction:column;gap:var(--sp-3)}
+/* F71: tighter again than F66's fix -- .page's gap is the only space
+   between .ctl (the filter/toggle row) and .content's first child (the
+   section heading). Measured live before this change: 12px (var(--sp-3),
+   F66's fix). Isa wants it closer still; 6px (F65's own deliberate
+   closely-related-controls one-off) read as too tight for a control row to
+   a full heading below it -- checked live, half of --sp-3 (var(--sp-2),
+   8px) reads as tight but not cramped, so that's what's used here. */
+.page{display:flex;flex-direction:column;gap:var(--sp-2)}
 /* F34: only .content (the list) carries the swipe animation now -- the
    controls above it (outside .content) stay put, so a swipe visibly moves
    just the list, not the whole screen. */
@@ -457,7 +464,16 @@ a.ticket{color:inherit;text-decoration:none}
 .dchev .chev{width:20px;height:20px;margin:0}
 .day.empty,.lrow.empty,.wcard.empty{cursor:default}
 .wh .away{display:inline-block;margin:0;padding:1px var(--sp-2);border-radius:var(--r-pill);background:var(--surface-2);font-size:var(--fs-meta)}
-[data-week],[data-month],#today{scroll-margin-top:var(--sp-4)}
+/* F70: a jump (e.g. Yearly's "N plans >") lands the target week at the top
+   of Monthly, but the month heading sits just above that week in the flow
+   and was landing flush against, or even partly behind, the header (measured
+   live: heading top 22px above the header's own bottom edge, i.e. hidden
+   under it). scroll-margin-top only pads the scrolled-to element itself, so
+   it has to clear the header by enough to also clear the heading above it --
+   measured live, the heading sits ~38px above its week row, so sp-4 (16px)
+   plus that plus a comfortable visible gap lands here; not a spacing-scale
+   step, a one-off scroll offset. */
+[data-week],[data-month],#today{scroll-margin-top:60px}
 
 /* ---- F9: one typography for every card label ("FRI 25", "WEEK 39",
    "SEPTEMBER"). F27: only the current day/week/month keeps the pill behind
