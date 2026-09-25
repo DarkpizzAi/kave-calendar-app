@@ -35,6 +35,14 @@ function afterAnim(el, fn, ms = 450) {
 let stack = [];
 let root = null;
 
+/* F21: the single day view's own "+", persisted the way the header bar
+   already persists (it lives in the sheet's fixed chrome, outside the
+   scrolling .sbody, exactly how the "+" fab stays on screen elsewhere in
+   the Calendar tab -- calendar.js/render.js's #fabs). view-event.js sets
+   this once, at boot, to avoid a circular import. */
+let dayAdd = null;
+export function setDayAdd(fn) { dayAdd = fn; }
+
 /* Other screens add their own levels (Settings: Calendar defaults,
    Categories; the event page and form): { title(level), body(level),
    onAction(button), bar(level) for buttons in the bar, onInput(field) }. */
@@ -139,7 +147,9 @@ function draw(anim) {
   sh.className = `sheet lv-${l.kind}${anim === "" && sh.classList.contains("in") ? " in" : ""}`;
   sh.querySelector(".stitle").textContent = title(l);
   const def = custom[l.kind];
-  sh.querySelector(".bar-acts").innerHTML = def && def.bar ? def.bar(l) : "";
+  sh.querySelector(".bar-acts").innerHTML = l.kind === "day"
+    ? `<button class="sbtn" data-sact="newday" aria-label="Add an event">${ICON.plus}</button>`
+    : def && def.bar ? def.bar(l) : "";
   const stage = sh.querySelector(".sstage");
   const fresh = document.createElement("div");
   fresh.className = "sbody";
@@ -221,6 +231,13 @@ export function initSheet() {
     if (stack.length) up();
   });
   root.addEventListener("click", (e) => {
+    /* F21: the day level's own "+" is a .bar-acts button carrying
+       data-sact, unlike every registered level's own bar buttons (they
+       dispatch through onAction below by data-act instead) -- caught here,
+       ahead of that split, or the .bar-acts branch below would swallow it
+       looking for an onAction "day" never registers. */
+    const newDayBtn = e.target.closest('[data-sact="newday"]');
+    if (newDayBtn) { const l = stack[stack.length - 1]; if (dayAdd && l) dayAdd(l.d); return; }
     const barBtn = e.target.closest(".bar-acts button");
     const b = barBtn ? null : e.target.closest("[data-sact]");
     if (!b) {

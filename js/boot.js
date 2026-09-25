@@ -14,7 +14,7 @@ import { initPullToSync } from "./pull-to-sync.js";
 import { appData } from "./data.js";
 import { store } from "./store.js";
 import { initCalendar, backToToday, closeMenus, loadOlderFull } from "./calendar.js";
-import { initSheet, back, sheetOpen, refreshSheet } from "./sheet.js";
+import { initSheet, back, sheetOpen, refreshSheet, setDayAdd } from "./sheet.js";
 import { initEvent, newEventForm } from "./view-event.js";
 
 initTheme();
@@ -43,6 +43,7 @@ async function syncNow() {
 actions.sync = syncNow;
 initSheet();
 initEvent({ data, refresh: refreshSheet });
+setDayAdd(newEventForm); // F21: the day-level sheet's own "+"
 initCalendar({ data, render, isCalendar, sync: syncNow });
 render();
 syncNow();
