@@ -299,12 +299,16 @@ function ensureYears() {
    title is its own standalone sticky bar, drawn right after it so it is the
    thing that keeps floating once the controls themselves scroll away. F4:
    no more Today card, just its anchor. */
+/* F34: the swipe animation now applies only to .content (the list), not
+   the whole .page -- the controls and the sticky title stay put; only the
+   view toggle's own .ind pill (its own transform/animation, untouched)
+   visibly slides to its new position. */
 export function calendarHtml() {
   frame = buildFrame();
   ensureYears();
   if (S.searchOpen) return `<div class="page">${controls()}${secTitleBar()}${searchPage()}</div>`;
   const v = S.view === "yearly" ? yearly() : weeks(S.view);
-  return `<div class="page ${S.slide}">${controls()}${secTitleBar()}${v.past}${todayAnchor()}${v.future}</div>`;
+  return `<div class="page">${controls()}${secTitleBar()}<div class="content ${S.slide}">${v.past}${todayAnchor()}${v.future}</div></div>`;
 }
 
 /* After the tab's HTML is in place: scroll, focus, clear one-shot state. */

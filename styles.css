@@ -252,8 +252,12 @@ a.ticket{color:inherit;text-decoration:none}
 .sec-title{position:sticky;top:0;z-index:5;margin:0;padding:var(--sp-2) 0;background:var(--surface);font-size:var(--fs-meta);font-weight:var(--fw-medium);letter-spacing:var(--tracking-label);text-transform:uppercase;font-variant-numeric:tabular-nums;color:var(--text-dim)}
 .sec-title:empty,.sec-title.searching{display:none}
 .page{display:flex;flex-direction:column;gap:var(--sp-3)}
+/* F34: only .content (the list) carries the swipe animation now -- the
+   controls and .sec-title above it (both outside .content) stay put, so a
+   swipe visibly moves just the list, not the whole screen. */
+.content{display:flex;flex-direction:column;gap:var(--sp-3)}
 /* room below the last card, so a jump can always bring its target to the top */
-.page::after{content:"";flex:none;height:50vh}
+.content::after{content:"";flex:none;height:50vh}
 /* F24: matches the sheet's own depth animation (F14) in quality --
    --motion-base and --ease-drag, the token built for a drag-released
    transition, rather than --motion-slow and --ease-sheet (280ms, the
