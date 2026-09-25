@@ -14,7 +14,7 @@ import { escapeHtml, copyText } from "./util.js";
 import { PALETTES, applyPalette, themeBootRan, paletteAccents, paletteSofts } from "./theme.js";
 import { status as syncStatus, checkToken } from "./sync.js";
 import { ICON } from "./chrome-icons.js";
-import { calendarHtml, afterCalendar, onScroll, backToToday } from "./calendar.js";
+import { calendarHtml, afterCalendar, onScroll, backToToday, showLoadOlder, todaysCount } from "./calendar.js";
 import { refreshSheet, openLevel, registerLevel } from "./sheet.js";
 import { readPrefs, isShown, toggleCategory, defaultsSummary, categoriesSummary, VIEW_NAMES, DETAIL_NAMES, STYLE_NAMES } from "./prefs.js";
 import { CATEGORIES, iconFor } from "./icons.js";
@@ -170,10 +170,14 @@ registerLevel("set-cats", {
   },
 });
 
+/* F3: a today's-event-count badge on the Calendar nav icon, styled like the
+   shopping list's item-count badge (household-look.md, "The nav count
+   badge"): hidden entirely at zero rather than showing "0". */
 function renderNav() {
+  const count = todaysCount();
   return Object.entries(VIEWS).map(([id, label]) => `
     <button data-view="${escapeHtml(id)}" ${current === id ? 'aria-current="page"' : ""}>
-      <span class="nav-icon" aria-hidden="true">${ICON[id]}</span>
+      <span class="nav-icon" aria-hidden="true">${ICON[id]}${id === "calendar" && count ? `<span class="nav-badge">${count > 99 ? "99+" : count}</span>` : ""}</span>
       <span class="nav-label">${escapeHtml(label)}</span>
     </button>`).join("");
 }
@@ -204,6 +208,7 @@ export function render() {
   document.getElementById("nav").innerHTML = renderNav();
   document.getElementById("fabs").innerHTML = current === "calendar" && !blocked
     ? `<button class="fab to-today" data-fab="today" aria-label="Back to today">${ICON.up}</button>`
+      + (showLoadOlder() ? `<button class="fab older" data-fab="older" aria-label="Load older years">${ICON.older}</button>` : "")
       + `<button class="fab add" data-fab="add" aria-label="Add an event">${ICON.plus}</button>` : "";
   if (current === "calendar" && !blocked) { afterCalendar(main, before); firstDraw = false; }
   else onScroll();

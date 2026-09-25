@@ -10,11 +10,12 @@
 import { escapeHtml as esc } from "./util.js";
 import { addDays, dayOfWeek, mondayOf, todayKey } from "./dates.js";
 import { isoWeek, monthOfWeek, loadRange, freeWeekendSaturday, longWeekends } from "./views.js";
-import { HOLIDAYS, holidayOn } from "./holidays.js";
+import { HOLIDAYS } from "./holidays.js";
 import { applyDetail } from "./filter.js";
 import { store } from "./store.js";
 import { indexByDay, weekRows, tappable, zoomWeekTarget, zoomMonthTarget, isAway, isBig, awayText,
-  shouldLoadMore, nextCount, iconsOf, searchEvents, shortDate, seePrevious, pastMonths, gesture, lastEventDay } from "./cal-model.js";
+  shouldLoadMore, nextCount, iconsOf, searchEvents, shortDate, pastMonths, gesture, lastEventDay,
+  fullPastWeeks, fullPastMonths, backToTodayState, todaysCount as cmTodaysCount } from "./cal-model.js";
 import { openLevel, sheetOpen } from "./sheet.js";
 import { ICON } from "./chrome-icons.js";
 import { readPrefs, byCategories } from "./prefs.js";
@@ -29,7 +30,7 @@ const WIDE = "(min-width: 900px)";
 const S = {
   view: null, detail: null, fromView: null, slide: "",
   past: { weekly: 0, monthly: 0, yearly: 0 }, future: { weekly: 10, monthly: 10, yearly: 15 },
-  revealPrev: false, searchOpen: false, query: "", menu: false,
+  searchOpen: false, query: "", menu: false,
   scrollTo: null, keepAnchor: false, pending: false,
   /* older years, loaded on demand: the oldest year shown, and whether
      kave-hub has anything older */
@@ -71,26 +72,23 @@ function row(e, withDate, click) {
   return `<li class="${cls(e)}" style="--n:${ic.length}"${click ? ` data-act="event" data-id="${esc(e.id)}"` : ""}>`
     + (withDate ? `<span class="c-d">${esc(shortDate(e.start, frame.thisYear))}</span>` : "")
     + `<span class="c-i">${ic.map(esc).join("")}</span><span class="c-t">${esc(e.title)}</span>`
-    + ((e.checklist || []).some((c) => !c.done) ? '<span class="todo" aria-label="Open to-dos"></span>' : "") + "</li>";
+    + ((e.checklist || []).some((c) => !c.done) ? `<span class="todo-ic" aria-label="Open to-dos">${ICON.checkbox}</span>` : "") + "</li>";
 }
 const list = (items, dated) => (items ? `<ul class="rows${dated ? " dated" : ""}">${items}</ul>` : "");
 export const rows = (evs, dated, click) => list(evs.map((e) => row(e, dated, click)).join(""), dated);
 const noteRow = (d, text) => `<li class="note" style="--n:0"><span class="c-d">${esc(shortDate(d, frame.thisYear))}</span><span class="c-i"></span><span class="c-t"><span class="flag acc">${esc(text)}</span></span></li>`;
-const hintRow = (d, text) => `<li class="hintrow" style="--n:1"><span class="c-d">${esc(shortDate(d, frame.thisYear))}</span><span class="c-i">🔍</span><span class="c-t">${esc(text)}</span></li>`;
+/* F10: a long weekend line is now a normal event line -- Other's icon (📌),
+   no accent-ink, nothing special. */
+const noteRowPlain = (d, text) => `<li style="--n:1"><span class="c-d">${esc(shortDate(d, frame.thisYear))}</span><span class="c-i">📌</span><span class="c-t">${esc(text)}</span></li>`;
 const iconSpans = (e) => icons(e).map((g) => `<span class="ic ${cls(e)}">${esc(g)}</span>`).join("");
 const sortByDay = (items) => items.sort((a, b) => (a.d < b.d ? -1 : a.d > b.d ? 1 : 0)).map((x) => x.html).join("");
 
-/* ---- Today card ---- */
+/* ---- Today (F4: the Today card is gone; a bare anchor keeps the scroll
+   machinery -- Back to today, onScroll's visibility check -- working at the
+   same spot in the list, between the past and the future). ---- */
 const place = (e) => [e.venue, e.city && e.city[0].toUpperCase() + e.city.slice(1)].filter(Boolean).join(", ");
-function todayCard() {
-  const evs = frame.on(frame.today);
-  const hol = holidayOn(frame.today);
-  const items = evs.map((e) => `<div class="titem"><span class="ticons">${icons(e).map(esc).join("")}</span><div class="tbody">`
-    + `<p class="ttitle">${esc(e.title)}</p>${place(e) ? `<p class="tmeta">${esc(place(e))}</p>` : ""}`
-    + ((e.links || []).length ? `<span class="tticket">🎟 ${esc(e.links[0].label)}</span>` : "") + "</div></div>").join("");
-  return `<section id="today" class="todayc" data-act="day" data-d="${frame.today}" role="button" tabindex="0">`
-    + `<p class="tbig">Today</p>${hol ? `<p class="thol">Bank holiday: ${esc(hol)}</p>` : ""}`
-    + (items || '<p class="tmeta">No events planned for today</p>') + "</section>";
+function todayAnchor() {
+  return `<span id="today" aria-hidden="true"></span>`;
 }
 
 /* ---- control row ---- */
@@ -118,12 +116,15 @@ function dayCard(d) {
   const tap = tappable(evs) ? ` role="button" tabindex="0" data-act="day" data-d="${d}"` : "";
   const isToday = d === frame.today;
   return `<div class="day${isToday ? " today" : ""}${evs.length ? "" : " empty"}"${tap}>`
-    + `<span class="lbl dl${isToday ? " on" : ""}">${DOW[dayOfWeek(d)]} ${Number(d.slice(8))}</span>${body}</div>`;
+    + `<span class="lbl-pill${isToday ? " on" : ""}">${DOW[dayOfWeek(d)]} ${Number(d.slice(8))}</span>${body}</div>`;
 }
+/* F8: Weekly keeps its "WEEK 39" heading, but it is no longer a tap target
+   (F11 removed the jump it gave); it must match Monthly's card label
+   exactly, so it shares the same .lbl-pill construction (F9). */
 function weekRow(m) {
   const days = [0, 1, 2, 3, 4, 5, 6].map((k) => addDays(m, k));
   const grid = weekRows(days, matchMedia(WIDE).matches).map((r) => r.map(dayCard).join("")).join("");
-  return `<section class="week" data-week="${m}"><button class="lbl wk" data-act="zoomweek" data-m="${m}">${weekLabel(m)}${ICON.chev}</button>`
+  return `<section class="week" data-week="${m}"><span class="lbl-pill wk">${weekLabel(m)}</span>`
     + `<div class="g3">${grid}</div></section>`;
 }
 function weekEvents(m) {
@@ -140,7 +141,7 @@ function weekCard(m) {
   const now = m <= frame.today && frame.today <= addDays(m, 6);
   const tap = tappable(evs) ? ` data-act="week" data-m="${m}" role="button" tabindex="0"` : "";
   return `<div class="wcard${now ? " now" : ""}${evs.length ? "" : " empty"}" data-week="${m}"${tap}>`
-    + `<div class="wh"><span class="lbl">${weekLabel(m)}</span>`
+    + `<div class="wh"><span class="lbl-pill">${weekLabel(m)}</span>`
     + away.map((e) => `<span class="away${frame.grey.has(e.id) ? " grey" : ""}">${esc(icons(e)[0])} ${esc(awayText(e, frame.thisYear))}</span>`).join("")
     + "</div>" + list(sortByDay(items), true) + "</div>";
 }
@@ -156,43 +157,61 @@ function weekBlocks(from, count, kind) {
   }
   return out;
 }
-const prevBtn = () => '<button class="reveal" data-act="prev">See previous</button>';
+/* F6: "See previous" is no longer inline text in the list; it is the
+   floating "load older" button that sits with the floating controls
+   (drawn in calendarHtml/controls). */
 function weeks(kind) {
   const from = addDays(frame.thisMonday, -7 * S.past[kind]);
-  const next = seePrevious({ from, firstMonday: frame.firstMonday, exhausted: S.exhausted });
-  return { past: (S.revealPrev && next !== "none" ? prevBtn() : "") + weekBlocks(from, S.past[kind], kind),
+  return { past: weekBlocks(from, S.past[kind], kind),
     future: weekBlocks(frame.thisMonday, S.future[kind], kind) };
 }
 
 /* ---- Yearly: a card per month ---- */
 const ymOf = (y, mo) => `${y}-${String(mo + 1).padStart(2, "0")}`;
 const daysIn = (y, mo) => new Date(Date.UTC(y, mo + 1, 0)).getUTCDate();
+/* F10: the year heading is big, once, like Monthly's big month heading. Isa's
+   correction in the mock-up round: the year heading itself takes no border
+   -- only the current month's card does, the same accent outline as
+   Weekly's today-card and Monthly's current-week card. */
+const yearHead = (y) => `<p class="year-big">${y}</p>`;
 function monthCard(y, mo) {
-  const key = ymOf(y, mo), n = daysIn(y, mo);
+  const key = ymOf(y, mo), n = daysIn(y, mo), now = key === frame.today.slice(0, 7);
   const evs = []; let cells = "";
   for (let dd = 1; dd <= n; dd++) {
     const d = `${key}-${String(dd).padStart(2, "0")}`;
     const on = frame.on(d);
     for (const e of on) if (!evs.includes(e)) evs.push(e);
-    cells += `<i class="${on.length ? "on" : ""}${dayOfWeek(d) >= 5 ? " we" : ""}${HOLIDAYS[d] ? " hol" : ""}${d === frame.today ? " t" : ""}"></i>`;
+    /* F12: only the current month is colour-coded (viewer's own event in the
+       accent, an other-person-only day in accent-soft); every other month's
+       square is plain grey. Today is marked independent of fill. */
+    const fill = !now ? "grey" : on.some((e) => e.owner === frame.me || e.owner === "shared") ? "mine" : on.length ? "other" : "";
+    cells += `<i class="${fill}${d === frame.today ? " t" : ""}"></i>`;
   }
-  const lw = longWeekends(HOLIDAYS, key + "-01", `${key}-${n}`, frame.on).filter((w) => w.start.slice(0, 7) === key || w.end.slice(0, 7) === key);
+  /* F10: a long weekend or opportunity that has already passed does not
+     show; the line is a normal event line (no 🔍, no accent-ink). */
+  const lw = longWeekends(HOLIDAYS, key + "-01", `${key}-${n}`, frame.on)
+    .filter((w) => (w.start.slice(0, 7) === key || w.end.slice(0, 7) === key) && w.end >= frame.today);
   const items = evs.filter(isBig).map((e) => ({ d: e.start, html: row(e, true, true) }))
-    .concat(lw.map((w) => ({ d: w.start, html: hintRow(w.start, `${w.text}, ${w.names}`) })));
-  const now = key === frame.today.slice(0, 7);
-  return `<div class="mcard${now ? " now" : ""}" data-act="zoommonth" data-ym="${key}" data-month="${key}">`
-    + `<p class="mh"><span class="lbl">${MONTHS[mo].toUpperCase()}${String(y) !== frame.thisYear ? " " + y : ""}${ICON.chev}</span>`
-    + `<span class="cnt">${evs.length} plan${evs.length === 1 ? "" : "s"}</span></p>`
+    .concat(lw.map((w) => ({ d: w.start, html: noteRowPlain(w.start, `${w.text}, ${w.names}`) })));
+  /* F11: the month heading is plain text, no chevron, not a tap target; "N
+     plans" plus a literal ">" is the only jump into Monthly. */
+  return `<div class="mcard${now ? " now" : ""}" data-month="${key}">`
+    + `<p class="mh"><span class="lbl-pill">${MONTHS[mo].toUpperCase()}</span>`
+    + `<button class="plans-line" data-act="zoommonth" data-ym="${key}">${evs.length} plan${evs.length === 1 ? "" : "s"} &gt;</button></p>`
     + `<div class="heat" style="--n:${n}" aria-hidden="true">${cells}</div>` + list(sortByDay(items), true) + "</div>";
 }
 function yearly() {
   const y0 = Number(frame.thisYear), m0 = Number(frame.today.slice(5, 7)) - 1;
   const shown = pastMonths(frame.today, S.floor, S.past.yearly);
-  const more = pastMonths(frame.today, S.floor, S.past.yearly + 1).length > shown.length;
-  let past = S.revealPrev && (more || !S.exhausted) ? prevBtn() : "";
-  for (const ym of shown) past += monthCard(Number(ym.slice(0, 4)), Number(ym.slice(5, 7)) - 1);
-  let future = "";
+  let past = "", pastYear = null;
+  for (const ym of shown) {
+    const y = Number(ym.slice(0, 4));
+    if (y !== pastYear) { past += yearHead(y); pastYear = y; }
+    past += monthCard(y, Number(ym.slice(5, 7)) - 1);
+  }
+  let future = "", curYear = pastYear;
   for (let y = y0, mo = m0, n = 0; ymOf(y, mo) + "-01" <= frame.range.max && n < S.future.yearly; n++) {
+    if (y !== curYear) { future += yearHead(y); curYear = y; }
     future += monthCard(y, mo);
     if (++mo === 12) { mo = 0; y++; }
   }
@@ -222,13 +241,17 @@ function ensureYears() {
   }
 }
 
-/* ---- the tab ---- */
+/* ---- the tab ----
+   F5: the control row floats, pinned to the top of the screen through
+   scroll (content moves behind it); it is now always the page's first
+   element so it can stick, rather than sitting between the past and the
+   future. F4: no more Today card, just its anchor. */
 export function calendarHtml() {
   frame = buildFrame();
   ensureYears();
   if (S.searchOpen) return `<div class="page">${controls()}${searchPage()}</div>`;
   const v = S.view === "yearly" ? yearly() : weeks(S.view);
-  return `<div class="page ${S.slide}">${v.past}${todayCard()}${controls()}${v.future}</div>`;
+  return `<div class="page ${S.slide}">${controls()}${v.past}${todayAnchor()}${v.future}</div>`;
 }
 
 /* After the tab's HTML is in place: scroll, focus, clear one-shot state. */
@@ -296,28 +319,29 @@ async function loadAllOlder() {
   for (let i = 0; i < 15 && !S.exhausted; i++) if (!(await loadOlder())) break;
   if (S.searchOpen) ctx.render();
 }
-async function showPrevious() {
-  const step = S.view === "yearly" ? 3 : 4;
+/* F7: one tap loads straight to 1 January of the floor year (the range
+   already starts there); a further tap once that is fully shown loads the
+   year before it from kave-hub, then reveals that too, in one go each time. */
+async function loadOlderFull() {
   if (S.view === "yearly") {
-    const more = pastMonths(frame.today, S.floor, S.past.yearly + 1).length > S.past.yearly;
-    if (!more && !(await loadOlder())) { ctx.render(); return; }
-    S.past.yearly = pastMonths(frame.today, S.floor, S.past.yearly + step).length;
+    const need = fullPastMonths(frame.today, S.floor);
+    if (S.past.yearly < need) { S.past.yearly = need; S.keepAnchor = true; ctx.render(); return; }
+    if (!(await loadOlder())) { ctx.render(); return; }
+    S.past.yearly = fullPastMonths(frame.today, S.floor);
   } else {
-    const from = addDays(frame.thisMonday, -7 * S.past[S.view]);
-    const next = seePrevious({ from, firstMonday: frame.firstMonday, exhausted: S.exhausted });
-    if (next === "none" || (next === "older" && !(await loadOlder()))) { ctx.render(); return; }
-    const floorMonday = mondayOf(S.floor + "-01-01");
-    const most = Math.round((Date.parse(frame.thisMonday) - Date.parse(floorMonday)) / 6048e5);
-    S.past[S.view] = Math.min(most, S.past[S.view] + step);
+    const need = fullPastWeeks(frame.thisMonday, S.floor);
+    if (S.past[S.view] < need) { S.past[S.view] = need; S.keepAnchor = true; ctx.render(); return; }
+    if (!(await loadOlder())) { ctx.render(); return; }
+    S.past[S.view] = fullPastWeeks(frame.thisMonday, S.floor);
   }
-  S.revealPrev = false; S.keepAnchor = true;
+  S.keepAnchor = true;
   ctx.render();
 }
 
 function setView(v, target) {
   if (v === S.view && !target) return;
   S.slide = VIEWS.indexOf(v) > VIEWS.indexOf(S.view) ? "slide-left" : v === S.view ? "" : "slide-right";
-  S.fromView = S.view; S.view = v; S.revealPrev = false; S.menu = false;
+  S.fromView = S.view; S.view = v; S.menu = false;
   if (target) {
     const need = Math.round((Date.parse(frame.thisMonday) - Date.parse(target)) / 6048e5);
     if (need > 0) S.past[v] = Math.max(S.past[v], need + 1);
@@ -325,6 +349,22 @@ function setView(v, target) {
     S.scrollTo = `[data-week="${target}"]`;
   }
   ctx.render();
+}
+
+/* F6: the floating "load older" button (rendered with the other round
+   buttons in render.js); hidden while searching, where it makes no sense. */
+export const showLoadOlder = () => !S.searchOpen;
+export { loadOlderFull };
+
+/* F3: the nav icon's badge. Independent of whatever view is drawn (the
+   badge shows even before the Calendar has been opened this session), so it
+   reads straight from the data instance rather than the last-built frame. */
+export function todaysCount() {
+  if (!ctx || !store.state.settings.me) return 0;
+  const detail = S.detail || (["full", "partial", "minimal"].includes(store.state.settings.defaultDetail) ? store.state.settings.defaultDetail : "full");
+  const today = todayKey();
+  const idx = indexByDay(ctx.data.events());
+  return cmTodaysCount(idx.get(today) || [], store.state.settings.me, detail);
 }
 
 function onClick(e) {
@@ -340,7 +380,6 @@ function onClick(e) {
   else if (a === "detail") { S.detail = b.dataset.v; S.menu = false; ctx.render(); }
   else if (a === "search") { S.searchOpen = true; S.menu = false; ctx.render(); loadAllOlder(); }
   else if (a === "closesearch") { S.searchOpen = false; S.query = ""; ctx.render(); }
-  else if (a === "prev") showPrevious();
   else if (a === "zoomweek") { e.stopPropagation(); setView("monthly", zoomWeekTarget(b.dataset.m)); }
   else if (a === "zoommonth") setView("monthly", zoomMonthTarget(b.dataset.ym));
   else if (a === "day") openLevel({ kind: "day", d: b.dataset.d });
@@ -350,8 +389,16 @@ function onClick(e) {
   e.preventDefault();
 }
 
+/* F7: discard whatever earlier data "load older" pulled in, so the list is
+   back to its normal range and pull to refresh works again. */
 export function backToToday() {
   const t = document.getElementById("today");
+  if (frame && Object.values(S.past).some(Boolean)) {
+    Object.assign(S, backToTodayState(frame.thisYear));
+    S.scrollTo = "#today";
+    ctx.render();
+    return;
+  }
   if (t) t.scrollIntoView({ block: "start", behavior: matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth" });
 }
 
@@ -393,9 +440,10 @@ export function initCalendar(c) {
       const i = VIEWS.indexOf(S.view) + (act === "next" ? 1 : -1);
       if (i >= 0 && i < VIEWS.length) { swallowClick(); setView(VIEWS[i]); }
     } else if (act === "pull") {
-      /* one pull does both: reveals See previous and syncs (quietly) */
+      /* F7: pulling to refresh just syncs; loading older data is now the
+         floating "load older" button's job (F6), so the DOM it left behind
+         never interferes with this gesture again. */
       ctx.sync();
-      if (!S.revealPrev) { S.revealPrev = true; ctx.render(); }
     }
   };
   mn.addEventListener("pointerdown", (e) => { if (e.pointerType !== "touch") start(e.clientX, e.clientY); });
@@ -403,7 +451,7 @@ export function initCalendar(c) {
   mn.addEventListener("touchstart", (e) => { if (e.touches.length === 1) start(e.touches[0].clientX, e.touches[0].clientY); }, { passive: true });
   mn.addEventListener("touchend", (e) => { const t = e.changedTouches[0]; if (t) end(t.clientX, t.clientY); }, { passive: true });
   mn.addEventListener("wheel", (e) => {
-    if (ctx.isCalendar() && mn.scrollTop <= 0 && e.deltaY < -30 && !S.revealPrev && !S.searchOpen) { S.revealPrev = true; ctx.render(); }
+    if (ctx.isCalendar() && mn.scrollTop <= 0 && e.deltaY < -30 && !S.searchOpen) ctx.sync();
   }, { passive: true });
 }
 

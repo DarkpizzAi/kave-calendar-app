@@ -13,7 +13,7 @@ import { wire, showBanner } from "./wire.js";
 import { initPullToSync } from "./pull-to-sync.js";
 import { appData } from "./data.js";
 import { store } from "./store.js";
-import { initCalendar, backToToday, closeMenus } from "./calendar.js";
+import { initCalendar, backToToday, closeMenus, loadOlderFull } from "./calendar.js";
 import { initSheet, back, sheetOpen, refreshSheet } from "./sheet.js";
 import { initEvent, newEventForm } from "./view-event.js";
 
@@ -49,11 +49,12 @@ syncNow();
 document.addEventListener("visibilitychange", () => { if (document.visibilityState === "visible") syncNow(); });
 window.addEventListener("online", syncNow);
 
-/* The two round buttons. "+" arrives with the event form (round 2). */
+/* The three round buttons: "+", "Back to today" and "load older" (F6). */
 document.getElementById("fabs").addEventListener("click", (e) => {
   const b = e.target.closest("[data-fab]");
   if (!b) return;
   if (b.dataset.fab === "today") backToToday();
+  else if (b.dataset.fab === "older") loadOlderFull();
   else newEventForm();
 });
 

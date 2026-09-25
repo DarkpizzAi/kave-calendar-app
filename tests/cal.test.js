@@ -1,6 +1,7 @@
 import { test, eq, ok } from "./run.js";
 import { weekRows, indexByDay, tappable, zoomWeekTarget, zoomMonthTarget, isAway, isBig, awayText,
-  shouldLoadMore, nextCount, iconsOf, searchEvents } from "../js/cal-model.js";
+  shouldLoadMore, nextCount, iconsOf, searchEvents, todaysCount, fullPastWeeks, fullPastMonths,
+  backToTodayState } from "../js/cal-model.js";
 
 const ev = (id, start, extra = {}) => ({ id, title: id, start, end: null, owner: "shared", status: "planned", activities: [], ...extra });
 const act = (type, icon) => ({ type, icon });
@@ -109,4 +110,29 @@ test("M3: Back events are ignored one by one, never more than were caused", () =
   const gate = createPopGate();
   gate.expect(2);
   eq([gate.take(), gate.take(), gate.take()], [true, true, false]);
+});
+
+/* ---- F3: today's-event-count badge, filtered by detail level ---- */
+test("cal: todaysCount is minimal-only-mine, both people at partial and full", () => {
+  const evs = [
+    ev("mine", "2026-09-25", { owner: "isa" }),
+    ev("shared", "2026-09-25", { owner: "shared" }),
+    ev("theirs", "2026-09-25", { owner: "hugo" }),
+    ev("gone", "2026-09-25", { owner: "hugo", deleted: true }),
+  ];
+  eq(todaysCount(evs, "isa", "minimal"), 2, "only mine and shared");
+  eq(todaysCount(evs, "isa", "partial"), 3, "both, greyed or not");
+  eq(todaysCount(evs, "isa", "full"), 3);
+  eq(todaysCount([], "isa", "full"), 0);
+});
+
+/* ---- F7: "load older" jumps straight to 1 January of the floor year, and
+   "Back to today" discards whatever it loaded ---- */
+test("cal: fullPastWeeks and fullPastMonths reach exactly 1 January of the floor year", () => {
+  eq(fullPastWeeks("2026-09-21", "2026"), 38, "38 Mondays from the first week of 2026 to late September");
+  eq(fullPastWeeks("2026-01-05", "2026"), 1);
+  eq(fullPastMonths("2026-09-24", "2025"), 20, "January 2025 to August 2026");
+});
+test("cal: Back to today discards the loaded past, the floor resets to this year", () => {
+  eq(backToTodayState("2026"), { past: { weekly: 0, monthly: 0, yearly: 0 }, floor: "2026", exhausted: false });
 });

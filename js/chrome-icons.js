@@ -9,7 +9,13 @@ export const ICON = {
   x: svg('<path d="M18 6 6 18M6 6l12 12"/>'),
   chev: svg('<path d="m9 6 6 6-6 6"/>', "chev"),
   up: svg('<path d="m6 15 6-6 6 6"/>'),
+  /* F6: the floating "load older" button -- a double chevron down, distinct
+     from "Back to today"'s single up chevron */
+  older: svg('<path d="m6 9 6 6 6-6M6 3l6 6 6-6"/>'),
   check: svg('<path d="m5 12 5 5L20 7"/>'),
+  /* F16: a tiny checkbox glyph marks an event with open to-dos in list rows,
+     never an emoji or a plain dot */
+  checkbox: svg('<rect x="4" y="4" width="16" height="16" rx="4"/><path d="m8 12.5 3 3 5-6"/>'),
   /* the event page: one line icon per group of information (round 2) */
   clock: svg('<circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/>'),
   pin: svg('<path d="M12 21s-7-6.2-7-12a7 7 0 0 1 14 0c0 5.8-7 12-7 12Z"/><circle cx="12" cy="9" r="2.5"/>'),

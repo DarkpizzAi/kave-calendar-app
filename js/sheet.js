@@ -74,13 +74,18 @@ function weekBody(m, f) {
 /* Day level: no cards, a strip per event; a time and names say what they
    are, so no "When / Who / Where" labels. Layout A (title left, icons right,
    a chevron column) until Task 9c settles it. */
+/* F13: the icons sit on the same line as the disclosure chevron, vertically
+   centred with it -- both are now siblings of the (possibly multi-line)
+   title block in the same flex row, rather than the icons living inside the
+   title's own row, which left them centred on just that line instead of on
+   the chevron's. */
 function strip(e, f) {
   const lines = [[place(e), e.end && e.end !== e.start ? "until " + shortDate(e.end, f.thisYear) : ""].filter(Boolean).join(" · "),
     e.guests || (e.owner !== f.me && e.owner !== "shared" ? who(e.owner) : "")].filter(Boolean);
   return `<section class="dsec layA${detailGrey(e) ? " greyw" : ""}" data-sact="event" data-id="${esc(e.id)}" role="button" tabindex="0">`
-    + `<div class="dmain"><div class="dhead"><h3>${esc(e.title)}</h3><span class="dicons">${iconsOf(e, f.me).map(esc).join("")}</span></div>`
+    + `<div class="dmain"><h3>${esc(e.title)}</h3>`
     + lines.map((l) => `<p class="dline">${esc(l)}</p>`).join("") + checklist(e) + tickets(e)
-    + `</div><span class="dchev">${ICON.chev}</span></section>`;
+    + `</div><span class="dicons">${iconsOf(e, f.me).map(esc).join("")}</span><span class="dchev">${ICON.chev}</span></section>`;
 }
 function dayBody(d, f) {
   const evs = f.on(d), hol = holidayOn(d);

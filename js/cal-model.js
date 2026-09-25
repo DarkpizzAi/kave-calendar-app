@@ -6,6 +6,7 @@
 import { addDays, dayOfWeek, mondayOf, daysOf } from "./dates.js";
 import { firstWeekOf } from "./views.js";
 import { iconFor } from "./icons.js";
+import { applyDetail } from "./filter.js";
 
 const DOW = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
 const MON = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
@@ -104,6 +105,33 @@ export function pastMonths(today, floorYear, count) {
     out.unshift(`${y}-${String(m + 1).padStart(2, "0")}`);
   }
   return out;
+}
+
+/* F7: "See previous" / the floating "load older" button jump straight to 1
+   January of the current floor year in one go, instead of revealing a few
+   weeks or months at a time. */
+export function fullPastWeeks(thisMonday, floorYear) {
+  const floorMonday = mondayOf(floorYear + "-01-01");
+  return Math.max(0, Math.round((Date.parse(thisMonday) - Date.parse(floorMonday)) / 6048e5));
+}
+export function fullPastMonths(today, floorYear) {
+  return pastMonths(today, floorYear, 9999).length;
+}
+
+/* F7: "Back to today" discards whatever earlier years were loaded, so the
+   list is back to its normal range (this year on) and pull to refresh works
+   again -- the bug was old, loaded years sitting in the DOM state. */
+export function backToTodayState(thisYear) {
+  return { past: { weekly: 0, monthly: 0, yearly: 0 }, floor: thisYear, exhausted: false };
+}
+
+/* F3: the Calendar nav icon's badge. Minimal shows only the viewer's own
+   (and shared) events today; Partial and Full show both people's -- exactly
+   applyDetail's own "minimal drops theirs" rule, reused rather than
+   reinvented. `eventsToday` is undeduped by span (indexByDay already gives
+   one entry per day). */
+export function todaysCount(eventsToday, me, detail) {
+  return applyDetail(eventsToday.filter((e) => !e.deleted), me, detail).length;
 }
 
 /* The emoji for an event, drawn for this viewer. A dated idea shows ❔. */

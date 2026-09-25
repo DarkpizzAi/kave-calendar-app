@@ -157,7 +157,11 @@ button:disabled { opacity: .5; cursor: default; }
   display: flex; flex-direction: column; align-items: center; justify-content: center;
   gap: var(--sp-1); padding: 0; min-height: 0;
 }
-.nav-icon { display: grid; place-items: center; width: 52px; height: 30px; border-radius: var(--r-pill); transition: background var(--motion-base) var(--ease-standard); }
+.nav-icon { position: relative; display: grid; place-items: center; width: 52px; height: 30px; border-radius: var(--r-pill); transition: background var(--motion-base) var(--ease-standard); }
+/* F3: the Calendar's today's-event-count badge, exactly the nav count
+   badge rule in household-look.md -- position and size are fixed, not
+   invented per app. */
+.nav-badge { position: absolute; top: -3px; left: calc(50% + 8px); min-width: 16px; height: 16px; padding: 0 4px; border-radius: var(--r-pill); background: var(--accent); color: var(--accent-text); font-size: var(--fs-micro); font-weight: 600; font-variant-numeric: tabular-nums; display: grid; place-items: center; line-height: 1; }
 .bottom-nav svg { width: 24px; height: 24px; }
 .bottom-nav button[aria-current="page"] { color: var(--accent-ink); }
 .bottom-nav button[aria-current="page"] .nav-icon { background: var(--accent-soft); }
@@ -224,16 +228,19 @@ a.ticket{color:inherit;text-decoration:none}
   .sfield,.sheet.in,.sheet.out,.shade.out,.slide-left,.slide-right,.views .ind,.sbody.out-up,.sbody.in-up,.sbody.out-down,.sbody.in-down{animation:none}
   .fab.to-today,.fab.to-today svg,.nav-icon{transition:none}
 }
-/* two round buttons: add, and above it back to today (Spoon's to-top, a bare chevron) */
-.fab{position:absolute;right:var(--sp-4);width:56px;height:56px;border-radius:var(--r-round);border:0;background:var(--accent);color:var(--accent-text);box-shadow:var(--shadow-raised);z-index:4;display:grid;place-items:center;padding:0}
-.fab.add{bottom:calc(var(--nav-h) + var(--sp-4) + env(safe-area-inset-bottom,0px));font-size:var(--fs-title-lg)}
-.fab.to-today{width:44px;height:44px;right:calc(var(--sp-4) + 6px);bottom:calc(var(--nav-h) + var(--sp-4) + 56px + var(--sp-3) + env(safe-area-inset-bottom,0px));opacity:0;transform:translateY(8px);pointer-events:none;transition:opacity .18s var(--ease-standard),transform .18s var(--ease-standard)}
+/* three round buttons, all the same size (F15): add, back to today above it,
+   and F6's "load older" on the opposite corner */
+.fab{position:absolute;width:56px;height:56px;border-radius:var(--r-round);border:0;background:var(--accent);color:var(--accent-text);box-shadow:var(--shadow-raised);z-index:4;display:grid;place-items:center;padding:0}
+.fab.add{right:var(--sp-4);bottom:calc(var(--nav-h) + var(--sp-4) + env(safe-area-inset-bottom,0px));font-size:var(--fs-title-lg)}
+.fab.to-today{right:var(--sp-4);bottom:calc(var(--nav-h) + var(--sp-4) + 56px + var(--sp-3) + env(safe-area-inset-bottom,0px));opacity:0;transform:translateY(8px);pointer-events:none;transition:opacity .18s var(--ease-standard),transform .18s var(--ease-standard)}
 .fab.to-today svg{width:22px;height:22px;stroke-width:2.5;transition:transform .18s var(--ease-standard)}
 .fab.to-today.show{opacity:1;transform:none;pointer-events:auto}
 .fab.to-today.down svg{transform:rotate(180deg)}
-/* the top block: Today card and the controls */
+.fab.older{left:var(--sp-4);bottom:calc(var(--nav-h) + var(--sp-4) + env(safe-area-inset-bottom,0px))}
+/* F5: the control row floats, pinned to the top through scroll; content
+   scrolls behind it rather than the row scrolling with the page. */
 .top{display:flex;flex-direction:column;gap:var(--sp-3)}
-.ctl{position:relative;display:flex;align-items:center;gap:var(--sp-2)}
+.ctl{position:sticky;top:0;z-index:5;background:var(--surface);padding-bottom:var(--sp-3);display:flex;align-items:center;gap:var(--sp-2)}
 .page{display:flex;flex-direction:column;gap:var(--sp-3)}
 /* room below the last card, so a jump can always bring its target to the top */
 .page::after{content:"";flex:none;height:50vh}
@@ -261,18 +268,8 @@ a.ticket{color:inherit;text-decoration:none}
 .opt{border:0;text-align:left;padding:8px var(--sp-3);border-radius:var(--r-pill);background:var(--surface-2)}
 .opt.on{background:var(--accent);color:var(--accent-text);font-weight:var(--fw-strong)}
 .mh{margin:0;color:var(--text-dim);font-size:var(--fs-meta)}
-/* Today card: accent, "Today", what, where, when, tickets; tap opens today */
-.todayc{border-radius:var(--r-card);padding:var(--sp-4);display:flex;flex-direction:column;gap:var(--sp-3);cursor:pointer;background:var(--accent);color:var(--accent-text)}
-.tbig{margin:0;font-size:var(--fs-title-lg);font-weight:var(--fw-strong);letter-spacing:var(--tracking-heading);line-height:1}
-.thol{margin:-4px 0 0;font-size:var(--fs-meta);font-weight:var(--fw-medium)}
-.titem{display:grid;grid-template-columns:auto minmax(0,1fr);column-gap:var(--sp-3);align-items:center}
-.ticons{font-size:22px;line-height:1;display:flex;align-items:center;gap:2px}
-.tbody{display:flex;flex-direction:column;gap:2px;min-width:0}
-.ttitle{margin:0;font-size:var(--fs-body);font-weight:var(--fw-strong)}
-.tmeta{margin:0;font-size:var(--fs-meta);opacity:.85}
-.tticket{align-self:flex-start;margin-top:var(--sp-1);border:1.5px solid currentColor;border-radius:var(--r-pill);padding:1px var(--sp-2);font-size:var(--fs-meta);font-weight:var(--fw-medium)}
-/* labels: the ALL CAPS corner label that names a card (P1 finding 12) */
-.lbl{font-size:var(--fs-meta);font-weight:var(--fw-medium);letter-spacing:var(--tracking-label);text-transform:uppercase;font-variant-numeric:tabular-nums;color:var(--text)}
+/* F4: the Today card is gone; #today is a bare, invisible scroll anchor. */
+#today{display:block;height:0}
 .chev{width:14px;height:14px;stroke-width:2.5;vertical-align:-2px;margin-left:2px;color:var(--text-dim)}
 /* rows: the icon cell is as wide as the row's own icons; dates share one column */
 .rows{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:5px;min-width:0}
@@ -287,36 +284,27 @@ a.ticket{color:inherit;text-decoration:none}
 .grey .c-i,.ic.grey{filter:grayscale(1);opacity:.45}
 .grey .c-t{color:var(--text-dim)}
 .idea .c-i,.ic.idea{opacity:.45}
-.todo{width:7px;height:7px;border-radius:var(--r-round);background:currentColor}
 .flag{display:inline-block;border-radius:var(--r-pill);padding:1px var(--sp-2);font-size:var(--fs-meta);font-weight:var(--fw-medium);max-width:100%;overflow:hidden;text-overflow:ellipsis;vertical-align:middle}
 .flag.acc{background:var(--accent);color:var(--accent-text)}
 .flag.soft{background:var(--accent-soft);color:var(--text)}
 /* weekly */
 .month{margin:var(--sp-3) 0 0;font-size:var(--fs-title-lg);font-weight:var(--fw-strong);letter-spacing:var(--tracking-heading);line-height:var(--lh-title)}
 .week{display:flex;flex-direction:column;gap:var(--sp-2);margin-bottom:var(--sp-2)}
-.wk{align-self:flex-start;border:0;background:none;padding:var(--sp-1) 0;color:var(--text-dim);cursor:pointer}
 .g3{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:var(--sp-2);align-items:stretch}
 .day{background:var(--panel);border-radius:var(--r-card);min-height:84px;padding:var(--sp-2);display:flex;flex-direction:column;gap:var(--sp-2);min-width:0;border:2px solid transparent;cursor:pointer}
 .day.today{border-color:var(--accent)}
-.dl{align-self:flex-start;padding:1px var(--sp-2);margin-left:calc(-1 * var(--sp-1));border-radius:var(--r-pill)}
-.dl.on{background:var(--accent);color:var(--accent-text);font-weight:var(--fw-strong)}
 .icons{display:flex;flex-wrap:wrap;gap:4px;font-size:18px;line-height:1.15}
-.reveal{border:0;background:transparent;color:var(--text-dim);font-size:var(--fs-ui);padding:9px 0;border-radius:var(--r-control)}
-/* monthly and yearly cards */
-.wcard,.mcard{background:var(--panel);border-radius:var(--r-card);padding:var(--sp-3);display:flex;flex-direction:column;gap:var(--sp-2);border:2px solid transparent;cursor:pointer}
+/* monthly and yearly cards. F11: the month card itself is no longer a tap
+   target (only its "N plans" line is), so it takes no pointer cursor. */
+.wcard,.mcard{background:var(--panel);border-radius:var(--r-card);padding:var(--sp-3);display:flex;flex-direction:column;gap:var(--sp-2);border:2px solid transparent}
+.wcard{cursor:pointer}
 .wcard.now,.mcard.now{border-color:var(--accent)}
 .wh{display:flex;gap:var(--sp-2);align-items:center;flex-wrap:wrap}
 .away{margin:0;display:grid;grid-template-columns:20px minmax(0,1fr);column-gap:var(--sp-2);font-size:var(--fs-meta);background:var(--surface-2);border-radius:var(--r-control);padding:var(--sp-1) var(--sp-2)}
 .away.grey{color:var(--text-dim)}
 .mh{margin:0;display:flex;justify-content:space-between;align-items:center}
-.cnt{color:var(--text-dim);font-size:var(--fs-meta)}
 .heat{display:grid;grid-template-columns:repeat(var(--n),minmax(0,1fr));gap:2px}
 .heat i{height:16px;border-radius:2px;background:var(--surface-2)}
-.heat i.on{background:var(--accent)}
-.heat i.we{box-shadow:inset 0 -3px 0 var(--rule-strong)}
-.heat i.hol{box-shadow:inset 0 -3px 0 var(--accent)}
-.heat i.on.we,.heat i.on.hol{box-shadow:none}
-.heat i.t{outline:2px solid var(--text);outline-offset:-2px}
 /* search */
 .hint{margin:0;color:var(--text-dim);font-size:var(--fs-meta)}
 .card{background:var(--panel);border-radius:var(--r-card);padding:var(--sp-3)}
@@ -354,35 +342,61 @@ a.ticket{color:inherit;text-decoration:none}
   .g3{grid-template-columns:repeat(7,minmax(0,1fr))}
   .day{min-height:110px}
   .fab.add{right:var(--sp-6)}
-  .fab.to-today{right:calc(var(--sp-6) + 6px)}
+  .fab.to-today{right:var(--sp-6)}
+  .fab.older{left:var(--sp-6)}
 }
 /* day level (P2 feedback): no cards, sections on the sheet like a recipe */
 .sheet.lv-day .sbody{padding:0;gap:0}
 .dpage{display:flex;flex-direction:column}
 .dhol{margin:0;padding:var(--sp-3) var(--sp-4);font-weight:var(--fw-medium);color:var(--text-dim)}
-.dsec{padding:var(--sp-4);border-top:1px solid var(--rule);display:flex;flex-direction:column;gap:var(--sp-2);cursor:pointer}
-.dpage > .dsec:first-child{border-top:0}
-.dhead{display:flex;gap:var(--sp-3);align-items:center}
-.dhead h3{margin:0;font-size:var(--fs-title);font-weight:var(--fw-strong);letter-spacing:var(--tracking-heading)}
-.dhead .chev{margin-left:auto;width:18px;height:18px}
 .dpage > .hint{padding:var(--sp-4)}
-/* day strips with room, a closing rule (layout A until Task 9c) */
+/* day strips with room, a closing rule (layout A until Task 9c). F13: the
+   icons are a sibling of the title block, in the same row as the chevron,
+   so .dsec's own align-items:center keeps all three vertically centred on
+   one another regardless of how many lines the title block wraps to. */
 .dpage{padding-bottom:var(--sp-7)}
 .dsec{display:flex;flex-direction:row;align-items:center;gap:var(--sp-3);padding:var(--sp-5) var(--sp-4);border-top:1px solid var(--rule)}
 .dpage > .dsec:first-child{border-top:0}
 .dpage > .dsec:last-of-type{border-bottom:1px solid var(--rule)}
 .dmain{flex:1;min-width:0;display:flex;flex-direction:column;gap:var(--sp-2)}
-.dhead{display:flex;align-items:flex-start;justify-content:space-between;gap:var(--sp-3)}
-.dhead h3,.dmain > h3{margin:0;font-size:var(--fs-title);font-weight:var(--fw-strong);letter-spacing:var(--tracking-heading)}
+.dmain > h3{margin:0;font-size:var(--fs-title);font-weight:var(--fw-strong);letter-spacing:var(--tracking-heading)}
 .dicons{flex:none;font-size:24px;line-height:1;display:flex;gap:2px}
 .dline{margin:0}
 .dline + .dline{color:var(--text-dim)}
-.dchev{flex:none;align-self:center;display:grid;place-items:center;color:var(--text-dim)}
+.dchev{flex:none;display:grid;place-items:center;color:var(--text-dim)}
 .dchev .chev{width:20px;height:20px;margin:0}
 .day.empty,.lrow.empty,.wcard.empty{cursor:default}
 .wh .away{display:inline-block;margin:0;padding:1px var(--sp-2);border-radius:var(--r-pill);background:var(--surface-2);font-size:var(--fs-meta)}
-.hintrow .c-t{color:var(--accent-ink);font-weight:var(--fw-medium)}
 [data-week],[data-month],#today{scroll-margin-top:var(--sp-4)}
+
+/* ---- F9: one pill construction for every card label ("FRI 25", "WEEK 39",
+   "SEPTEMBER"), sized to its own text only, never a fixed or minimum width
+   (household-look.md, Shape). Today's own fills with the accent. ---- */
+.lbl-pill{display:inline-block;align-self:flex-start;font-size:var(--fs-meta);font-weight:var(--fw-medium);letter-spacing:var(--tracking-label);text-transform:uppercase;font-variant-numeric:tabular-nums;background:var(--surface-2);color:var(--text);border-radius:var(--r-pill);padding:2px var(--sp-2)}
+.lbl-pill.on{background:var(--accent);color:var(--accent-text);font-weight:var(--fw-strong)}
+/* F8: Weekly's "WEEK 39" is no longer a tap target */
+.wk{cursor:default}
+
+/* ---- F10: the year heading, big and once, like Monthly's big month
+   heading; no border on the heading itself (Isa's correction). ---- */
+.year-big{font-size:var(--fs-display);font-weight:var(--fw-strong);letter-spacing:var(--tracking-heading);margin:var(--sp-3) 0 0;display:block}
+/* F11: "N plans >" is the only tap target into Monthly, set in the same
+   font as the rest of the line, not a heading and not the chevron glyph. */
+.plans-line{margin:0;font-size:var(--fs-meta);color:var(--text-dim);background:none;border:0;padding:0;min-height:0;text-align:right;white-space:nowrap}
+
+/* ---- F12: the heat strip. Today is marked independent of fill; only the
+   current month is colour-coded (viewer's own event in the accent, an
+   other-person-only day in accent-soft); every other month's day is plain
+   grey, regardless of events. ---- */
+.heat i.mine{background:var(--accent)}
+.heat i.other{background:var(--accent-soft)}
+.heat i.grey{background:#8a8f9c}
+.heat i.t{outline:2px solid var(--text);outline-offset:-2px}
+
+/* ---- F16: a tiny inline SVG checkbox glyph marks an event with open
+   to-dos, replacing the plain dot (never an emoji). ---- */
+.todo-ic{display:inline-flex;color:var(--text-dim);vertical-align:-2px}
+.todo-ic svg{width:13px;height:13px;stroke-width:2.5}
 
 /* ================= The event page and form (round 2) =================
    After Google Calendar: a group per kind of information, a line icon on
