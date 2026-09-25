@@ -331,7 +331,11 @@ a.ticket{color:inherit;text-decoration:none}
 .hint{margin:0;color:var(--text-dim);font-size:var(--fs-meta)}
 .card{background:var(--panel);border-radius:var(--r-card);padding:var(--sp-3)}
 /* the sheet: header taps and swipes close; each level looks different */
-.shade{position:absolute;inset:0;background:var(--bg);opacity:.6;z-index:7}
+/* F32: the backdrop must not darken the page's own header above it -- it
+   used to be inset:0 of .shell (position:relative), covering .app-header
+   too; now it starts where .sheet itself does (top:56px, matching), so the
+   page header stays undarkened. */
+.shade{position:absolute;left:0;right:0;bottom:0;top:56px;background:var(--bg);opacity:.6;z-index:7}
 .sbar{flex:none;background:var(--accent-soft);border-radius:var(--r-sheet);padding:var(--sp-5) var(--sp-4) var(--sp-4);position:relative;touch-action:none;cursor:pointer}
 .grab{position:absolute;top:8px;left:50%;transform:translateX(-50%);width:36px;height:4px;border-radius:var(--r-pill);background:var(--text-dim);opacity:.5}
 .stitle{margin:0;font-size:var(--fs-title-lg);font-weight:var(--fw-strong);letter-spacing:var(--tracking-heading);line-height:1.2}
