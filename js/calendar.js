@@ -13,7 +13,7 @@ import { isoWeek, monthOfWeek, loadRange, freeWeekendSaturday, longWeekends } fr
 import { HOLIDAYS } from "./holidays.js";
 import { applyDetail } from "./filter.js";
 import { store } from "./store.js";
-import { indexByDay, weekRows, tappable, zoomWeekTarget, zoomMonthTarget, isAway, isBig, awayText,
+import { indexByDay, weekRows, tappable, zoomWeekTarget, zoomMonthTarget, isAway, awayText,
   shouldLoadMore, nextCount, iconsOf, searchEvents, shortDate, pastMonths, gesture, lastEventDay,
   fullPastWeeks, fullPastMonths, backToTodayState, todaysCount as cmTodaysCount } from "./cal-model.js";
 import { openLevel, sheetOpen } from "./sheet.js";
@@ -191,7 +191,11 @@ function monthCard(y, mo) {
      show; the line is a normal event line (no 🔍, no accent-ink). */
   const lw = longWeekends(HOLIDAYS, key + "-01", `${key}-${n}`, frame.on)
     .filter((w) => (w.start.slice(0, 7) === key || w.end.slice(0, 7) === key) && w.end >= frame.today);
-  const items = evs.filter(isBig).map((e) => ({ d: e.start, html: row(e, true, true) }))
+  /* F17: no second, hard-coded gate here any more -- evs already carries only
+     the viewer's Yearly categories (prefs.js's byCategories, applied in
+     buildFrame), whose default is now the real "big things" set. Toggling
+     Categories in Settings genuinely changes what a month's card lists. */
+  const items = evs.map((e) => ({ d: e.start, html: row(e, true, true) }))
     .concat(lw.map((w) => ({ d: w.start, html: noteRowPlain(w.start, `${w.text}, ${w.names}`) })));
   /* F11: the month heading is plain text, no chevron, not a tap target; "N
      plans" plus a literal ">" is the only jump into Monthly. */

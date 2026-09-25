@@ -42,7 +42,10 @@ export const zoomWeekTarget = (day) => mondayOf(day);
 export const zoomMonthTarget = (ym) => firstWeekOf(ym);
 
 const has = (e, types) => (e.activities || []).some((a) => types.includes(a.type));
-const AWAY = ["transport", "accommodation", "business-trip"];
+/* Also prefs.js's single source for Yearly's default-shown categories
+   (F17): the "who is away" set plus "visitor" is what Yearly always meant
+   by "big things", so it is exported rather than re-declared. */
+export const AWAY = ["transport", "accommodation", "business-trip"];
 
 /* Monthly's "who is away" line. */
 export const isAway = (e) => has(e, AWAY);

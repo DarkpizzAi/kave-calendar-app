@@ -16,7 +16,7 @@ import { status as syncStatus, checkToken } from "./sync.js";
 import { ICON } from "./chrome-icons.js";
 import { calendarHtml, afterCalendar, onScroll, backToToday, showLoadOlder, todaysCount } from "./calendar.js";
 import { refreshSheet, openLevel, registerLevel } from "./sheet.js";
-import { readPrefs, isShown, toggleCategory, defaultsSummary, categoriesSummary, VIEW_NAMES, DETAIL_NAMES, STYLE_NAMES } from "./prefs.js";
+import { readPrefs, isShown, toggleCategory, resetCategories, defaultsSummary, categoriesSummary, VIEW_NAMES, DETAIL_NAMES, STYLE_NAMES } from "./prefs.js";
 import { CATEGORIES, iconFor } from "./icons.js";
 import { resetCalendarDefaults } from "./calendar.js";
 
@@ -163,8 +163,14 @@ registerLevel("set-cats", {
       }).join("") + "</div>").join("");
     return `<p class="fhint">What ${me === "hugo" ? "Hugo" : "Isa"} sees in each view. Each of you picks your own; hiding a category deletes nothing.</p><div class="grid">${head}${rowsHtml}</div>`;
   },
+  bar: () => `<button class="act-btn" data-act="reset">Reset</button>`,
   onAction(b) {
-    const v = b.dataset.tickView, t = b.dataset.tickType, s = store.state.settings;
+    const s = store.state.settings;
+    if (b.dataset.act === "reset") {
+      store.setSetting("hiddenCategories", resetCategories(readPrefs(s)).hiddenCategories);
+      return;
+    }
+    const v = b.dataset.tickView, t = b.dataset.tickType;
     if (!v || !t || !s.me) return;
     store.setSetting("hiddenCategories", toggleCategory(readPrefs(s), s.me, v, t).hiddenCategories);
   },
