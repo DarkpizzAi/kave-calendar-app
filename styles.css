@@ -496,20 +496,25 @@ a.ticket{color:inherit;text-decoration:none}
 .plans-line{margin:0;font-size:var(--fs-meta);color:var(--text-dim);background:none;border:0;padding:0;min-height:0;text-align:right;white-space:nowrap}
 
 /* ---- F58 (revises F12/F31): the heat strip. Today is marked independent
-   of fill. Current month: the viewer's own or a joint event fills accent,
-   an other-person-only day fills accent-soft, empty is unfilled (the plain
-   .heat i background above, var(--surface-2)). Future months: the viewer's
-   own or a joint event fills a muted, darker "accent fade" (.future); every
-   other day (empty, or another person only) is unfilled -- the SAME empty
-   colour as the current month's, not a separate flatter grey (that was
-   F31's bug: every future square, including ones with no fill at all,
-   drew as one flat grey with nothing to tell them apart).
+   of fill. Current month: an other-person-only day fills accent-soft,
+   empty is unfilled (the plain .heat i background above, var(--surface-2)).
+   Future months: the viewer's own or a joint event fills a muted, darker
+   "accent fade" (.future); every other day (empty, or another person only)
+   is unfilled -- the SAME empty colour as the current month's, not a
+   separate flatter grey (that was F31's bug: every future square, including
+   ones with no fill at all, drew as one flat grey with nothing to tell them
+   apart).
    --accent-soft turned out to read as a PALE tint next to that empty fill,
    not a dark one (checked live at 16px against .heat i.mine and the plain
    empty square) -- so .future is a deliberately darkened accent, a one-off
    kept out of the token system, the same reasoning F12's own open question
-   about --accent-soft already raised. */
-.heat i.mine{background:var(--accent)}
+   about --accent-soft already raised.
+   F72: the current month's own/joint fill (.mine) now uses the SAME muted
+   accent fade as .future, not the brighter full --accent -- one consistent
+   look across the whole Yearly grid, current month included. Only this
+   fill colour changed; heatFill()'s "mine"/"other"/"future" labels and the
+   other-person / empty-day logic are untouched. */
+.heat i.mine{background:color-mix(in srgb, var(--accent) 55%, var(--text) 25%)}
 .heat i.other{background:var(--accent-soft)}
 .heat i.future{background:color-mix(in srgb, var(--accent) 55%, var(--text) 25%)}
 .heat i.t{outline:2px solid var(--text);outline-offset:-2px}
