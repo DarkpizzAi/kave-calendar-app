@@ -253,15 +253,25 @@ a.ticket{color:inherit;text-decoration:none}
 .page{display:flex;flex-direction:column;gap:var(--sp-3)}
 /* room below the last card, so a jump can always bring its target to the top */
 .page::after{content:"";flex:none;height:50vh}
-.slide-left{animation:sl var(--motion-slow) var(--ease-sheet)}
-.slide-right{animation:sr var(--motion-slow) var(--ease-sheet)}
-@keyframes sl{from{transform:translateX(40%);opacity:0}}
-@keyframes sr{from{transform:translateX(-40%);opacity:0}}
+/* F24: matches the sheet's own depth animation (F14) in quality --
+   --motion-base and --ease-drag, the token built for a drag-released
+   transition, rather than --motion-slow and --ease-sheet (280ms, the
+   vertical sheet's own curve, borrowed for this and reading as sluggish for
+   a sideways flick). A shorter travel distance (18% instead of 40%) is the
+   other half of "insufficiently fluid": at 40% the incoming page arrives
+   from further off-screen than the finger just travelled, which is what
+   read as a slow, disconnected snap rather than a continuation of the
+   swipe. */
+.slide-left{animation:sl var(--motion-base) var(--ease-drag);will-change:transform,opacity}
+.slide-right{animation:sr var(--motion-base) var(--ease-drag);will-change:transform,opacity}
+@keyframes sl{from{transform:translateX(18%);opacity:0}}
+@keyframes sr{from{transform:translateX(-18%);opacity:0}}
 .ctl2{display:flex;gap:var(--sp-2);align-items:center}
 .ctl.searching .ctl2{flex:1}
 /* the view switch: the selected pill is the soft accent and slides with the page */
 .views{position:relative;flex:1;display:flex;background:var(--surface-2);border-radius:var(--r-pill);padding:3px}
-.views .ind{position:absolute;top:3px;bottom:3px;left:3px;width:calc((100% - 6px) / 3);border-radius:var(--r-pill);background:var(--panel);box-shadow:var(--shadow-card);transform:translateX(calc(var(--i) * 100%));animation:ind var(--motion-slow) var(--ease-sheet)}
+/* F24: the tab indicator moves with the page it belongs to -- same timing. */
+.views .ind{position:absolute;top:3px;bottom:3px;left:3px;width:calc((100% - 6px) / 3);border-radius:var(--r-pill);background:var(--panel);box-shadow:var(--shadow-card);transform:translateX(calc(var(--i) * 100%));animation:ind var(--motion-base) var(--ease-drag)}
 @keyframes ind{from{transform:translateX(calc(var(--from) * 100%))}}
 .views button{position:relative;flex:1;border:0;background:none;padding:7px var(--sp-2);border-radius:var(--r-pill);font-size:var(--fs-meta)}
 .views button.on{font-weight:var(--fw-strong)}
