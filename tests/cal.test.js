@@ -2,7 +2,7 @@ import { test, eq, ok } from "./run.js";
 import { weekRows, indexByDay, tappable, zoomWeekTarget, zoomMonthTarget, isAway, isBig, awayText,
   shouldLoadMore, nextCount, iconsOf, searchEvents, todaysCount, fullPastWeeks, fullPastMonths,
   backToTodayState, eventsInMonth, tripCityFor, defaultCity, hideCancelled,
-  hasOpenTodos, guestsExcludingViewer } from "../js/cal-model.js";
+  hasOpenTodos, guestsExcludingViewer, statusGuestsLine } from "../js/cal-model.js";
 import { readPrefs, byCategories } from "../js/prefs.js";
 
 const ev = (id, start, extra = {}) => ({ id, title: id, start, end: null, owner: "shared", status: "planned", activities: [], ...extra });
@@ -211,6 +211,15 @@ test("cal: guestsExcludingViewer drops the viewer's own name, case-insensitively
   eq(guestsExcludingViewer("", "Isa"), "");
   eq(guestsExcludingViewer(null, "Isa"), "");
   eq(guestsExcludingViewer("Apu,  Jordi ,Isa", "Isa"), "Apu, Jordi", "extra whitespace around names is trimmed");
+});
+
+/* ---- F60: the day-sheet status/guests line is empty (not the bare status)
+   when there are no guests -- the status only shows once, in F39's pill. */
+test("cal: statusGuestsLine is empty with no guests, so the status pill above never duplicates", () => {
+  eq(statusGuestsLine("Planned", ""), "", "no guests -- nothing to show, the pill already carries the status");
+  eq(statusGuestsLine("Planned", "Apu, Jordi"), "Planned · Apu, Jordi");
+  eq(statusGuestsLine("", "Apu"), "Apu", "no status label, guests still show alone");
+  eq(statusGuestsLine("", ""), "");
 });
 
 /* ---- F38: does this event have at least one open to-do ---- */

@@ -14,7 +14,7 @@ import { escapeHtml as esc, safeUrl } from "./util.js";
 import { addDays, dayOfWeek } from "./dates.js";
 import { isoWeek } from "./views.js";
 import { holidayOn } from "./holidays.js";
-import { tappable, iconsOf, hasOpenTodos, guestsExcludingViewer } from "./cal-model.js";
+import { tappable, iconsOf, hasOpenTodos, guestsExcludingViewer, statusGuestsLine } from "./cal-model.js";
 import { rows, frameNow, detailGrey, place } from "./calendar.js";
 import { ICON } from "./chrome-icons.js";
 import { STATUS_LABEL } from "./model.js";
@@ -99,7 +99,11 @@ function strip(e, f) {
      viewer's own name filtered out -- never "Isa · Apu" on Isa's phone. */
   /* F43: the "until Sun" day-span used to repeat here too, redundant with
      the date already named by the day this strip belongs to. */
-  const statusGuests = [STATUS_LABEL[e.status], guestsExcludingViewer(e.guests, who(f.me))].filter(Boolean).join(" · ");
+  /* F60: with no guests, this line is empty rather than falling back to the
+     bare status word -- that would duplicate F39's status pill above, in
+     the title itself. statusGuestsLine (cal-model.js, tested) is the one
+     place that rule lives. */
+  const statusGuests = statusGuestsLine(STATUS_LABEL[e.status], guestsExcludingViewer(e.guests, who(f.me)));
   const lines = [statusGuests].filter(Boolean);
   const name = stripName(e, f);
   /* F38: no inline add-task in this view -- a small checkbox glyph (F16)

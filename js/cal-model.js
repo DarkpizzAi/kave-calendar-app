@@ -210,6 +210,15 @@ export function guestsExcludingViewer(guests, viewerName) {
     .join(", ");
 }
 
+/* F60: the single-day sheet's status/guests line under an event's title.
+   With no guests, F37's line used to fall back to the bare status word,
+   duplicating F39's status pill shown right above it in the header -- so
+   with no guests this line is empty, not the status alone; the status
+   still shows, once, in the pill. */
+export function statusGuestsLine(statusLabel, guestsText) {
+  return guestsText ? [statusLabel, guestsText].filter(Boolean).join(" · ") : "";
+}
+
 const fold = (s) => String(s || "").toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
 export function searchEvents(events, query) {
   const q = fold(query).trim();
