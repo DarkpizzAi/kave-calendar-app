@@ -19,7 +19,7 @@ import { indexByDay, weekRows, tappable, zoomWeekTarget, zoomMonthTarget, isAway
   hasLoadedOlder, hasOpenTodos, heatFill } from "./cal-model.js";
 import { openLevel, sheetOpen } from "./sheet.js";
 import { ICON } from "./chrome-icons.js";
-import { readPrefs, byCategories } from "./prefs.js";
+import { readPrefs, byCategories, eventBlocksFreeTime } from "./prefs.js";
 
 const MONTHS = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
 const DOW = ["MON", "TUE", "WED", "THU", "FRI", "SAT", "SUN"];
@@ -165,7 +165,11 @@ function weekCard(m) {
   const evs = weekEvents(m);
   const away = evs.filter(isAway), rest = evs.filter((e) => !isAway(e));
   const items = rest.map((e) => ({ d: e.start < m ? m : e.start, html: row(e, true, false) }));
-  const sat = freeWeekendSaturday(m, frame.on, frame.today);
+  /* free-time blocking is per category, shared by both people, and must
+     never depend on the viewer's own display filters -- so it reads
+     straight from settings and from frame.onAll (unfiltered), not frame.on */
+  const blocks = (e) => eventBlocksFreeTime(readPrefs(store.state.settings), e);
+  const sat = freeWeekendSaturday(m, frame.onAll, frame.today, blocks);
   if (sat) items.push({ d: sat, html: noteRow(sat, "Free weekend") });
   const now = m <= frame.today && frame.today <= addDays(m, 6);
   const tap = tappable(evs) ? ` data-act="week" data-m="${m}" role="button" tabindex="0"` : "";
@@ -230,7 +234,8 @@ function monthCard(y, mo) {
   }
   /* F10: a long weekend or opportunity that has already passed does not
      show; the line is a normal event line (no 🔍, no accent-ink). */
-  const lw = longWeekends(HOLIDAYS, key + "-01", `${key}-${n}`, frame.on)
+  const blocks = (e) => eventBlocksFreeTime(readPrefs(store.state.settings), e);
+  const lw = longWeekends(HOLIDAYS, key + "-01", `${key}-${n}`, frame.onAll, blocks)
     .filter((w) => (w.start.slice(0, 7) === key || w.end.slice(0, 7) === key) && w.end >= frame.today);
   /* F17: no second, hard-coded gate here any more -- evs already carries only
      the viewer's Yearly categories (prefs.js's byCategories, applied in

@@ -32,12 +32,12 @@ export function loadRange(today, lastEventDay, floorYear) {
 }
 
 /* ---- free weekends (Monthly): the current and the next month only ---- */
-export function freeWeekendSaturday(monday, eventsOn, today) {
+export function freeWeekendSaturday(monday, eventsOn, today, blocks) {
   const sat = addDays(monday, 5);
   const thisMonth = today.slice(0, 7);
   const next = addDays(thisMonth + "-28", 7).slice(0, 7);
   if (![thisMonth, next].includes(sat.slice(0, 7))) return null;
-  return [4, 5, 6].every((k) => !eventsOn(addDays(monday, k)).length) ? sat : null;
+  return [4, 5, 6].every((k) => !eventsOn(addDays(monday, k)).some(blocks)) ? sat : null;
 }
 
 /* Clear: nobody has anything that day. Open: somebody does, but nothing
@@ -85,14 +85,14 @@ export function classifyWeekend(block) {
   return null;
 }
 
-export function longWeekends(holidays, from, to, eventsOn) {
+export function longWeekends(holidays, from, to, eventsOn, blocks) {
   const out = [];
   for (const block of weekendBlocks(holidays, from, to)) {
     const c = classifyWeekend(block);
     if (!c) continue;
     const days = [];
     for (let d = c.start; d <= c.end; d = addDays(d, 1)) days.push(d);
-    const busy = days.some((d) => eventsOn(d).length);
+    const busy = days.some((d) => eventsOn(d).some(blocks));
     const names = [...new Set(days.filter((d) => holidays[d]).map((d) => holidays[d]))].join(", ");
     const text = c.kind === "chance" ? "Long weekend opportunity" : busy ? "Long weekend" : "Free long weekend";
     out.push({ ...c, text, names });

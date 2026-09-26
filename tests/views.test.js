@@ -22,10 +22,14 @@ test("load range: 1 January back, end of the year after next forward, or the las
 
 /* ---- free weekends: current and next month only ---- */
 test("a free weekend shows on its Saturday, this month and next only", () => {
+  const blocksAll = () => true;
+  const blocksNothing = () => false;
   const events = [ev("a", "2026-10-03")];
-  eq(freeWeekendSaturday("2026-09-21", on(events), "2026-09-24"), "2026-09-26");
-  eq(freeWeekendSaturday("2026-09-28", on(events), "2026-09-24"), null);
-  eq(freeWeekendSaturday("2026-11-23", on([]), "2026-09-24"), null);
+  eq(freeWeekendSaturday("2026-09-21", on(events), "2026-09-24", blocksAll), "2026-09-26");
+  eq(freeWeekendSaturday("2026-09-28", on(events), "2026-09-24", blocksAll), null);
+  eq(freeWeekendSaturday("2026-11-23", on([]), "2026-09-24", blocksAll), null);
+  eq(freeWeekendSaturday("2026-09-21", on([ev("b", "2026-09-26")]), "2026-09-24", blocksNothing), "2026-09-26",
+     "a non-blocking event on the Saturday itself doesn't stop it reading as free");
 });
 
 /* ---- long weekends from bank holidays ---- */
@@ -51,13 +55,20 @@ test("classify: a Wednesday holiday is not a long weekend", () => {
   eq(classifyWeekend({ anchor: "2026-06-24", start: "2026-06-24", end: "2026-06-24", length: 1 }), null);
 });
 test("long weekends are labelled free, long, or opportunity, with the holiday names", () => {
-  const lw = longWeekends(HOLIDAYS, "2026-09-01", "2026-12-31", on([ev("x", "2026-10-10")]));
+  const blocksAll = () => true;
+  const lw = longWeekends(HOLIDAYS, "2026-09-01", "2026-12-31", on([ev("x", "2026-10-10")]), blocksAll);
   const byStart = Object.fromEntries(lw.map((w) => [w.start, w]));
   eq(byStart["2026-09-11"].text, "Free long weekend");
   eq(byStart["2026-09-24"].text, "Long weekend opportunity");
   eq(byStart["2026-10-10"].text, "Long weekend");
   eq(byStart["2026-12-05"].names, "La Immaculada");
   eq(byStart["2026-12-25"].names, "Nadal, Sant Esteve");
+});
+test("long weekends: a non-blocking event doesn't turn Free into Long", () => {
+  const blocksNothing = () => false;
+  const lw = longWeekends(HOLIDAYS, "2026-09-01", "2026-09-30", on([ev("x", "2026-09-12")]), blocksNothing);
+  const byStart = Object.fromEntries(lw.map((w) => [w.start, w]));
+  eq(byStart["2026-09-11"].text, "Free long weekend", "an event that doesn't block still reads as free");
 });
 
 /* ---- per-day free state: Clear (nothing at all) vs Open (something, but
