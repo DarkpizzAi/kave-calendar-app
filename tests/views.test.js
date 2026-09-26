@@ -94,12 +94,20 @@ test("stats lead with trips, cities, plans, and never costs", () => {
 });
 
 /* ---- detail levels ---- */
-test("detail levels: full, partial greys the other person, minimal hides them", () => {
-  const list = [ev("m", "2026-10-01", { owner: "isa" }), ev("o", "2026-10-01"), ev("t", "2026-10-01", { owner: "hugo" })];
+test("detail levels: full, partial greys the other person, minimal hides them except when away", () => {
+  const list = [
+    ev("m", "2026-10-01", { owner: "isa" }),
+    ev("o", "2026-10-01"),
+    ev("t", "2026-10-01", { owner: "hugo" }),
+    ev("trip", "2026-10-01", { owner: "hugo", activities: [{ type: "transport" }] }),
+  ];
   eq(DETAIL_LEVELS, ["full", "partial", "minimal"]);
-  eq(applyDetail(list, "isa", "full").map((x) => [x.event.id, x.grey]), [["m", false], ["o", false], ["t", false]]);
-  eq(applyDetail(list, "isa", "partial").map((x) => [x.event.id, x.grey]), [["m", false], ["o", false], ["t", true]]);
-  eq(applyDetail(list, "isa", "minimal").map((x) => x.event.id), ["m", "o"]);
+  eq(applyDetail(list, "isa", "full").map((x) => [x.event.id, x.grey]),
+     [["m", false], ["o", false], ["t", false], ["trip", false]]);
+  eq(applyDetail(list, "isa", "partial").map((x) => [x.event.id, x.grey]),
+     [["m", false], ["o", false], ["t", true], ["trip", true]]);
+  eq(applyDetail(list, "isa", "minimal").map((x) => x.event.id), ["m", "o", "trip"],
+     "hugo's non-away event is hidden; his trip survives");
 });
 
 /* ---- icons ---- */
