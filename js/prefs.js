@@ -27,6 +27,16 @@ const labelOf = (list, v) => list.find(([k]) => k === v)[1];
 export const YEARLY_DEFAULT_SHOWN = [...AWAY, "visitor"];
 const defaultHidden = (view) => (view === "yearly" ? TYPES.filter((t) => !YEARLY_DEFAULT_SHOWN.includes(t)) : []);
 
+/* Free-time blocking: which categories count against a free weekend/long
+   weekend/opportunity. One list, shared by both people -- symmetric, not
+   "my categories" vs "their categories" (spec section 4). Default: things
+   usually booked and paid for in advance (a trip, a concert, a work
+   commitment); casual, easy-to-move plans don't block. */
+export const BLOCKING_DEFAULT = [
+  "transport", "accommodation", "business-trip", "work",
+  "live-music", "clubbing", "cinema", "theatre", "activity",
+];
+
 /* Settings as stored -> clean preferences. Anything unexpected falls back. */
 export function readPrefs(settings) {
   const s = settings || {};
@@ -39,11 +49,15 @@ export function readPrefs(settings) {
       hiddenCategories[p][v] = Array.isArray(list) ? list.filter((t) => TYPES.includes(t)) : defaultHidden(v);
     }
   }
+  const blockingCategories = Array.isArray(s.blockingCategories)
+    ? s.blockingCategories.filter((t) => TYPES.includes(t))
+    : BLOCKING_DEFAULT;
   return {
     defaultView: oneOf(VIEW_NAMES, s.defaultView, "weekly"),
     defaultDetail: oneOf(DETAIL_NAMES, s.defaultDetail, "full"),
     cardStyle: oneOf(STYLE_NAMES, s.cardStyle, "lines"),
     hiddenCategories,
+    blockingCategories,
   };
 }
 
@@ -67,6 +81,23 @@ export function toggleCategory(prefs, me, view, type) {
   const cur = prefs.hiddenCategories[me][view];
   const next = cur.includes(type) ? cur.filter((t) => t !== type) : [...cur, type];
   return { ...prefs, hiddenCategories: { ...prefs.hiddenCategories, [me]: { ...prefs.hiddenCategories[me], [view]: next } } };
+}
+
+export function blocksFreeTime(prefs, type) {
+  return prefs.blockingCategories.includes(type);
+}
+
+export function toggleBlocking(prefs, type) {
+  const cur = prefs.blockingCategories;
+  const next = cur.includes(type) ? cur.filter((t) => t !== type) : [...cur, type];
+  return { ...prefs, blockingCategories: next };
+}
+
+/* Same "no activities reads as Other" rule byCategories already uses --
+   reused, not re-derived, so the two can't drift apart (Review Focus). */
+export function eventBlocksFreeTime(prefs, event) {
+  const types = event.activities && event.activities.length ? event.activities.map((a) => a.type) : ["none"];
+  return types.some((t) => blocksFreeTime(prefs, t));
 }
 
 /* An event shows while any of its activities' categories shows; an event

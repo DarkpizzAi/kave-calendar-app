@@ -1,5 +1,5 @@
 import { test, eq, ok } from "./run.js";
-import { readPrefs, isShown, toggleCategory, byCategories, defaultsSummary, categoriesSummary, resetCategories } from "../js/prefs.js";
+import { readPrefs, isShown, toggleCategory, byCategories, defaultsSummary, categoriesSummary, resetCategories, blocksFreeTime, toggleBlocking, eventBlocksFreeTime, BLOCKING_DEFAULT } from "../js/prefs.js";
 
 const ev = (id, types) => ({ id, activities: types.map((type) => ({ type })) });
 
@@ -32,6 +32,44 @@ test("prefs: a toggle is per person and per view", () => {
   ok(isShown(p, "isa", "weekly", "transport"), "other view untouched");
   ok(isShown(p, "hugo", "yearly", "transport"), "other person untouched");
   ok(isShown(toggleCategory(p, "isa", "yearly", "transport"), "isa", "yearly", "transport"), "toggling back shows it");
+});
+test("prefs: free-time blocking defaults to things usually booked ahead", () => {
+  const p = readPrefs({});
+  ok(blocksFreeTime(p, "transport"));
+  ok(blocksFreeTime(p, "accommodation"));
+  ok(blocksFreeTime(p, "business-trip"));
+  ok(blocksFreeTime(p, "work"));
+  ok(blocksFreeTime(p, "live-music"));
+  ok(blocksFreeTime(p, "cinema"));
+  ok(!blocksFreeTime(p, "eating"), "casual, easy to move");
+  ok(!blocksFreeTime(p, "none"), "no activity at all never blocks");
+});
+test("prefs: blocking is one shared list, not per person", () => {
+  const p = readPrefs({});
+  eq(p.blockingCategories, BLOCKING_DEFAULT);
+});
+test("prefs: toggling blocking off and back on returns to the start", () => {
+  let p = readPrefs({});
+  ok(blocksFreeTime(p, "transport"));
+  p = toggleBlocking(p, "transport");
+  ok(!blocksFreeTime(p, "transport"));
+  p = toggleBlocking(p, "transport");
+  ok(blocksFreeTime(p, "transport"));
+});
+test("prefs: eventBlocksFreeTime is per category, never per owner", () => {
+  const p = readPrefs({});
+  const sharedFlight = { activities: [{ type: "transport" }], owner: "shared" };
+  const hugosDinner = { activities: [{ type: "eating" }], owner: "hugo" };
+  const noActivity = { activities: [], owner: "isa" };
+  const mixed = { activities: [{ type: "eating" }, { type: "transport" }], owner: "isa" };
+  ok(eventBlocksFreeTime(p, sharedFlight), "blocking category, shared owner, still blocks");
+  ok(!eventBlocksFreeTime(p, hugosDinner), "non-blocking category, not affected by whose it is");
+  ok(!eventBlocksFreeTime(p, noActivity), "no activities reads as \"none\", never blocks");
+  ok(eventBlocksFreeTime(p, mixed), "any one blocking activity is enough");
+});
+test("prefs: stored blocking junk falls back to the default", () => {
+  eq(readPrefs({ blockingCategories: "nonsense" }).blockingCategories, BLOCKING_DEFAULT);
+  eq(readPrefs({ blockingCategories: ["transport", "not-a-real-type"] }).blockingCategories, ["transport"]);
 });
 test("prefs: an event hides only when none of its activities' categories shows", () => {
   let p = toggleCategory(readPrefs({}), "isa", "weekly", "eating");
