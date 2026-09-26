@@ -109,6 +109,11 @@ test("detail levels: full, partial greys the other person, minimal hides them ex
   eq(applyDetail(list, "isa", "minimal").map((x) => x.event.id), ["m", "o", "trip"],
      "hugo's non-away event is hidden; his trip survives");
 });
+test("detail levels: minimal keeps an away event even when it has other activities too", () => {
+  const mixed = ev("mixed", "2026-10-01", { owner: "hugo", activities: [{ type: "eating" }, { type: "transport" }] });
+  eq(applyDetail([mixed], "isa", "minimal").map((x) => x.event.id), ["mixed"],
+     "one away activity among several is still enough to survive Minimal");
+});
 
 /* ---- icons ---- */
 test("the catalogue from round 1b, and person icons follow the viewer", () => {
