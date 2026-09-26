@@ -3,6 +3,8 @@
 Compass. Port 8778, so it can run alongside Spoon (8777) and the hub (8642).
 
     python dev_server.py          # serves this folder on http://localhost:8778
+                                   # bound to 0.0.0.0, so a phone on the same
+                                   # Wi-Fi can reach it at http://<this-pc-ip>:8778
 
 Use this instead of `python -m http.server` so edits show on a plain reload.
 Threaded, reuses the address, and exits cleanly so a restart never hits a
@@ -43,7 +45,7 @@ class Server(socketserver.ThreadingTCPServer):
 
 
 def main():
-    with Server(("127.0.0.1", PORT), NoCache) as httpd:
+    with Server(("0.0.0.0", PORT), NoCache) as httpd:
         print(f"serving {ROOT} on http://localhost:{PORT} (no cache)", flush=True)
         with contextlib.suppress(KeyboardInterrupt):
             httpd.serve_forever()
