@@ -1,5 +1,5 @@
 import { test, eq, ok } from "./run.js";
-import { isoWeek, monthOfWeek, firstWeekOf, loadRange, freeWeekendSaturday, weekendBlocks, classifyWeekend, longWeekends, yearStats } from "../js/views.js";
+import { isoWeek, monthOfWeek, firstWeekOf, loadRange, freeWeekendSaturday, weekendBlocks, classifyWeekend, longWeekends, yearStats, dayFreeState } from "../js/views.js";
 import { applyDetail, DETAIL_LEVELS } from "../js/filter.js";
 import { CATEGORIES, iconFor } from "../js/icons.js";
 import { HOLIDAYS } from "../js/holidays.js";
@@ -58,6 +58,18 @@ test("long weekends are labelled free, long, or opportunity, with the holiday na
   eq(byStart["2026-10-10"].text, "Long weekend");
   eq(byStart["2026-12-05"].names, "La Immaculada");
   eq(byStart["2026-12-25"].names, "Nadal, Sant Esteve");
+});
+
+/* ---- per-day free state: Clear (nothing at all) vs Open (something, but
+   nothing blocking) ---- */
+test("dayFreeState: Clear when nobody has anything, Open when they do but it doesn't block", () => {
+  const blocksTransport = (e) => e.activities.some((a) => a.type === "transport");
+  const noEvents = on([]);
+  const flexibleOnly = on([ev("h", "2026-10-04", { activities: [{ type: "eating" }] })]);
+  const withBlocking = on([ev("f", "2026-10-04", { activities: [{ type: "transport" }] })]);
+  eq(dayFreeState("2026-10-04", noEvents, blocksTransport), "clear");
+  eq(dayFreeState("2026-10-04", flexibleOnly, blocksTransport), "open");
+  eq(dayFreeState("2026-10-04", withBlocking, blocksTransport), "", "a day with a blocking event on it is neither");
 });
 
 /* ---- the Yearly stats card ---- */

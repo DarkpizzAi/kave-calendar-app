@@ -40,6 +40,15 @@ export function freeWeekendSaturday(monday, eventsOn, today) {
   return [4, 5, 6].every((k) => !eventsOn(addDays(monday, k)).length) ? sat : null;
 }
 
+/* Clear: nobody has anything that day. Open: somebody does, but nothing
+   that blocks. Neither ("", falsy): a blocking event landed on this day --
+   the caller decides what that means for the window it's part of. */
+export function dayFreeState(day, eventsOn, blocks) {
+  const evs = eventsOn(day);
+  if (!evs.length) return "clear";
+  return evs.some(blocks) ? "" : "open";
+}
+
 /* ---- long weekends (Yearly), from the bank holidays ---- */
 const offDay = (holidays) => (d) => dayOfWeek(d) >= 5 || !!holidays[d];
 
