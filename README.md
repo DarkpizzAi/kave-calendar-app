@@ -3,15 +3,17 @@
 The household planner: events, what they cost, trips, and the loose ends
 attached to them. Replaces Google Calendar and the yearly planning sheet.
 
-**On `main`, this is the shell:** Calendar, Insights, Trips and Radar are
-dashed stubs, and Settings works. **Sub-project A** (the data model, the
-Calendar, events, the sheet import) is being built on branch `compass-a`.
-Its design is one document in the private kave-hub repo,
+**`main` is sub-project A, live at v1.0** (26/09/2026): the data model and
+sync engine, the Calendar tab (Weekly/Monthly/Yearly, one sheet with
+levels), the event page and form, Settings, and three years imported from
+the yearly planning sheet. Insights, Trips and Radar are still dashed
+stubs, built in sub-projects B, C and D. A's design is one document in the
+private kave-hub repo,
 `docs/superpowers/specs/2026-09-24-compass-a-core-design.md`, and its plan
-with a handoff for a new chat is
-`docs/superpowers/plans/2026-09-24-compass-a-core.md`. The product
-brainstorm for the later sub-projects (Trips and Radar, Insights, the box's
-jobs) is `calendar/data/compass-planning-app-brainstorm.md` there.
+(now closed) is `docs/superpowers/plans/2026-09-24-compass-a-core.md`. The
+product brainstorm for the later sub-projects (Trips and Radar, Insights,
+the box's jobs) is `calendar/data/compass-planning-app-brainstorm.md`
+there.
 
 **This repo is the static app shell only.** No data, no secrets. It is public
 so GitHub Pages can serve it for free.
@@ -88,8 +90,10 @@ is `phone`.
 
 ## Icons
 
-`icon-512.png` is the master artwork, and it is currently a **placeholder** -
-a generated compass rose, not designed. Replace it, then:
+`icon-512.png` is the master artwork: a flat, solid-colour ring-and-needle
+compass in the app's own accent, matching the household look's app-tile
+icon rule (one clear symbol per app, flat and smooth, no photorealism - the
+same construction logic as Spoon's bowl-and-spoon). To change it:
 
 ```bash
 python make_icons.py
@@ -174,11 +178,27 @@ Native ES modules, no bundler, no build step.
 | `js/store.js` | persisted state, `localStorage` under `compass.*` |
 | `js/theme.js` | palette selection, colour-scheme, CSP-boot diagnostic |
 | `js/sync.js` | sync status and the token check |
-| `js/render.js` | all views, re-rendered whole on every interaction |
+| `js/local.js`, `js/merge.js` | local cache/queue, per-event merge |
+| `js/model.js`, `js/dates.js`, `js/money.js` | the event record, dates, costs |
+| `js/data.js` | the app's data instance over sync + local |
+| `js/cal-model.js` | pure Calendar logic (weeks, filters, trip/away rules) |
+| `js/views.js`, `js/holidays.js`, `js/filter.js` | ISO weeks, long weekends, detail levels |
+| `js/icons.js`, `js/chrome-icons.js` | the category catalogue, app-chrome SVGs |
+| `js/calendar.js` | the Calendar tab: drawing and its handlers |
+| `js/sheet.js` | levels, history, the sheet's depth animation |
+| `js/view-event.js`, `js/event-form.js` | the event page and form |
+| `js/prefs.js` | Settings' category toggles and defaults |
+| `js/updates.js` | check-for-updates, ported from Spoon |
+| `js/render.js` | the frame, Settings, no-token/who-am-I screens |
 | `js/wire.js` | one-time listeners, the banner |
 | `js/pull-to-sync.js` | the pull gesture, armed per tab |
 | `js/boot.js` | entry point, service-worker registration |
 | `github.js` | Contents API client, carried over from Spoon |
+
+This table names the modules, not their exact count - **`SHELL` in
+`service-worker.js` is the ground truth** for what must load offline. A
+module must be listed there in the same commit it's added; that list is
+what to diff against `js/*.js`, not this table.
 
 **Every module must be listed in `SHELL` in `service-worker.js`.** A module
 missing there is a module the app cannot load offline, and nothing will say so
@@ -192,10 +212,12 @@ features.
 
 ## Status
 
-**`main` is the shell** (v0.6): Calendar, Insights, Trips and Radar are
-dashed stubs; Settings works (paste a token, check it against the hub repo,
-switch palette, read the running service-worker version, see whether the CSP
-preload was blocked). **Branch `compass-a`** adds the data layer and the
-Calendar's logic (65 browser tests, `tests/`), with the Calendar screen next.
+**`main` is v1.0** (26/09/2026, commit `1455435`): sub-project A complete.
+The Calendar tab (Weekly/Monthly/Yearly, the event sheet and form),
+Settings (token, who-am-I, palette, categories, sync status, check for
+updates), and three years of real data imported from the sheet. Built
+through the usual prototype-then-code gates, then seven rounds of testing
+live on the phone against real data before release. 133 browser tests
+(`tests/`), 28 pytest (`calendar/tools` in kave-hub).
 
-Next: a spec for what Compass actually does.
+Next: sub-project B (Trips and Radar).

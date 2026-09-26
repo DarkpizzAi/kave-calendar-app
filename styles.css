@@ -162,7 +162,13 @@ button:disabled { opacity: .5; cursor: default; }
    badge rule in household-look.md -- position and size are fixed, not
    invented per app. */
 .nav-badge { position: absolute; top: -3px; left: calc(50% + 8px); min-width: 16px; height: 16px; padding: 0 4px; border-radius: var(--r-pill); background: var(--accent); color: var(--accent-text); font-size: var(--fs-micro); font-weight: 600; font-variant-numeric: tabular-nums; display: grid; place-items: center; line-height: 1; }
-.bottom-nav svg { width: 24px; height: 24px; }
+/* `.shell svg{width:18px}` further down has the same specificity (0,1,1)
+   and comes later, so it was quietly shrinking every nav icon to 18px.
+   `.shell .bottom-nav svg` (0,2,1) outranks it, as `.shell .fab` does.
+   Same trap for colour: `.shell button{color:inherit}` was beating the
+   dim inactive tab, hence `.shell .bottom-nav button` here. */
+.shell .bottom-nav svg { width: 24px; height: 24px; }
+.shell .bottom-nav button { color: var(--text-dim); }
 .bottom-nav button[aria-current="page"] { color: var(--accent-ink); }
 .bottom-nav button[aria-current="page"] .nav-icon { background: var(--accent-soft); }
 .nav-label { font-size: var(--fs-micro); line-height: 1; letter-spacing: var(--tracking-label); }

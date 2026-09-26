@@ -13,8 +13,8 @@
 
 const IS_LOCAL_DEV = ["localhost", "127.0.0.1"].includes(location.hostname);
 
-// { kind: "idle"|"checking"|"installing"|"ready"|"current"|"error"|"unsupported", version, checkedAt }
-export let updateState = { kind: "idle", version: null, checkedAt: null };
+// { kind: "idle"|"checking"|"installing"|"ready"|"current"|"error"|"unsupported", version, checkedAt, reason }
+export let updateState = { kind: "idle", version: null, checkedAt: null, reason: null };
 
 /* Ask the controlling worker which VERSION it is running. */
 function swVersion() {
@@ -47,16 +47,26 @@ function whenSettled(worker) {
    as render.js's own dataSync: a plain object mutated, then render() called
    by whoever changed it). */
 export async function checkForUpdate(onChange) {
-  if (!("serviceWorker" in navigator) || IS_LOCAL_DEV) {
-    updateState = { ...updateState, kind: "unsupported" };
+  if (!("serviceWorker" in navigator)) {
+    updateState = { ...updateState, kind: "unsupported", reason: "no-api" };
+    onChange();
+    return;
+  }
+  if (IS_LOCAL_DEV) {
+    updateState = { ...updateState, kind: "unsupported", reason: "local-dev" };
     onChange();
     return;
   }
   updateState = { ...updateState, kind: "checking" };
   onChange();
   try {
+    /* .ready waits for an in-flight registration to settle; without it,
+       getRegistration() can lose the race right after boot.js's
+       register() call and come back empty, which read as "unsupported"
+       on an installed PWA that in fact has a service worker. */
+    await navigator.serviceWorker.ready;
     const reg = await navigator.serviceWorker.getRegistration();
-    if (!reg) { updateState = { ...updateState, kind: "unsupported" }; onChange(); return; }
+    if (!reg) { updateState = { ...updateState, kind: "unsupported", reason: "no-registration" }; onChange(); return; }
     await reg.update();
     const incoming = reg.installing || reg.waiting;
     if (!incoming) {
@@ -105,6 +115,8 @@ export function updateStatusLines() {
   else if (updateState.kind === "ready") lines.push(["ok", "New version ready"]);
   else if (updateState.kind === "current") lines.push(["ok", "Up to date"]);
   else if (updateState.kind === "error") lines.push(["error", "Check failed. Try again when you have signal."]);
+  else if (updateState.kind === "unsupported" && updateState.reason === "no-api") lines.push(["muted", "This browser has no update mechanism"]);
+  else if (updateState.kind === "unsupported" && updateState.reason === "no-registration") lines.push(["error", "No service worker found. Try closing and reopening the app."]);
   else if (updateState.kind === "unsupported" || IS_LOCAL_DEV) lines.push(["muted", "Updates apply on reload here"]);
   else if (!updateState.checkedAt) lines.push(["muted", "Not checked yet"]);
   if (updateState.kind !== "ready" && updateState.checkedAt) {
