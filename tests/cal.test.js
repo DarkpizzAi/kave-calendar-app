@@ -2,7 +2,7 @@ import { test, eq, ok } from "./run.js";
 import { weekRows, indexByDay, tappable, zoomWeekTarget, zoomMonthTarget, isAway, isBig, awayText,
   shouldLoadMore, nextCount, iconsOf, searchEvents, todaysCount, fullPastWeeks, fullPastMonths,
   backToTodayState, eventsInMonth, tripCityFor, defaultCity, hideCancelled,
-  hasOpenTodos, guestsExcludingViewer, statusGuestsLine, heatFill } from "../js/cal-model.js";
+  hasOpenTodos, guestsExcludingViewer, statusGuestsLine, monthGrid, glanceBusy } from "../js/cal-model.js";
 import { readPrefs, byCategories } from "../js/prefs.js";
 
 const ev = (id, start, extra = {}) => ({ id, title: id, start, end: null, owner: "shared", status: "planned", activities: [], ...extra });
@@ -222,25 +222,32 @@ test("cal: statusGuestsLine never repeats the status -- guests alone, or empty",
   eq(statusGuestsLine(null), "");
 });
 
-/* ---- F61 (corrects F58/F12): the heat-strip fill reads from whatever
-   accessor is passed in -- calendar.js passes frame.onAll (unfiltered, the
-   same source "N plans" already uses), never frame.on (category-filtered),
-   so a hidden category's day still lights up. ---- */
-test("cal: heatFill colours a day from the given accessor, unfiltered by category when that accessor is unfiltered", () => {
-  const mine = ev("m", "2026-11-05", { owner: "isa" });
-  const other = ev("o", "2026-11-06", { owner: "hugo" });
-  const onAll = (d) => (d === "2026-11-05" ? [mine] : d === "2026-11-06" ? [other] : []);
-  eq(heatFill(onAll, "2026-11-05", true, "isa"), "mine", "current month, viewer's own event");
-  eq(heatFill(onAll, "2026-11-06", true, "isa"), "other", "current month, another person only");
-  eq(heatFill(onAll, "2026-11-07", true, "isa"), "", "current month, empty day");
-  eq(heatFill(onAll, "2026-11-05", false, "isa"), "future", "future month, viewer's own event -- accent fade");
-  eq(heatFill(onAll, "2026-11-06", false, "isa"), "", "future month, another person only -- unfilled, not a separate grey");
-  eq(heatFill(onAll, "2026-11-07", false, "isa"), "", "future month, empty day");
-  /* the point of F61: pass an accessor that ignores the category filter
-     (frame.onAll), and a hidden-category event still fills -- the caller
-     (calendar.js) is responsible for choosing onAll over on for this. */
-  const onFiltered = () => []; // simulates a category-hidden day under frame.on
-  eq(heatFill(onFiltered, "2026-11-05", true, "isa"), "", "if the caller passed the filtered accessor, the day would wrongly read empty -- onAll must be what's wired up in calendar.js");
+/* ---- Glance redesign: monthGrid (a real 6x7 Monday-first grid) and
+   glanceBusy (mine/other/"" fill) replace the old heat-strip's monthGrid-
+   less day loop and heatFill's mine/other/future rule. ---- */
+test("cal: monthGrid: a real 6x7 grid, Monday-first, blank pad cells", () => {
+  const rows = monthGrid(2026, 8); // September 2026: 1st is a Tuesday
+  eq(rows.length, 5, "Sep 2026 needs exactly 5 rows (30 days, starts Tue)");
+  eq(rows[0], [null, "2026-09-01", "2026-09-02", "2026-09-03", "2026-09-04", "2026-09-05", "2026-09-06"]);
+  eq(rows[4], ["2026-09-28", "2026-09-29", "2026-09-30", null, null, null, null]);
+});
+test("cal: monthGrid: a month that already starts on Monday has no leading pad", () => {
+  const rows = monthGrid(2026, 5); // June 2026: 1st is a Monday
+  eq(rows[0][0], "2026-06-01");
+});
+test("cal: glanceBusy: mine/joint wins over another person's item on the same day", () => {
+  const mine = ev("a", "2026-09-26", { owner: "isa" }), other = ev("b", "2026-09-26", { owner: "hugo" });
+  const onMixed = (d) => (d === "2026-09-26" ? [mine, other] : []);
+  eq(glanceBusy(onMixed, "2026-09-26", "isa"), "mine");
+  eq(glanceBusy(onMixed, "2026-09-26", "hugo"), "mine", "hugo's own event still wins for hugo");
+});
+test("cal: glanceBusy: another person's item alone reads as 'other'", () => {
+  const other = ev("b", "2026-09-26", { owner: "hugo" });
+  const on = (d) => (d === "2026-09-26" ? [other] : []);
+  eq(glanceBusy(on, "2026-09-26", "isa"), "other");
+});
+test("cal: glanceBusy: nothing at all is the empty string", () => {
+  eq(glanceBusy(() => [], "2026-09-26", "isa"), "");
 });
 
 /* ---- F38: does this event have at least one open to-do ---- */

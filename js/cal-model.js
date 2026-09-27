@@ -225,17 +225,32 @@ export function statusGuestsLine(guestsText) {
   return guestsText || "";
 }
 
-/* F61 (corrects F58/F12): the Yearly heat-strip squares must not respect
-   the category filter -- same reasoning as F20's "N plans", which already
-   reads from the unfiltered accessor. `on` here is meant to be
-   frame.onAll, not frame.on; the itemised lines below the squares are the
-   only thing that stays category-filtered (calendar.js passes frame.on
-   for those, unchanged). Pure so the fill rule is tested without a DOM. */
-export function heatFill(on, d, isCurrentMonth, me) {
+/* Glance: a real 6x7 month grid, Monday-first, blank pad cells for days
+   outside the month (spec section 7 -- computed, never hand-guessed). */
+export function monthGrid(year, monthIndex) {
+  const first = new Date(Date.UTC(year, monthIndex, 1));
+  const lead = (first.getUTCDay() + 6) % 7; // Monday = 0
+  const daysInMonth = new Date(Date.UTC(year, monthIndex + 1, 0)).getUTCDate();
+  const pad2 = (n) => String(n).padStart(2, "0");
+  const cells = [];
+  for (let i = 0; i < lead; i++) cells.push(null);
+  for (let d = 1; d <= daysInMonth; d++) cells.push(`${year}-${pad2(monthIndex + 1)}-${pad2(d)}`);
+  while (cells.length % 7 !== 0) cells.push(null);
+  const rows = [];
+  for (let i = 0; i < cells.length; i += 7) rows.push(cells.slice(i, i + 7));
+  return rows;
+}
+
+/* Glance's busy fill: mine/joint (grey, solid) wins over another person's
+   item alone (grey, faded by CSS opacity) on the same day; nothing at all
+   is "" (plain panel, no fill). No "future month" distinction any more --
+   the redesigned Glance colours every month's busy days the same way,
+   unlike the old heat-strip this replaces (F58/F61's now-retired rule). */
+export function glanceBusy(on, d, me) {
   const evs = on(d);
   const mine = evs.some((e) => e.owner === me || e.owner === "shared");
-  if (isCurrentMonth) return mine ? "mine" : evs.length ? "other" : "";
-  return mine ? "future" : "";
+  if (mine) return "mine";
+  return evs.length ? "other" : "";
 }
 
 const fold = (s) => String(s || "").toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
