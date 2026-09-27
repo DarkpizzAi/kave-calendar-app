@@ -125,17 +125,17 @@ function renderSettings() {
     ${opener("Calendar defaults", "set-defaults", defaultsSummary(prefs))}
     ${me ? opener("Categories", "set-cats", categoriesSummary(prefs, me)) : ""}
     ${opener("Free time", "set-freetime", freeTimeSummary(prefs))}
-    ${field("Who am I", choices("me", [["isa", "Isa"], ["hugo", "Hugo"]], me), "Stamps every edit you make. Nothing is saved until it is set.")}
     ${field("Sync", `<div class="sync-status"><p class="sync-line ${dot}"><i></i>${escapeHtml(syncLine)}</p>${when ? `<p class="sync-line muted">${escapeHtml(when)}</p>` : ""}</div>`
       + `<button id="syncNow"${s.token ? "" : " disabled"}>Sync now</button>`)}
     <div class="advanced-block">
       <button class="adv-toggle" id="advToggle" aria-expanded="${advancedOpen}" aria-controls="advFields"><span class="caret">${advancedOpen ? "&#9662;" : "&#9656;"}</span> Advanced settings</button>
       <div class="fields" id="advFields"${advancedOpen ? "" : " hidden"}>
+        ${field('<label for="appLink">App link</label>', `<div class="token-row"><input id="appLink" type="text" value="${escapeHtml(APP_URL)}" readonly><button id="copyAppLink">Copy</button></div>`,
+          "Open Compass on another device: copy this and send it to your phone.")}
+        ${field("Who am I", choices("me", [["isa", "Isa"], ["hugo", "Hugo"]], me), "Stamps every edit you make. Nothing is saved until it is set.")}
         ${field('<label for="tokenInput">GitHub token</label>', `<div class="token-row"><input id="tokenInput" type="password" placeholder="${s.token ? "Token saved" : "github_pat_..."}"`
           + ` autocomplete="off" autocapitalize="off" spellcheck="false" enterkeyhint="done"><button id="clearToken"${s.token ? "" : " disabled"}>Clear</button></div>${tok}`,
           "Stored on this device only, sent only to GitHub. Fine-grained, Contents: read and write on kave-hub.")}
-        ${field('<label for="appLink">App link</label>', `<div class="token-row"><input id="appLink" type="text" value="${escapeHtml(APP_URL)}" readonly><button id="copyAppLink">Copy</button></div>`,
-          "Open Compass on another device: copy this and send it to your phone.")}
         ${field("About", `<div class="sync-status">${updLines}</div>`
           + `<button id="updateBtn"${updateBusy() ? " disabled" : ""}>${escapeHtml(updateButtonText())}</button>${diag}`,
           "The household planner. Data in kave-hub; the mini PC runs the sweeps.")}

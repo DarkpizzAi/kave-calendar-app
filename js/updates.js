@@ -60,11 +60,6 @@ export async function checkForUpdate(onChange) {
   updateState = { ...updateState, kind: "checking" };
   onChange();
   try {
-    /* .ready waits for an in-flight registration to settle; without it,
-       getRegistration() can lose the race right after boot.js's
-       register() call and come back empty, which read as "unsupported"
-       on an installed PWA that in fact has a service worker. */
-    await navigator.serviceWorker.ready;
     const reg = await navigator.serviceWorker.getRegistration();
     if (!reg) { updateState = { ...updateState, kind: "unsupported", reason: "no-registration" }; onChange(); return; }
     await reg.update();
