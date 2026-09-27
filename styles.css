@@ -409,8 +409,7 @@ a.ticket{color:inherit;text-decoration:none}
 .bsq2.today .lbl{color:var(--accent-text)}
 .bsq2.clear{background:var(--good-tx);color:var(--good-bg)}
 .bsq2.clear .lbl{color:var(--good-bg)}
-.bsq2.open{background:var(--good-bg);color:var(--good-tx)}
-.bsq2.open .lbl{color:var(--good-tx)}
+.bsq2.open{border:2px solid var(--good-tx)}
 .werect{background:var(--surface-2);border-radius:var(--r-card);min-height:64px;padding:6px var(--sp-2);display:flex;flex-direction:column;gap:3px;cursor:pointer;margin-bottom:var(--sp-2)}
 .werect:last-child{margin-bottom:0}
 .werect .lbl{font-size:var(--fs-micro);font-weight:500;color:var(--text-dim)}
@@ -418,8 +417,7 @@ a.ticket{color:inherit;text-decoration:none}
 .werect.today .lbl{color:var(--accent-text)}
 .werect.clear{background:var(--good-tx);color:var(--good-bg)}
 .werect.clear .lbl{color:var(--good-bg)}
-.werect.open{background:var(--good-bg);color:var(--good-tx)}
-.werect.open .lbl{color:var(--good-tx)}
+.werect.open{border:2px solid var(--good-tx)}
 /* agenda: one grey rectangle per day, every day, always -- an empty day is
    just a day card with nothing in it, never skipped, never a placeholder line */
 .daycard{background:var(--surface-2);border-radius:var(--r-card);padding:6px var(--sp-2);margin-bottom:var(--sp-2);cursor:pointer}
@@ -429,8 +427,7 @@ a.ticket{color:inherit;text-decoration:none}
 .daycard.today > .cd{color:var(--accent-text)}
 .daycard.clear{background:var(--good-tx);color:var(--good-bg)}
 .daycard.clear > .cd{color:var(--good-bg)}
-.daycard.open{background:var(--good-bg);color:var(--good-tx)}
-.daycard.open > .cd{color:var(--good-tx)}
+.daycard.open{border:2px solid var(--good-tx)}
 /* glance: a real Monday-first month grid, blank pad cells outside the month.
    No card: just the squares, month to month, with no boxed container or
    border around the group. */
@@ -463,8 +460,7 @@ a.ticket{color:inherit;text-decoration:none}
 .dsq.today .more{background:var(--accent-text)}
 .dsq.clear{background:var(--good-tx)}
 .dsq.clear .num{color:var(--good-bg)}
-.dsq.open{background:var(--good-bg)}
-.dsq.open .num{color:var(--good-tx)}
+.dsq.open{border:2px solid var(--good-tx)}
 /* search */
 .hint{margin:0;color:var(--text-dim);font-size:var(--fs-meta)}
 .card{background:var(--panel);border-radius:var(--r-card);padding:var(--sp-3)}

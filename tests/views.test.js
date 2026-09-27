@@ -20,14 +20,15 @@ test("load range: 1 January back, end of the year after next forward, or the las
   eq(loadRange("2026-09-24", "2029-05-02"), { min: "2026-01-01", max: "2029-05-02" });
 });
 
-/* ---- free weekends: current and next month only ---- */
-test("a free weekend shows on its Saturday, this month and next only", () => {
+/* ---- free weekends: any future one, not the one underway ---- */
+test("a free weekend shows on its Saturday, however far out, as long as it's still ahead", () => {
   const blocksAll = () => true;
   const blocksNothing = () => false;
   const events = [ev("a", "2026-10-03")];
   eq(freeWeekendSaturday("2026-09-21", on(events), "2026-09-24", blocksAll), "2026-09-26");
   eq(freeWeekendSaturday("2026-09-28", on(events), "2026-09-24", blocksAll), null);
-  eq(freeWeekendSaturday("2026-11-23", on([]), "2026-09-24", blocksAll), null);
+  eq(freeWeekendSaturday("2026-11-23", on([]), "2026-09-24", blocksAll), "2026-11-28",
+     "a free weekend months out still shows, not just this month or next");
   eq(freeWeekendSaturday("2026-09-21", on([ev("b", "2026-09-26")]), "2026-09-24", blocksNothing), "2026-09-26",
      "a non-blocking event on the Saturday itself doesn't stop it reading as free");
   eq(freeWeekendSaturday("2026-09-21", on([]), "2026-09-28", blocksAll), null,
@@ -93,7 +94,8 @@ test("weekFreeNote: a plain free weekend note attaches to the Saturday", () => {
      happen to fall near this week */
   const blocksAll = () => true;
   eq(weekFreeNote("2026-09-21", {}, on([]), "2026-09-24", blocksAll), { on: "2026-09-26", text: "Free weekend" });
-  eq(weekFreeNote("2026-11-16", {}, on([]), "2026-09-24", blocksAll), null, "outside the current/next month freeWeekendSaturday itself checks");
+  eq(weekFreeNote("2026-11-16", {}, on([]), "2026-09-24", blocksAll), { on: "2026-11-21", text: "Free weekend" },
+     "a free weekend months out still gets its note");
 });
 test("weekFreeNote: a long weekend or opportunity starting inside this week takes priority", () => {
   const blocksAll = () => true;
