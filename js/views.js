@@ -31,13 +31,10 @@ export function loadRange(today, lastEventDay, floorYear) {
   return { min: from + "-01-01", max: lastEventDay && lastEventDay > max ? lastEventDay : max };
 }
 
-/* ---- free weekends (Monthly): the current and the next month only ---- */
+/* ---- free weekends (Monthly): any future one, not the one underway ---- */
 export function freeWeekendSaturday(monday, eventsOn, today, blocks) {
   const sat = addDays(monday, 5);
   if (sat <= today) return null;
-  const thisMonth = today.slice(0, 7);
-  const next = addDays(thisMonth + "-28", 7).slice(0, 7);
-  if (![thisMonth, next].includes(sat.slice(0, 7))) return null;
   return [4, 5, 6].every((k) => !eventsOn(addDays(monday, k)).some(blocks)) ? sat : null;
 }
 
@@ -51,7 +48,7 @@ export function dayFreeState(day, eventsOn, blocks) {
 }
 
 /* One week's worth of free-window note, for Grid: a plain free weekend
-   (Saturday, current/next month only, same as Agenda's own note) if there
+   (Saturday, any week still ahead, same as Agenda's own note) if there
    is one, else a long weekend or opportunity whose block *starts* inside
    this Monday-to-Sunday week (Yearly/Glance's own longWeekends, scoped to
    this one week's dates instead of a whole month). Long weekend takes
