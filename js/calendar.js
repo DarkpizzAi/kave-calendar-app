@@ -113,7 +113,7 @@ function controls() {
     + VIEWS.map((v) => `<button role="tab" aria-selected="${S.view === v}" data-act="view" data-v="${v}">${v[0].toUpperCase() + v.slice(1)}</button>`).join("") + "</div>";
   const detail = `<button class="ib" data-act="menu" aria-label="Detail level" aria-expanded="${S.menu}">${ICON.eye}</button>`;
   const catsOn = store.state.settings.categoriesOn !== false;
-  const cats = `<button class="ib${catsOn ? " on" : ""}" data-act="cats" aria-label="Categories" aria-pressed="${catsOn}">${ICON.tag}</button>`;
+  const cats = `<button class="ib" data-act="cats" aria-label="Categories" aria-pressed="${catsOn}">${ICON.grid4}</button>`;
   const free = `<button class="ib${S.freeOn ? " on" : ""}" data-act="free" aria-label="Highlight free time" aria-pressed="${S.freeOn}">${ICON.star}</button>`;
   /* F29: "load older" is now one of three inline control buttons, sitting
      between detail and search, not a floating round button (F6's mechanism
