@@ -23,14 +23,14 @@ import { readPrefs, byCategories, eventBlocksFreeTime } from "./prefs.js";
 
 const MONTHS = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
 const DOW = ["MON", "TUE", "WED", "THU", "FRI", "SAT", "SUN"];
-export const VIEWS = ["weekly", "monthly", "yearly"];
+export const VIEWS = ["glance", "grid", "agenda"];
 const WIDE = "(min-width: 900px)";
 
 /* Transient UI state: not persisted, reset when the app opens. The defaults
    come from Settings. */
 const S = {
   view: null, detail: null, fromView: null, slide: "",
-  past: { weekly: 0, monthly: 0, yearly: 0 }, future: { weekly: 10, monthly: 10, yearly: 15 },
+  past: { glance: 0, grid: 0, agenda: 0 }, future: { glance: 15, grid: 10, agenda: 10 },
   searchOpen: false, query: "", menu: false,
   scrollTo: null, keepAnchor: false, pending: false,
   /* older years, loaded on demand: the oldest year shown, and whether
@@ -43,7 +43,7 @@ let frame = null;        // what this draw is built from; rebuilt every draw
 
 function prefs() {
   const s = store.state.settings;
-  if (!S.view) S.view = VIEWS.includes(s.defaultView) ? s.defaultView : "weekly";
+  if (!S.view) S.view = VIEWS.includes(s.defaultView) ? s.defaultView : "glance";
   if (!S.detail) S.detail = ["full", "partial", "minimal"].includes(s.defaultDetail) ? s.defaultDetail : "full";
   return { me: s.me, style: s.cardStyle === "icons" ? "icons" : "lines" };
 }
@@ -187,9 +187,9 @@ function weekBlocks(from, count, kind) {
     /* Weekly heads a month where its 1st falls; Monthly files a week under
        the month of its Thursday, so no week shows twice. */
     const first = [0, 1, 2, 3, 4, 5, 6].map((k) => addDays(m, k)).find((x) => x.slice(8) === "01");
-    const monthOf = kind === "weekly" ? (first || m) : monthOfWeek(m) + "-01";
-    if (monthOf.slice(0, 7) !== cur && (i === 0 || first || kind === "monthly")) { cur = monthOf.slice(0, 7); out += monthHead(monthOf); }
-    out += kind === "weekly" ? weekRow(m) : weekCard(m);
+    const monthOf = kind === "grid" ? (first || m) : monthOfWeek(m) + "-01";
+    if (monthOf.slice(0, 7) !== cur && (i === 0 || first || kind === "agenda")) { cur = monthOf.slice(0, 7); out += monthHead(monthOf); }
+    out += kind === "grid" ? weekRow(m) : weekCard(m);
   }
   return out;
 }
@@ -266,7 +266,7 @@ function monthCard(y, mo) {
 }
 function yearly() {
   const y0 = Number(frame.thisYear), m0 = Number(frame.today.slice(5, 7)) - 1;
-  const shown = pastMonths(frame.today, S.floor, S.past.yearly);
+  const shown = pastMonths(frame.today, S.floor, S.past.glance);
   let past = "", pastYear = null;
   for (const ym of shown) {
     const y = Number(ym.slice(0, 4));
@@ -274,7 +274,7 @@ function yearly() {
     past += monthCard(y, Number(ym.slice(5, 7)) - 1);
   }
   let future = "", curYear = pastYear;
-  for (let y = y0, mo = m0, n = 0; ymOf(y, mo) + "-01" <= frame.range.max && n < S.future.yearly; n++) {
+  for (let y = y0, mo = m0, n = 0; ymOf(y, mo) + "-01" <= frame.range.max && n < S.future.glance; n++) {
     if (y !== curYear) { future += yearHead(y); curYear = y; }
     future += monthCard(y, mo);
     if (++mo === 12) { mo = 0; y++; }
@@ -297,7 +297,7 @@ function searchPage() {
 const asked = new Set();
 function ensureYears() {
   const want = new Set([frame.thisYear, String(Number(frame.thisYear) + 1)]);
-  if (S.view === "yearly") for (let i = 0; i < S.future.yearly; i += 12) want.add(String(Number(frame.thisYear) + 1 + i / 12));
+  if (S.view === "glance") for (let i = 0; i < S.future.glance; i += 12) want.add(String(Number(frame.thisYear) + 1 + i / 12));
   else want.add(addDays(frame.thisMonday, 7 * S.future[S.view]).slice(0, 4));
   for (const y of want) if (!asked.has(y) && y <= frame.range.max.slice(0, 4)) {
     asked.add(y);
@@ -318,7 +318,7 @@ export function calendarHtml() {
   frame = buildFrame();
   ensureYears();
   if (S.searchOpen) return `<div class="page">${controls()}${searchPage()}</div>`;
-  const v = S.view === "yearly" ? yearly() : weeks(S.view);
+  const v = S.view === "glance" ? yearly() : weeks(S.view);
   return `<div class="page">${controls()}<div class="content ${S.slide}">${v.past}${todayAnchor()}${v.future}</div></div>`;
 }
 
@@ -364,9 +364,9 @@ export function scrollToTop() {
 /* Only a real scroll event calls this, never a draw. */
 function loadMore(mn) {
   if (!frame) return;
-  const cap = S.view === "yearly" ? yearlyCap() : weeksCap();
+  const cap = S.view === "glance" ? yearlyCap() : weeksCap();
   if (!shouldLoadMore(mn, { count: S.future[S.view], cap, pending: S.pending, searching: S.searchOpen })) return;
-  S.future[S.view] = nextCount(S.future[S.view], S.view === "yearly" ? 6 : 8, cap);
+  S.future[S.view] = nextCount(S.future[S.view], S.view === "glance" ? 6 : 8, cap);
   S.pending = true;
   setTimeout(() => { S.pending = false; ctx.render(); }, 0);
 }
@@ -406,11 +406,11 @@ async function loadAllOlder() {
    already starts there); a further tap once that is fully shown loads the
    year before it from kave-hub, then reveals that too, in one go each time. */
 async function loadOlderFull() {
-  if (S.view === "yearly") {
+  if (S.view === "glance") {
     const need = fullPastMonths(frame.today, S.floor);
-    if (S.past.yearly < need) { S.past.yearly = need; S.keepAnchor = true; ctx.render(); return; }
+    if (S.past.glance < need) { S.past.glance = need; S.keepAnchor = true; ctx.render(); return; }
     if (!(await loadOlder())) { ctx.render(); return; }
-    S.past.yearly = fullPastMonths(frame.today, S.floor);
+    S.past.glance = fullPastMonths(frame.today, S.floor);
   } else {
     const need = fullPastWeeks(frame.thisMonday, S.floor);
     if (S.past[S.view] < need) { S.past[S.view] = need; S.keepAnchor = true; ctx.render(); return; }
@@ -467,8 +467,8 @@ function onClick(e) {
   /* F29: "load older" is now one of the inline control buttons, not a
      floating round button; same loadOlderFull mechanism (F6/F7). */
   else if (a === "older") loadOlderFull();
-  else if (a === "zoomweek") { e.stopPropagation(); setView("monthly", zoomWeekTarget(b.dataset.m)); }
-  else if (a === "zoommonth") setView("monthly", zoomMonthTarget(b.dataset.ym));
+  else if (a === "zoomweek") { e.stopPropagation(); setView("agenda", zoomWeekTarget(b.dataset.m)); }
+  else if (a === "zoommonth") setView("agenda", zoomMonthTarget(b.dataset.ym));
   else if (a === "day") openLevel({ kind: "day", d: b.dataset.d });
   else if (a === "week") openLevel({ kind: "week", m: b.dataset.m });
   else if (a === "event") { e.stopPropagation(); openLevel({ kind: "event", id: b.dataset.id }); }
