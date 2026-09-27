@@ -31,7 +31,7 @@ const WIDE = "(min-width: 900px)";
 const S = {
   view: null, detail: null, fromView: null, slide: "",
   past: { glance: 0, grid: 0, agenda: 0 }, future: { glance: 15, grid: 10, agenda: 10 },
-  searchOpen: false, query: "", menu: false,
+  searchOpen: false, freeOn: false, query: "", menu: false,
   scrollTo: null, keepAnchor: false, pending: false,
   /* older years, loaded on demand: the oldest year shown, and whether
      kave-hub has anything older */
@@ -114,6 +114,7 @@ function controls() {
   const views = `<div class="segment" role="tablist"><span class="seg-thumb" style="--i:${idx};--from:${from}"></span>`
     + VIEWS.map((v) => `<button role="tab" aria-selected="${S.view === v}" data-act="view" data-v="${v}">${v[0].toUpperCase() + v.slice(1)}</button>`).join("") + "</div>";
   const detail = `<button class="ib" data-act="menu" aria-label="Detail level" aria-expanded="${S.menu}">${ICON.eye}</button>`;
+  const free = `<button class="ib${S.freeOn ? " on" : ""}" data-act="free" aria-label="Highlight free time" aria-pressed="${S.freeOn}">${ICON.star}</button>`;
   /* F29: "load older" is now one of three inline control buttons, sitting
      between detail and search, not a floating round button (F6's mechanism
      is unchanged, only where its trigger sits); its icon is an archive box. */
@@ -124,7 +125,7 @@ function controls() {
   const menu = S.menu ? `<div class="menu"><p class="mt">Detail level</p>${[["full", "Full"], ["partial", "Partial"], ["minimal", "Minimal"]]
     .map(([k, l]) => `<button class="opt${S.detail === k ? " on" : ""}" data-act="detail" data-v="${k}">${l}</button>`).join("")}`
     + '<p class="mh">Full: both of you. Partial: the other person greyed. Minimal: yours and shared only.</p></div>' : "";
-  return `<div class="ctl${S.searchOpen ? " searching" : ""}">${S.searchOpen ? "" : views}<div class="ctl2">${S.searchOpen ? "" : detail + older}${search}</div>${menu}</div>`;
+  return `<div class="ctl${S.searchOpen ? " searching" : ""}">${S.searchOpen ? "" : views}<div class="ctl2">${S.searchOpen ? "" : free + detail + older}${search}</div>${menu}</div>`;
 }
 
 /* ---- Weekly and Monthly: runs of weeks ---- */
@@ -461,6 +462,7 @@ function onClick(e) {
   const a = b.dataset.act;
   if (a === "view") setView(b.dataset.v);
   else if (a === "menu") { S.menu = !S.menu; ctx.render(); }
+  else if (a === "free") { S.freeOn = !S.freeOn; ctx.render(); }
   else if (a === "detail") { S.detail = b.dataset.v; S.menu = false; ctx.render(); }
   else if (a === "search") { S.searchOpen = true; S.menu = false; ctx.render(); loadAllOlder(); }
   else if (a === "closesearch") { S.searchOpen = false; S.query = ""; ctx.render(); }
