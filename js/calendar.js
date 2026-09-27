@@ -165,6 +165,10 @@ function agendaDay(d, m, freeDays, note) {
   const evs = frame.on(d);
   const away = evs.filter(isAway), rest = evs.filter((e) => !isAway(e));
   const weekend = dayOfWeek(d) >= 5 ? " weekend" : "";
+  /* Sunday is the last day of a Monday-first week: its own margin is the
+     gap the reader should see between two different weeks, distinct from
+     the tighter gap between two days of the same week (below). */
+  const weekEnd = dayOfWeek(d) === 6 ? " week-end" : "";
   const label = `${DOW[dayOfWeek(d)][0]}${DOW[dayOfWeek(d)].slice(1).toLowerCase()} ${Number(d.slice(8))}`;
   const tap = tappable(evs) ? ` role="button" tabindex="0" data-act="day" data-d="${d}"` : "";
   /* A plain free weekend is colour only (Clear/Open, above); only a real
@@ -172,7 +176,7 @@ function agendaDay(d, m, freeDays, note) {
      the day its window opens. */
   const noteLine = (note && note.kind === "long" && note.on === d)
     ? `<li style="--n:1"><span class="c-i">🔍</span><span class="c-t">${esc(note.text)}</span></li>` : "";
-  return `<div class="daycard ${periodState(d, freeDays)}${weekend}" data-week="${m}"${tap}><span class="cd">${label}</span>`
+  return `<div class="daycard ${periodState(d, freeDays)}${weekend}${weekEnd}" data-week="${m}"${tap}><span class="cd">${label}</span>`
     + away.map((e) => `<span class="away${frame.grey.has(e.id) ? " grey" : ""}">${esc(icons(e)[0])} ${esc(awayText(e, frame.thisYear))}</span>`).join("")
     + `<ul class="rows">${rest.map((e) => row(e, false, false)).join("")}${noteLine}</ul></div>`;
 }
