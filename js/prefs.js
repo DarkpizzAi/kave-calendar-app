@@ -30,8 +30,8 @@ const defaultHidden = () => [];
    usually booked and paid for in advance (a trip, a concert, a work
    commitment); casual, easy-to-move plans don't block. */
 export const BLOCKING_DEFAULT = [
-  "transport", "accommodation", "business-trip", "work",
-  "live-music", "clubbing", "cinema", "activity",
+  "live-music", "birthday", "cinema", "activity", "business-trip",
+  "work", "visitor", "transport", "accommodation",
 ];
 
 /* Old view names, still possibly sitting in someone's saved settings from
