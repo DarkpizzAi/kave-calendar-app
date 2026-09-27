@@ -32,7 +32,7 @@ export function readForm(raw) {
 const COST_FOR = {
   transport: "travel/flights", accommodation: "travel/accommodation", eating: "food/eating-out",
   drinks: "leisure/events-nightlife", clubbing: "leisure/events-nightlife", "live-music": "leisure/events-nightlife",
-  cinema: "leisure/culture", theatre: "leisure/culture", activity: "leisure/culture", birthday: "gifts-donations/gifts",
+  cinema: "leisure/culture", activity: "leisure/culture", birthday: "gifts-donations/gifts",
 };
 export function costDefaults(event, me) {
   const a = (event.activities || []).find((x) => COST_FOR[x.type]);

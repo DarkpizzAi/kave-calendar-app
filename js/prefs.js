@@ -31,7 +31,7 @@ const defaultHidden = () => [];
    commitment); casual, easy-to-move plans don't block. */
 export const BLOCKING_DEFAULT = [
   "transport", "accommodation", "business-trip", "work",
-  "live-music", "clubbing", "cinema", "theatre", "activity",
+  "live-music", "clubbing", "cinema", "activity",
 ];
 
 /* Old view names, still possibly sitting in someone's saved settings from
