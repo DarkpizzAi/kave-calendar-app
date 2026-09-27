@@ -34,6 +34,7 @@ export function loadRange(today, lastEventDay, floorYear) {
 /* ---- free weekends (Monthly): the current and the next month only ---- */
 export function freeWeekendSaturday(monday, eventsOn, today, blocks) {
   const sat = addDays(monday, 5);
+  if (sat < today) return null;
   const thisMonth = today.slice(0, 7);
   const next = addDays(thisMonth + "-28", 7).slice(0, 7);
   if (![thisMonth, next].includes(sat.slice(0, 7))) return null;
@@ -65,7 +66,7 @@ export function weekFreeNote(monday, holidays, eventsOn, today, blocks) {
      enough to catch that anchor, while the result is still filtered down to
      only a block that actually starts inside this week. */
   const lw = longWeekends(holidays, addDays(monday, -7), addDays(sunday, 7), eventsOn, blocks)
-    .find((w) => w.start >= monday && w.start <= sunday);
+    .find((w) => w.start >= monday && w.start <= sunday && w.end >= today);
   if (lw) return { on: lw.start, text: lw.text };
   const sat = freeWeekendSaturday(monday, eventsOn, today, blocks);
   return sat ? { on: sat, text: "Free weekend" } : null;
@@ -81,7 +82,7 @@ export function weekFreeNote(monday, holidays, eventsOn, today, blocks) {
 export function weekFreeDays(monday, holidays, eventsOn, today, blocks) {
   const sunday = addDays(monday, 6);
   const lw = longWeekends(holidays, addDays(monday, -7), addDays(sunday, 7), eventsOn, blocks)
-    .find((w) => w.start >= monday && w.start <= sunday);
+    .find((w) => w.start >= monday && w.start <= sunday && w.end >= today);
   if (lw) {
     const days = [];
     for (let d = lw.start; d <= lw.end; d = addDays(d, 1)) if (d >= monday && d <= sunday) days.push(d);

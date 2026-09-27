@@ -30,6 +30,8 @@ test("a free weekend shows on its Saturday, this month and next only", () => {
   eq(freeWeekendSaturday("2026-11-23", on([]), "2026-09-24", blocksAll), null);
   eq(freeWeekendSaturday("2026-09-21", on([ev("b", "2026-09-26")]), "2026-09-24", blocksNothing), "2026-09-26",
      "a non-blocking event on the Saturday itself doesn't stop it reading as free");
+  eq(freeWeekendSaturday("2026-09-21", on([]), "2026-09-28", blocksAll), null,
+     "a free Saturday that has already passed doesn't show, even in the current month");
 });
 
 /* ---- long weekends from bank holidays ---- */
@@ -101,6 +103,11 @@ test("weekFreeNote: a long weekend or opportunity starting inside this week take
 test("weekFreeNote: nothing qualifying this week is null", () => {
   const blocksAll = () => true;
   eq(weekFreeNote("2026-09-21", {}, on([ev("x", "2026-09-26")]), "2026-09-24", blocksAll), null);
+});
+test("weekFreeNote: a long weekend that has already ended is null", () => {
+  const blocksAll = () => true;
+  // block runs 2026-10-10 to 2026-10-12; today is after it ends
+  eq(weekFreeNote("2026-10-05", HOLIDAYS, on([]), "2026-10-13", blocksAll), null);
 });
 
 test("weekFreeDays: a plain free weekend covers only Saturday and Sunday", () => {
