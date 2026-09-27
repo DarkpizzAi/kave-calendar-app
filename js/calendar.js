@@ -15,7 +15,7 @@ import { applyDetail } from "./filter.js";
 import { store } from "./store.js";
 import { indexByDay, tappable, zoomWeekTarget, zoomMonthTarget, isAway, awayText, AWAY,
   shouldLoadMore, nextCount, iconsOf, searchEvents, shortDate, pastMonths, gesture, lastEventDay,
-  fullPastMonths, backToTodayState, todaysCount as cmTodaysCount, hideCancelled,
+  fullPastWeeks, fullPastMonths, backToTodayState, todaysCount as cmTodaysCount, hideCancelled,
   hasLoadedOlder, hasOpenTodos } from "./cal-model.js";
 import { openLevel, sheetOpen } from "./sheet.js";
 import { ICON } from "./chrome-icons.js";
@@ -155,12 +155,9 @@ function agendaDay(d, freeDays) {
     + away.map((e) => `<span class="away${frame.grey.has(e.id) ? " grey" : ""}">${esc(icons(e)[0])} ${esc(awayText(e, frame.thisYear))}</span>`).join("")
     + `<ul class="rows">${rest.map((e) => row(e, false, false)).join("")}</ul></div>`;
 }
-/* Agenda always starts today -- the current week's card never shows a day
-   before it (Isa: "past days don't show up"); every later week still shows
-   all seven, since none of its days can be in the past. */
 function agendaWeek(m) {
   const freeDays = S.freeOn ? new Set(weekFreeDays(m, HOLIDAYS, frame.onAll, frame.today, freeBlocks)) : new Set();
-  const days = [0, 1, 2, 3, 4, 5, 6].map((k) => addDays(m, k)).filter((d) => d >= frame.today);
+  const days = [0, 1, 2, 3, 4, 5, 6].map((k) => addDays(m, k));
   return `<div class="weekCard" data-week="${m}">${days.map((d) => agendaDay(d, freeDays)).join("")}</div>`;
 }
 function weekBlocks(from, count) {
@@ -174,10 +171,13 @@ function weekBlocks(from, count) {
   }
   return out;
 }
-/* Agenda has no past to load -- it never shows a day before today, so
-   there's nothing for "See previous"/"load older" to reveal. */
+/* F6: "See previous" is no longer inline text in the list; it is the
+   floating "load older" button that sits with the floating controls
+   (drawn in calendarHtml/controls). */
 function weeks() {
-  return { past: "", future: weekBlocks(frame.thisMonday, S.future.agenda) };
+  const from = addDays(frame.thisMonday, -7 * S.past.agenda);
+  return { past: weekBlocks(from, S.past.agenda),
+    future: weekBlocks(frame.thisMonday, S.future.agenda) };
 }
 
 /* ---- Grid: a real Monday-first month grid, one card per month ---- */
@@ -381,13 +381,18 @@ async function loadAllOlder() {
 /* F7: one tap loads straight to 1 January of the floor year (the range
    already starts there); a further tap once that is fully shown loads the
    year before it from kave-hub, then reveals that too, in one go each time. */
-/* Grid-only: Agenda always starts today and never shows a day before it, so
-   there is no older button for it to answer (showLoadOlder below). */
 async function loadOlderFull() {
-  const need = fullPastMonths(frame.today, S.floor);
-  if (S.past.grid < need) { S.past.grid = need; S.keepAnchor = true; ctx.render(); return; }
-  if (!(await loadOlder())) { ctx.render(); return; }
-  S.past.grid = fullPastMonths(frame.today, S.floor);
+  if (S.view === "grid") {
+    const need = fullPastMonths(frame.today, S.floor);
+    if (S.past.grid < need) { S.past.grid = need; S.keepAnchor = true; ctx.render(); return; }
+    if (!(await loadOlder())) { ctx.render(); return; }
+    S.past.grid = fullPastMonths(frame.today, S.floor);
+  } else {
+    const need = fullPastWeeks(frame.thisMonday, S.floor);
+    if (S.past[S.view] < need) { S.past[S.view] = need; S.keepAnchor = true; ctx.render(); return; }
+    if (!(await loadOlder())) { ctx.render(); return; }
+    S.past[S.view] = fullPastWeeks(frame.thisMonday, S.floor);
+  }
   S.keepAnchor = true;
   ctx.render();
 }
@@ -398,9 +403,7 @@ function setView(v, target) {
   S.fromView = S.view; S.view = v; S.menu = false;
   if (target) {
     const need = Math.round((Date.parse(frame.thisMonday) - Date.parse(target)) / 6048e5);
-    /* Agenda has no past to extend into -- a target before today just
-       won't have a card to scroll to (Agenda always starts today). */
-    if (need > 0 && v !== "agenda") S.past[v] = Math.max(S.past[v], need + 1);
+    if (need > 0) S.past[v] = Math.max(S.past[v], need + 1);
     S.future[v] = Math.max(S.future[v], -need + 12);
     S.scrollTo = `[data-week="${target}"]`;
   }
@@ -408,9 +411,9 @@ function setView(v, target) {
 }
 
 /* F29: "load older" is now an inline control button (drawn in controls()
-   above, not with the round buttons); hidden while searching (makes no
-   sense mid-search) and in Agenda (nothing older ever shows there). */
-export const showLoadOlder = () => !S.searchOpen && S.view !== "agenda";
+   above, not with the round buttons); hidden while searching, where it
+   makes no sense. */
+export const showLoadOlder = () => !S.searchOpen;
 export { loadOlderFull };
 
 /* F3: the nav icon's badge. Independent of whatever view is drawn (the
