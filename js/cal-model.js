@@ -11,7 +11,7 @@ import { applyDetail } from "./filter.js";
 const DOW = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
 
 /* F62: "Mon 21" in rows -- weekday and day-of-month only, for every year,
-   not just the current one. Yearly's future-year cards used to append the
+   not just the current one. Grid's future-year cards used to append the
    month (and year) here, "Fri 24 Sep 2027" instead of "Fri 24" -- but each
    card already names its own month and year (monthCard's heading,
    yearHead), so repeating it on every line was redundant, and the current
@@ -20,12 +20,6 @@ const DOW = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
    dropping the parameter buys nothing. */
 export function shortDate(day, thisYear) {
   return `${DOW[dayOfWeek(day)]} ${Number(day.slice(8))}`;
-}
-
-/* Weekly: day cards three a row (3, 3, 1), one row of seven when wide. */
-export function weekRows(days, wide) {
-  if (wide) return [days.slice()];
-  return [days.slice(0, 3), days.slice(3, 6), days.slice(6)];
 }
 
 /* day -> events on it, in start order; a span fills every day it covers. */
@@ -42,28 +36,28 @@ export function indexByDay(events) {
 /* Empty is blank and cannot be tapped (spec: day cards, week cards, rows). */
 export const tappable = (events) => events.length > 0;
 
-/* Jumps land the target week at the top of Monthly. */
+/* Jumps land the target week at the top of Agenda. */
 export const zoomWeekTarget = (day) => mondayOf(day);
 export const zoomMonthTarget = (ym) => firstWeekOf(ym);
 
 const has = (e, types) => (e.activities || []).some((a) => types.includes(a.type));
-/* Also prefs.js's single source for Yearly's default-shown categories
-   (F17): the "who is away" set plus "visitor" is what Yearly always meant
+/* Also prefs.js's single source for Grid's default-shown categories
+   (F17): the "who is away" set plus "visitor" is what Grid always meant
    by "big things", so it is exported rather than re-declared. */
 export const AWAY = ["transport", "accommodation", "business-trip"];
 
-/* Monthly's "who is away" line. */
+/* Agenda's "who is away" line. */
 export const isAway = (e) => has(e, AWAY);
 
-/* Yearly's big things: trips away, visitors, business trips; never birthdays. */
+/* Grid's big things: trips away, visitors, business trips; never birthdays. */
 export function isBig(e) {
   if (has(e, ["birthday"])) return false;
   return isAway(e) || has(e, ["visitor"]);
 }
 
-/* F35: a cancelled event is hidden outright in Weekly ("if I really don't
-   want to see them I'll delete them" is Isa's own escape hatch there); Monthly
-   and Yearly keep it visible, struck through instead (calendar.js's cls()
+/* F35: a cancelled event is hidden outright in Grid ("if I really don't
+   want to see them I'll delete them" is Isa's own escape hatch there);
+   Agenda keeps it visible, struck through instead (calendar.js's cls()
    marks it, the CSS strikes only the title). */
 export const hideCancelled = (events, view) => (view === "grid" ? events.filter((e) => e.status !== "cancelled") : events);
 
@@ -76,7 +70,7 @@ export function lastEventDay(events) {
 }
 
 /* F22: a new event defaults its city to Barcelona, unless its date falls
-   within a trip the person is already on -- reusing isAway (Monthly's own
+   within a trip the person is already on -- reusing isAway (Agenda's own
    "away" test, spec section 3) rather than a second definition of "trip".
    `events` need not be pre-filtered: deleted events are skipped here. */
 export function tripCityFor(events, date) {
@@ -131,7 +125,7 @@ export function seePrevious({ from, firstMonday, exhausted }) {
   return exhausted ? "none" : "older";
 }
 
-/* Yearly's past months, oldest first: the last `count` months before this
+/* Grid's past months, oldest first: the last `count` months before this
    one, never before January of the floor year. */
 export function pastMonths(today, floorYear, count) {
   const out = [];
@@ -159,7 +153,7 @@ export function fullPastMonths(today, floorYear) {
    list is back to its normal range (this year on) and pull to refresh works
    again -- the bug was old, loaded years sitting in the DOM state. */
 export function backToTodayState(thisYear) {
-  return { past: { weekly: 0, monthly: 0, yearly: 0 }, floor: thisYear, exhausted: false };
+  return { past: { grid: 0, agenda: 0 }, floor: thisYear, exhausted: false };
 }
 
 /* F3: the Calendar nav icon's badge. Minimal shows only the viewer's own
@@ -171,11 +165,11 @@ export function todaysCount(eventsToday, me, detail) {
   return applyDetail(eventsToday.filter((e) => !e.deleted), me, detail).length;
 }
 
-/* F20: the Yearly month card's own unique-events-in-month collection,
+/* F20: the Grid month card's own unique-events-in-month collection,
    pulled out so it can run once against the filtered index (the card's
    body and the heat-strip, F12/F17, unaffected) and once against an
    unfiltered-by-category index (the "N plans" count, which must match
-   what Monthly actually shows once you jump there -- Isa: category
+   what Agenda actually shows once you jump there -- Isa: category
    filters are a Calendar display choice, not a count that should lie
    about how many plans exist). `on` is a day -> events accessor, same
    shape as a frame's `on`. */
@@ -225,7 +219,7 @@ export function statusGuestsLine(guestsText) {
   return guestsText || "";
 }
 
-/* F61 (corrects F58/F12): the Yearly heat-strip squares must not respect
+/* F61 (corrects F58/F12): the Grid heat-strip squares must not respect
    the category filter -- same reasoning as F20's "N plans", which already
    reads from the unfiltered accessor. `on` here is meant to be
    frame.onAll, not frame.on; the itemised lines below the squares are the

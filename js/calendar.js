@@ -24,13 +24,13 @@ import { readPrefs, byCategories, eventBlocksFreeTime } from "./prefs.js";
 
 const MONTHS = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
 const DOW = ["MON", "TUE", "WED", "THU", "FRI", "SAT", "SUN"];
-export const VIEWS = ["glance", "grid", "agenda"];
+export const VIEWS = ["grid", "agenda"];
 
 /* Transient UI state: not persisted, reset when the app opens. The defaults
    come from Settings. */
 const S = {
   view: null, detail: null, fromView: null, slide: "",
-  past: { glance: 0, grid: 0, agenda: 0 }, future: { glance: 15, grid: 10, agenda: 10 },
+  past: { grid: 0, agenda: 0 }, future: { grid: 15, agenda: 10 },
   searchOpen: false, freeOn: false, query: "", menu: false,
   scrollTo: null, keepAnchor: false, pending: false,
   /* older years, loaded on demand: the oldest year shown, and whether
@@ -43,7 +43,7 @@ let frame = null;        // what this draw is built from; rebuilt every draw
 
 function prefs() {
   const s = store.state.settings;
-  if (!S.view) S.view = VIEWS.includes(s.defaultView) ? s.defaultView : "glance";
+  if (!S.view) S.view = VIEWS.includes(s.defaultView) ? s.defaultView : "grid";
   if (!S.detail) S.detail = ["full", "partial", "minimal"].includes(s.defaultDetail) ? s.defaultDetail : "full";
   return { me: s.me, style: s.cardStyle === "icons" ? "icons" : "lines" };
 }
@@ -55,8 +55,8 @@ function buildFrame() {
   /* the detail level first, then the viewer's categories for this view */
   const detailed = applyDetail(byCategories(ctx.data.events(), readPrefs(store.state.settings), me, S.view), me, S.detail);
   const grey = new Set(detailed.filter((x) => x.grey).map((x) => x.event.id));
-  /* F35: Weekly hides a cancelled event outright; Monthly and Yearly keep it
-     (struck through, cls() below). */
+  /* F35: Grid hides a cancelled event outright; Agenda keeps it (struck
+     through, cls() below). */
   const events = hideCancelled(detailed.map((x) => x.event), S.view);
   const idx = indexByDay(events);
   const last = lastEventDay(events);
@@ -75,8 +75,8 @@ function buildFrame() {
 
 /* ---- pieces ---- */
 const icons = (e) => iconsOf(e, frame.me);
-/* F35: Monthly and Yearly keep a cancelled event visible, title struck
-   through; Weekly never sees one here at all (hideCancelled in buildFrame). */
+/* F35: Agenda keeps a cancelled event visible, title struck through; Grid
+   never sees one here at all (hideCancelled in buildFrame). */
 const cls = (e) => `${frame.grey.has(e.id) ? "grey" : ""}${e.status === "idea" ? " idea" : ""}${e.status === "cancelled" ? " cancelled" : ""}`;
 
 function row(e, withDate, click) {
@@ -122,7 +122,7 @@ function controls() {
   return `<div class="ctl${S.searchOpen ? " searching" : ""}">${S.searchOpen ? "" : views}<div class="ctl2">${S.searchOpen ? "" : free + detail + older}${search}</div>${menu}</div>`;
 }
 
-/* ---- Weekly and Monthly: runs of weeks ---- */
+/* ---- Agenda: a run of weeks ---- */
 /* F54: this heading used to also be F26's sticky-title section boundary
    (data-sec); F26 is fully reverted, so it is back to being just the plain,
    non-sticky "September" heading, drawn once per month. */
@@ -130,58 +130,24 @@ const monthHead = (d) => {
   const label = `${MONTHS[Number(d.slice(5, 7)) - 1]}${d.slice(0, 4) !== frame.thisYear ? " " + d.slice(0, 4) : ""}`;
   return `<h3 class="month">${esc(label)}</h3>`;
 };
-/* Both Grid and Agenda share one card model: a "period card" (one calendar
-   week, var(--panel), black in dark mode) holding one smaller "day card"
-   per day (var(--surface-2), grey, CSS) -- never a border. Today is the one
-   day card whose FILL turns solid accent, always wins over Clear/Open.
-   Free time (S.freeOn) colours Clear/Open only on days that are actually
-   part of a detected free weekend/long weekend/opportunity (weekFreeDays) --
-   never a bare weekday just because nothing happens to land on it. */
-function gridBlocks(e) { return eventBlocksFreeTime(readPrefs(store.state.settings), e); }
+/* Agenda's card model: a "period card" (one calendar week, var(--panel),
+   black in dark mode) holding one smaller "day card" per day
+   (var(--surface-2), grey, CSS) -- never a border. Today is the one day
+   card whose FILL turns solid accent, always wins over Clear/Open. Free
+   time (S.freeOn) colours Clear/Open only on days that are actually part of
+   a detected free weekend/long weekend/opportunity (weekFreeDays) -- never
+   a bare weekday just because nothing happens to land on it. Grid (below)
+   shares the same free-time colouring logic via periodState/freeBlocks, but
+   draws its own month-grid card model. */
+function freeBlocks(e) { return eventBlocksFreeTime(readPrefs(store.state.settings), e); }
 function periodState(d, freeDays) {
   if (d === frame.today) return "today";
   if (!S.freeOn || !freeDays.has(d)) return "";
-  return dayFreeState(d, frame.onAll, gridBlocks) || "";
+  return dayFreeState(d, frame.onAll, freeBlocks) || "";
 }
-function gridLabel(d) {
-  const dow = DOW[dayOfWeek(d)];
-  return `${dow[0]}${dow.slice(1).toLowerCase()} ${Number(d.slice(8))}`;
-}
-/* Up to 4 emoji, 2x2, across every event of the day -- event boundaries
-   don't matter here, only the icons themselves (a weekday square never
-   shows title text, for anyone, at any setting). The 🔍 free-window note
-   joins the same grid when this day opens a window whose first date is a
-   weekday (a Friday bridge day, say) -- weekdays never get the note's text,
-   only its emoji, per spec. */
-function gridEmojis(d, evs, note) {
-  const icons_ = evs.flatMap((e) => icons(e).map((g) => `<span class="ic ${cls(e)}">${esc(g)}</span>`));
-  if (note && note.on === d) icons_.unshift('<span class="ic">🔍</span>');
-  return icons_.slice(0, 4).join("");
-}
-function gridWeekday(d, freeDays, note) {
-  const evs = frame.on(d);
-  const tap = tappable(evs) ? ` role="button" tabindex="0" data-act="day" data-d="${d}"` : "";
-  return `<div class="bsq2 ${periodState(d, freeDays)}"${tap}><span class="lbl">${gridLabel(d)}</span>`
-    + `<span class="emogrid">${gridEmojis(d, evs, note)}</span></div>`;
-}
-function gridWeekend(d, freeDays, note) {
-  const evs = frame.on(d);
-  const tap = tappable(evs) ? ` role="button" tabindex="0" data-act="day" data-d="${d}"` : "";
-  const noteLine = (note && note.on === d) ? `<li style="--n:1"><span class="c-i">🔍</span><span class="c-t">${esc(note.text)}</span></li>` : "";
-  return `<div class="werect ${periodState(d, freeDays)}"${tap}><span class="lbl">${gridLabel(d)}</span>`
-    + `<ul class="rows">${evs.map((e) => row(e, false, false)).join("")}${noteLine}</ul></div>`;
-}
-function weekRow(m) {
-  const days = [0, 1, 2, 3, 4, 5, 6].map((k) => addDays(m, k));
-  const freeDays = S.freeOn ? new Set(weekFreeDays(m, HOLIDAYS, frame.onAll, frame.today, gridBlocks)) : new Set();
-  const note = S.freeOn ? weekFreeNote(m, HOLIDAYS, frame.onAll, frame.today, gridBlocks) : null;
-  const weekdays = days.slice(0, 5).map((d) => gridWeekday(d, freeDays, note)).join("");
-  const weekend = days.slice(5, 7).map((d) => gridWeekend(d, freeDays, note)).join("");
-  return `<div class="gridCard" data-week="${m}"><div class="wk-row2">${weekdays}</div>${weekend}</div>`;
-}
-/* Agenda: the same period-card/day-card model, one grey rectangle per day,
-   every day of the week (never skipped, never a "Nothing planned" line --
-   an empty day is just a day card with nothing in it). */
+/* Agenda: one grey rectangle per day, every day of the week (never skipped,
+   never a "Nothing planned" line -- an empty day is just a day card with
+   nothing in it). */
 function agendaDay(d, freeDays) {
   const evs = frame.on(d);
   const away = evs.filter(isAway), rest = evs.filter((e) => !isAway(e));
@@ -192,40 +158,38 @@ function agendaDay(d, freeDays) {
     + `<ul class="rows">${rest.map((e) => row(e, false, false)).join("")}</ul></div>`;
 }
 function agendaWeek(m) {
-  const freeDays = S.freeOn ? new Set(weekFreeDays(m, HOLIDAYS, frame.onAll, frame.today, gridBlocks)) : new Set();
+  const freeDays = S.freeOn ? new Set(weekFreeDays(m, HOLIDAYS, frame.onAll, frame.today, freeBlocks)) : new Set();
   const days = [0, 1, 2, 3, 4, 5, 6].map((k) => addDays(m, k));
-  return `<div class="gridCard" data-week="${m}">${days.map((d) => agendaDay(d, freeDays)).join("")}</div>`;
+  return `<div class="weekCard" data-week="${m}">${days.map((d) => agendaDay(d, freeDays)).join("")}</div>`;
 }
-function weekBlocks(from, count, kind) {
+function weekBlocks(from, count) {
   let out = "", cur = "";
-  for (let i = 0, m = from; i < count && m <= frame.range.max; i++, m = addDays(m, 7)) {
-    /* Weekly heads a month where its 1st falls; Monthly files a week under
-       the month of its Thursday, so no week shows twice. */
-    const first = [0, 1, 2, 3, 4, 5, 6].map((k) => addDays(m, k)).find((x) => x.slice(8) === "01");
-    const monthOf = kind === "grid" ? (first || m) : monthOfWeek(m) + "-01";
-    if (monthOf.slice(0, 7) !== cur && (i === 0 || first || kind === "agenda")) { cur = monthOf.slice(0, 7); out += monthHead(monthOf); }
-    out += kind === "grid" ? weekRow(m) : agendaWeek(m);
+  for (let m = from, i = 0; i < count && m <= frame.range.max; i++, m = addDays(m, 7)) {
+    /* Monthly files a week under the month of its Thursday, so no week
+       shows twice. */
+    const monthOf = monthOfWeek(m) + "-01";
+    if (monthOf.slice(0, 7) !== cur) { cur = monthOf.slice(0, 7); out += monthHead(monthOf); }
+    out += agendaWeek(m);
   }
   return out;
 }
 /* F6: "See previous" is no longer inline text in the list; it is the
    floating "load older" button that sits with the floating controls
    (drawn in calendarHtml/controls). */
-function weeks(kind) {
-  const from = addDays(frame.thisMonday, -7 * S.past[kind]);
-  return { past: weekBlocks(from, S.past[kind], kind),
-    future: weekBlocks(frame.thisMonday, S.future[kind], kind) };
+function weeks() {
+  const from = addDays(frame.thisMonday, -7 * S.past.agenda);
+  return { past: weekBlocks(from, S.past.agenda),
+    future: weekBlocks(frame.thisMonday, S.future.agenda) };
 }
 
-/* ---- Glance: a real Monday-first month grid, one card per month ---- */
+/* ---- Grid: a real Monday-first month grid, one card per month ---- */
 const ymOf = (y, mo) => `${y}-${String(mo + 1).padStart(2, "0")}`;
 const daysIn = (y, mo) => new Date(Date.UTC(y, mo + 1, 0)).getUTCDate();
 const yearHead = (y) => `<p class="year-big">${y}</p>`;
-function glanceBlocks(e) { return eventBlocksFreeTime(readPrefs(store.state.settings), e); }
 /* Lead-padded, Monday-first cells for one calendar month, chunked into
    real weeks (each row's own Monday, for weekFreeDays) -- padded only to
    the next multiple of 7, never a whole extra blank row. */
-function glanceRows(key, n) {
+function gridRows(key, n) {
   const lead = dayOfWeek(`${key}-01`);
   const cells = [];
   for (let i = 0; i < lead; i++) cells.push(null);
@@ -242,7 +206,7 @@ function glanceRows(key, n) {
    with several activities across several events still shows only the one
    that ranks highest; ties keep whichever was found first. */
 const DAY_PRIORITY = [...AWAY, "work", ...CATEGORIES.map((c) => c.type).filter((t) => !AWAY.includes(t) && t !== "work")];
-function glanceIcon(d) {
+function gridIcon(d) {
   const evs = frame.on(d);
   let best = null, bestRank = Infinity;
   for (const e of evs) {
@@ -257,45 +221,45 @@ function glanceIcon(d) {
   const more = evs.length > 1 ? `<span class="more"></span>` : "";
   return `<span class="emo${grey ? " grey" : ""}">${iconFor(best.a, best.e, frame.me)}</span>${more}`;
 }
-function glanceSquare(d, freeDays) {
+function gridSquare(d, freeDays) {
   if (!d) return `<div class="dsq pad"></div>`;
   const st = periodState(d, freeDays);
-  /* Unlike Grid/Agenda (tappable() -- a day with nothing cannot be
-     tapped), every Glance square opens the single day, empty or not: it
-     is also the entry point for the day-swipe browser in sheet.js, which
-     needs to be able to land on a day with nothing on it. */
+  /* Unlike Agenda (tappable() -- a day with nothing cannot be tapped),
+     every Grid square opens the single day, empty or not: it is also the
+     entry point for the day-swipe browser in sheet.js, which needs to be
+     able to land on a day with nothing on it. */
   /* F16's own glyph, reused rather than re-derived: at least one event
      that day still has an unchecked to-do. */
   const todo = frame.on(d).some(hasOpenTodos) ? `<span class="dtodo" aria-label="Open to-dos">${ICON.checkbox}</span>` : "";
-  return `<div class="dsq ${st}" role="button" tabindex="0" data-act="day" data-d="${d}"><span class="num">${Number(d.slice(8))}</span>${todo}${glanceIcon(d)}</div>`;
+  return `<div class="dsq ${st}" role="button" tabindex="0" data-act="day" data-d="${d}"><span class="num">${Number(d.slice(8))}</span>${todo}${gridIcon(d)}</div>`;
 }
-function glanceMonth(y, mo) {
+function gridMonth(y, mo) {
   const key = ymOf(y, mo), n = daysIn(y, mo), now = key === frame.today.slice(0, 7);
   const label = `${MONTHS[mo].toUpperCase()}${key.slice(0, 4) !== frame.thisYear ? " " + key.slice(0, 4) : ""}`;
-  const rows = glanceRows(key, n).map((r) => {
-    const freeDays = S.freeOn ? new Set(weekFreeDays(r.monday, HOLIDAYS, frame.onAll, frame.today, glanceBlocks)) : new Set();
-    return `<div class="grid7">${r.days.map((d) => glanceSquare(d, freeDays)).join("")}</div>`;
+  const rows = gridRows(key, n).map((r) => {
+    const freeDays = S.freeOn ? new Set(weekFreeDays(r.monday, HOLIDAYS, frame.onAll, frame.today, freeBlocks)) : new Set();
+    return `<div class="grid7">${r.days.map((d) => gridSquare(d, freeDays)).join("")}</div>`;
   }).join("");
   const wdhead = readPrefs(store.state.settings).showWeekdayHeader
     ? `<div class="wdhead">${DOW.map((w) => `<span>${w[0]}</span>`).join("")}</div>` : "";
-  return `<div class="glanceCard${now ? " now" : ""}" data-month="${key}">`
+  return `<div class="gridCard${now ? " now" : ""}" data-month="${key}">`
     + `<p class="mh"><span class="lbl-pill${now ? " on" : ""}">${label}</span></p>`
     + wdhead
     + `<div class="monthgrid">${rows}</div></div>`;
 }
-function glance() {
+function grid() {
   const y0 = Number(frame.thisYear), m0 = Number(frame.today.slice(5, 7)) - 1;
-  const shown = pastMonths(frame.today, S.floor, S.past.glance);
+  const shown = pastMonths(frame.today, S.floor, S.past.grid);
   let past = "", pastYear = null;
   for (const ym of shown) {
     const y = Number(ym.slice(0, 4));
     if (y !== pastYear) { past += yearHead(y); pastYear = y; }
-    past += glanceMonth(y, Number(ym.slice(5, 7)) - 1);
+    past += gridMonth(y, Number(ym.slice(5, 7)) - 1);
   }
   let future = "", curYear = pastYear;
-  for (let y = y0, mo = m0, n = 0; ymOf(y, mo) + "-01" <= frame.range.max && n < S.future.glance; n++) {
+  for (let y = y0, mo = m0, n = 0; ymOf(y, mo) + "-01" <= frame.range.max && n < S.future.grid; n++) {
     if (y !== curYear) { future += yearHead(y); curYear = y; }
-    future += glanceMonth(y, mo);
+    future += gridMonth(y, mo);
     if (++mo === 12) { mo = 0; y++; }
   }
   return { past, future };
@@ -316,7 +280,7 @@ function searchPage() {
 const asked = new Set();
 function ensureYears() {
   const want = new Set([frame.thisYear, String(Number(frame.thisYear) + 1)]);
-  if (S.view === "glance") for (let i = 0; i < S.future.glance; i += 12) want.add(String(Number(frame.thisYear) + 1 + i / 12));
+  if (S.view === "grid") for (let i = 0; i < S.future.grid; i += 12) want.add(String(Number(frame.thisYear) + 1 + i / 12));
   else want.add(addDays(frame.thisMonday, 7 * S.future[S.view]).slice(0, 4));
   for (const y of want) if (!asked.has(y) && y <= frame.range.max.slice(0, 4)) {
     asked.add(y);
@@ -337,7 +301,7 @@ export function calendarHtml() {
   frame = buildFrame();
   ensureYears();
   if (S.searchOpen) return `<div class="page">${controls()}${searchPage()}</div>`;
-  const v = S.view === "glance" ? glance() : weeks(S.view);
+  const v = S.view === "grid" ? grid() : weeks();
   return `<div class="page">${controls()}<div class="content ${S.slide}">${v.past}${todayAnchor()}${v.future}</div></div>`;
 }
 
@@ -383,9 +347,9 @@ export function scrollToTop() {
 /* Only a real scroll event calls this, never a draw. */
 function loadMore(mn) {
   if (!frame) return;
-  const cap = S.view === "glance" ? yearlyCap() : weeksCap();
+  const cap = S.view === "grid" ? yearlyCap() : weeksCap();
   if (!shouldLoadMore(mn, { count: S.future[S.view], cap, pending: S.pending, searching: S.searchOpen })) return;
-  S.future[S.view] = nextCount(S.future[S.view], S.view === "glance" ? 6 : 8, cap);
+  S.future[S.view] = nextCount(S.future[S.view], S.view === "grid" ? 6 : 8, cap);
   S.pending = true;
   setTimeout(() => { S.pending = false; ctx.render(); }, 0);
 }
@@ -425,11 +389,11 @@ async function loadAllOlder() {
    already starts there); a further tap once that is fully shown loads the
    year before it from kave-hub, then reveals that too, in one go each time. */
 async function loadOlderFull() {
-  if (S.view === "glance") {
+  if (S.view === "grid") {
     const need = fullPastMonths(frame.today, S.floor);
-    if (S.past.glance < need) { S.past.glance = need; S.keepAnchor = true; ctx.render(); return; }
+    if (S.past.grid < need) { S.past.grid = need; S.keepAnchor = true; ctx.render(); return; }
     if (!(await loadOlder())) { ctx.render(); return; }
-    S.past.glance = fullPastMonths(frame.today, S.floor);
+    S.past.grid = fullPastMonths(frame.today, S.floor);
   } else {
     const need = fullPastWeeks(frame.thisMonday, S.floor);
     if (S.past[S.view] < need) { S.past[S.view] = need; S.keepAnchor = true; ctx.render(); return; }

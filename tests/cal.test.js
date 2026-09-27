@@ -1,5 +1,5 @@
 import { test, eq, ok } from "./run.js";
-import { weekRows, indexByDay, tappable, zoomWeekTarget, zoomMonthTarget, isAway, isBig, awayText,
+import { indexByDay, tappable, zoomWeekTarget, zoomMonthTarget, isAway, isBig, awayText,
   shouldLoadMore, nextCount, iconsOf, searchEvents, todaysCount, fullPastWeeks, fullPastMonths,
   backToTodayState, eventsInMonth, tripCityFor, defaultCity, hideCancelled,
   hasOpenTodos, guestsExcludingViewer, statusGuestsLine, heatFill } from "../js/cal-model.js";
@@ -8,16 +8,10 @@ import { readPrefs, byCategories, toggleCategory } from "../js/prefs.js";
 const ev = (id, start, extra = {}) => ({ id, title: id, start, end: null, owner: "shared", status: "planned", activities: [], ...extra });
 const act = (type, icon) => ({ type, icon });
 
-test("cal: F35 -- a cancelled event is hidden in Weekly, kept (for a struck-through title) in Monthly and Yearly", () => {
+test("cal: F35 -- a cancelled event is hidden in Grid, kept (for a struck-through title) in Agenda", () => {
   const list = [ev("live", "2026-10-01"), ev("dead", "2026-10-01", { status: "cancelled" })];
   eq(hideCancelled(list, "grid").map((e) => e.id), ["live"]);
   eq(hideCancelled(list, "agenda").map((e) => e.id), ["live", "dead"]);
-  eq(hideCancelled(list, "glance").map((e) => e.id), ["live", "dead"]);
-});
-test("cal: week rows are 3-3-1 on a phone, 7 when wide", () => {
-  const days = ["a", "b", "c", "d", "e", "f", "g"];
-  eq(weekRows(days, false), [["a", "b", "c"], ["d", "e", "f"], ["g"]]);
-  eq(weekRows(days, true), [days]);
 });
 test("cal: indexByDay spans multi-day events and skips deleted ones", () => {
   const idx = indexByDay([ev("trip", "2026-10-30", { end: "2026-11-01" }), ev("gone", "2026-10-30", { deleted: true })]);
@@ -84,7 +78,7 @@ test("cal: See previous reveals more, then loads the year before, then stops", (
   eq(seePrevious({ from: "2025-12-29", firstMonday: "2025-12-29", exhausted: false }), "older");
   eq(seePrevious({ from: "2025-12-29", firstMonday: "2025-12-29", exhausted: true }), "none");
 });
-test("cal: Yearly's past months run across years, oldest first", () => {
+test("cal: Grid's past months run across years, oldest first", () => {
   eq(pastMonths("2026-03-10", "2025", 4), ["2025-11", "2025-12", "2026-01", "2026-02"]);
   eq(pastMonths("2026-03-10", "2026", 12), ["2026-01", "2026-02"]);
   eq(pastMonths("2026-03-10", "2025", 0), []);
@@ -108,8 +102,8 @@ test("cal: F53 -- a pull only arms at the true top, not once load older has move
   eq(gesture({ dx: 5, dy: 90, top: true, searching: false, loadedOlder: false }), "pull");
   eq(gesture({ dx: 5, dy: 90, top: true, searching: false, loadedOlder: true }), null,
     "scrollTop<=0 after load older sits at the older content's own top, not today's range");
-  eq(hasLoadedOlder({ weekly: 0, monthly: 0, yearly: 0 }), false);
-  eq(hasLoadedOlder({ weekly: 3, monthly: 0, yearly: 0 }), true);
+  eq(hasLoadedOlder({ grid: 0, agenda: 0 }), false);
+  eq(hasLoadedOlder({ grid: 3, agenda: 0 }), true);
 });
 
 /* ---- deferred minors from the final review ---- */
@@ -149,7 +143,7 @@ test("cal: fullPastWeeks and fullPastMonths reach exactly 1 January of the floor
   eq(fullPastMonths("2026-09-24", "2025"), 20, "January 2025 to August 2026");
 });
 test("cal: Back to today discards the loaded past, the floor resets to this year", () => {
-  eq(backToTodayState("2026"), { past: { weekly: 0, monthly: 0, yearly: 0 }, floor: "2026", exhausted: false });
+  eq(backToTodayState("2026"), { past: { grid: 0, agenda: 0 }, floor: "2026", exhausted: false });
 });
 
 /* ---- F20: "N plans" must not respect the category filters; the heat-strip
@@ -168,8 +162,8 @@ test("cal: F20/F61 -- the plans count and the heat-strip fill both ignore catego
   const drinks = ev("drinks", "2026-10-05", { activities: [act("drinks")] });
   const trip = ev("trip", "2026-10-10", { activities: [act("transport")] });
   const all = [drinks, trip];
-  const prefs = toggleCategory(readPrefs({}), "isa", "glance", "drinks");
-  const filtered = byCategories(all, prefs, "isa", "glance");
+  const prefs = toggleCategory(readPrefs({}), "isa", "grid", "drinks");
+  const filtered = byCategories(all, prefs, "isa", "grid");
   const onAll = (d) => (indexByDay(all).get(d) || []);
   const onFiltered = (d) => (indexByDay(filtered).get(d) || []);
   const count = eventsInMonth(onAll, "2026-10", 31).length;
@@ -179,7 +173,7 @@ test("cal: F20/F61 -- the plans count and the heat-strip fill both ignore catego
   ok(count !== itemisedLines, "the count/heat-strip source and the itemised-lines source now disagree when a category is hidden -- that's F61's whole point");
 });
 
-/* ---- F22: default city, trip-aware -- reuses isAway (Monthly's "away"
+/* ---- F22: default city, trip-aware -- reuses isAway (Agenda's "away"
    test), never a second definition of "trip". ---- */
 test("cal: tripCityFor finds the trip covering a date, city and all", () => {
   const flight = ev("f", "2026-10-01", { activities: [act("transport")], end: "2026-10-05", city: "porto" });
