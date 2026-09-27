@@ -228,6 +228,12 @@ button:disabled { opacity: .5; cursor: default; }
 .sstage{flex:1;min-height:0;position:relative;display:flex;flex-direction:column;overflow:hidden}
 .sbody{flex:1;min-height:0;overflow-y:auto;padding:var(--sp-4);display:flex;flex-direction:column;gap:var(--sp-3)}
 .sbody.leaving{position:absolute;inset:0;pointer-events:none}
+/* Archive: newest at the bottom, scrolled there on open/load, only scrolls
+   up (js/calendar.js pins scrollTop, no CSS direction trick needed) --
+   "Load more" is its own first child so it sits above the oldest month/week
+   shown, exactly where scrolling further up leads. */
+.archive-more{align-self:center;border:0;border-radius:var(--r-pill);background:var(--surface-2);color:var(--text-dim);font:inherit;font-size:var(--fs-ui);font-weight:var(--fw-medium);padding:var(--sp-2) var(--sp-4);margin-bottom:var(--sp-2)}
+.archive-more[disabled]{opacity:.6}
 .sheet.lv-day .sbody,.sheet.lv-event .sbody{padding:0;gap:0}
 /* depth moves vertically: deeper, the old level leaves upwards and the new
    one rises from the bottom; Back reverses */
@@ -311,18 +317,16 @@ a.ticket{color:inherit;text-decoration:none}
    (kave-food-app/styles.css, its Period + Group-by segmented control),
    copied verbatim -- the same component Compass's view toggle has aimed
    at, and missed, for two prior rounds (F30, F36). Adapted only where the
-   spec itself says to: three options, not two, so the thumb's width is
-   calc(33.33% - 3px), not calc(50% - 3px), and its translateX is 0/100/200%
-   -- driven here by --i (0, 1 or 2, set per render in calendar.js) rather
-   than three fixed [data-on] selectors, the same value at each step. */
-/* F69: display:grid with three equal 1fr columns, not flex. Flex's
-   flex:1 1 0 + min-width:0 (Spoon's own construction, F59) actively let a
-   segment shrink below its own label's width, so "Monthly" -- the longest
-   of the three -- truncated to "Mont..." at 375px while "Weekly"/"Yearly"
-   stayed full width. Grid's 1fr tracks default to an auto (content) floor:
-   equal fr tracks are still sized equal to each other, but that shared
-   size is bumped up to whatever the widest cell (Monthly) actually needs,
-   so no cell can truncate and all three stay the same width. */
+   spec itself says to: Grid/Agenda, two options, so the thumb's width is
+   calc(50% - 3px) and its translateX is 0/100% -- driven here by --i (0 or
+   1, set per render in calendar.js) rather than fixed [data-on] selectors,
+   the same value at each step. */
+/* F69: display:grid with equal 1fr columns, not flex. Flex's flex:1 1 0 +
+   min-width:0 (Spoon's own construction, F59) actively let a segment
+   shrink below its own label's width. Grid's 1fr tracks default to an
+   auto (content) floor: equal fr tracks are still sized equal to each
+   other, but that shared size is bumped up to whatever the widest cell
+   ("Agenda") actually needs, so no cell can truncate. */
 /* F65: --ctl-h is the one thing that makes the toggle and the round icon
    buttons equal by construction instead of by two numbers that happen to
    match and then drift -- which is exactly what happened: .segment
@@ -330,15 +334,20 @@ a.ticket{color:inherit;text-decoration:none}
    min-height:44px rule was silently overriding .ib's own height:40px. Per
    the approved round-6 mock-up. */
 :root{--ctl-h:40px}
-.segment{position:relative;display:grid;grid-template-columns:repeat(3,1fr);height:var(--ctl-h);background:var(--surface-2);border-radius:var(--r-pill);padding:3px}
-.seg-thumb{position:absolute;top:3px;bottom:3px;left:3px;width:calc(33.33% - 3px);border-radius:var(--r-pill);background:var(--accent);box-shadow:var(--shadow-card);transform:translateX(calc(var(--i) * 100%));animation:ind var(--motion-base) var(--ease-drag)}
+/* Grid was a third option once (F59/F69 above); since it's gone, this was
+   still reserving a third column's worth of width -- the pill read as too
+   long, with its trailing third empty. Two columns now, and a bit more
+   horizontal padding per button (sp-2 -> sp-4) so "Agenda", the longer
+   label, sits with real breathing room rather than a content-tight fit. */
+.segment{position:relative;display:grid;grid-template-columns:repeat(2,1fr);height:var(--ctl-h);background:var(--surface-2);border-radius:var(--r-pill);padding:3px}
+.seg-thumb{position:absolute;top:3px;bottom:3px;left:3px;width:calc(50% - 3px);border-radius:var(--r-pill);background:var(--accent);box-shadow:var(--shadow-card);transform:translateX(calc(var(--i) * 100%));animation:ind var(--motion-base) var(--ease-drag)}
 @keyframes ind{from{transform:translateX(calc(var(--from) * 100%))}}
 /* F36: matches Spoon's "6 months / all time" toggle's own text size,
    --fs-ui, not --fs-meta. */
 /* F69: no flex/min-width/overflow-ellipsis any more -- .segment is a grid
    now, and grid items stretch to fill their (equal) column with no
    truncation needed. */
-.segment button{position:relative;z-index:1;border:none;background:none;font:inherit;font-size:var(--fs-ui);font-weight:var(--fw-medium);color:var(--text-dim);padding:7px var(--sp-2);min-height:0;border-radius:var(--r-pill);white-space:nowrap}
+.segment button{position:relative;z-index:1;border:none;background:none;font:inherit;font-size:var(--fs-ui);font-weight:var(--fw-medium);color:var(--text-dim);padding:7px var(--sp-4);min-height:0;border-radius:var(--r-pill);white-space:nowrap}
 /* F30/F59: the selected button's text is accent-text on the accent-filled
    thumb -- Compass's toggle is a tablist (aria-selected), not Spoon's plain
    toggle buttons (aria-pressed), so the same rule keys off aria-selected. */
@@ -493,8 +502,10 @@ a.ticket{color:inherit;text-decoration:none}
      existing wide-screen breakpoint (already used just below for .segment's
      own fixed width), not a second invented one. */
   .ctl{flex-wrap:wrap;justify-content:flex-start;width:auto;max-width:518px}
-  .ctl .segment{flex:none;width:380px}
-  .ctl.searching .ctl2{width:380px}
+  /* Was 380px, sized for the three-option segment (F59); two options with
+     the wider per-button padding above need less. */
+  .ctl .segment{flex:none;width:260px}
+  .ctl.searching .ctl2{width:260px}
   .fab.add{right:var(--sp-6)}
   .fab.up,.fab.down{right:var(--sp-6)}
 }
