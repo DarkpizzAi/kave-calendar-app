@@ -32,6 +32,8 @@ test("a free weekend shows on its Saturday, this month and next only", () => {
      "a non-blocking event on the Saturday itself doesn't stop it reading as free");
   eq(freeWeekendSaturday("2026-09-21", on([]), "2026-09-28", blocksAll), null,
      "a free Saturday that has already passed doesn't show, even in the current month");
+  eq(freeWeekendSaturday("2026-09-21", on([]), "2026-09-26", blocksAll), null,
+     "today being the Saturday itself is enough to stop it showing");
 });
 
 /* ---- long weekends from bank holidays ---- */
@@ -104,10 +106,11 @@ test("weekFreeNote: nothing qualifying this week is null", () => {
   const blocksAll = () => true;
   eq(weekFreeNote("2026-09-21", {}, on([ev("x", "2026-09-26")]), "2026-09-24", blocksAll), null);
 });
-test("weekFreeNote: a long weekend that has already ended is null", () => {
+test("weekFreeNote: a long weekend that has already started (today is its first day, or later) is null", () => {
   const blocksAll = () => true;
-  // block runs 2026-10-10 to 2026-10-12; today is after it ends
-  eq(weekFreeNote("2026-10-05", HOLIDAYS, on([]), "2026-10-13", blocksAll), null);
+  // block runs 2026-10-10 to 2026-10-12
+  eq(weekFreeNote("2026-10-05", HOLIDAYS, on([]), "2026-10-10", blocksAll), null, "today is the block's first day");
+  eq(weekFreeNote("2026-10-05", HOLIDAYS, on([]), "2026-10-13", blocksAll), null, "today is after it ends");
 });
 
 test("weekFreeDays: a plain free weekend covers only Saturday and Sunday", () => {
@@ -116,9 +119,15 @@ test("weekFreeDays: a plain free weekend covers only Saturday and Sunday", () =>
 });
 test("weekFreeDays: an opportunity block includes its bridge weekday, not the whole week", () => {
   const blocksAll = () => true;
-  // 2026-09-24 (Thu) is an opportunity holiday, block runs Thu-Sun (bridge Friday)
-  eq(weekFreeDays("2026-09-21", HOLIDAYS, on([]), "2026-09-24", blocksAll),
+  // 2026-09-24 (Thu) is an opportunity holiday, block runs Thu-Sun (bridge Friday); today is before it starts
+  eq(weekFreeDays("2026-09-21", HOLIDAYS, on([]), "2026-09-21", blocksAll),
      ["2026-09-24", "2026-09-25", "2026-09-26", "2026-09-27"]);
+});
+test("weekFreeDays: a long weekend block is excluded once today is its first day, falling back to the plain Saturday check", () => {
+  const blocksAll = () => true;
+  // the Thu-Sun opportunity block starting 2026-09-24 no longer qualifies once today
+  // reaches its first day, so this only reports the following Saturday/Sunday
+  eq(weekFreeDays("2026-09-21", HOLIDAYS, on([]), "2026-09-24", blocksAll), ["2026-09-26", "2026-09-27"]);
 });
 test("weekFreeDays: nothing qualifying this week is an empty list", () => {
   const blocksAll = () => true;
