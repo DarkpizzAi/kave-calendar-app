@@ -46,12 +46,15 @@ export function dayFreeState(day, eventsOn, blocks) {
   return evs.some(blocks) ? "" : "open";
 }
 
-/* One week's worth of free-window note, for Agenda: a plain free weekend
-   (Saturday, any week still ahead) if there is one, else a long weekend or
-   opportunity whose block *starts* inside this Monday-to-Sunday week
-   (Grid's own longWeekends, scoped to this one week's dates instead of a
-   whole month). Long weekend takes priority when both would otherwise
-   apply, since it is the rarer, more worth-surfacing case. */
+/* One week's worth of free-window note, for the 🔍 badge/line: a plain free
+   weekend (Saturday, any week still ahead) if there is one, else a long
+   weekend or opportunity whose block *starts* inside this Monday-to-Sunday
+   week (Grid's own longWeekends, scoped to this one week's dates instead of
+   a whole month). Long weekend takes priority when both would otherwise
+   apply, since it is the rarer, more worth-surfacing case. `kind` tells a
+   caller which one it got -- only "long" is worth a 🔍 and explanatory
+   text; a plain free weekend is worth colouring green, never a note (an
+   ordinary Saturday needs no explaining). */
 export function weekFreeNote(monday, holidays, eventsOn, today, blocks) {
   const sunday = addDays(monday, 6);
   /* weekendBlocks (inside longWeekends) filters candidate holiday anchors by
@@ -62,9 +65,9 @@ export function weekFreeNote(monday, holidays, eventsOn, today, blocks) {
      only a block that actually starts inside this week. */
   const lw = longWeekends(holidays, addDays(monday, -7), addDays(sunday, 7), eventsOn, blocks)
     .find((w) => w.start >= monday && w.start <= sunday && w.start > today);
-  if (lw) return { on: lw.start, text: lw.text };
+  if (lw) return { on: lw.start, text: lw.text, kind: "long" };
   const sat = freeWeekendSaturday(monday, eventsOn, today, blocks);
-  return sat ? { on: sat, text: "Free weekend" } : null;
+  return sat ? { on: sat, text: "Free weekend", kind: "plain" } : null;
 }
 
 /* Which of this week's days are actually part of a qualifying free window --

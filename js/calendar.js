@@ -126,10 +126,8 @@ function controls() {
 /* F54: this heading used to also be F26's sticky-title section boundary
    (data-sec); F26 is fully reverted, so it is back to being just the plain,
    non-sticky "September" heading, drawn once per month. */
-const monthHead = (d) => {
-  const label = `${MONTHS[Number(d.slice(5, 7)) - 1]}${d.slice(0, 4) !== frame.thisYear ? " " + d.slice(0, 4) : ""}`;
-  return `<h3 class="month">${esc(label)}</h3>`;
-};
+const monthLabel = (d) => `${MONTHS[Number(d.slice(5, 7)) - 1]}${d.slice(0, 4) !== frame.thisYear ? " " + d.slice(0, 4) : ""}`;
+const monthHead = (d) => `<h3 class="month">${esc(monthLabel(d))}</h3>`;
 /* Agenda's card model: a "period card" (one calendar week, var(--panel),
    black in dark mode) holding one smaller "day card" per day
    (var(--surface-2), grey, CSS) -- never a border. Today is the one day
@@ -145,22 +143,39 @@ function periodState(d, freeDays) {
   if (!S.freeOn || !freeDays.has(d)) return "";
   return dayFreeState(d, frame.onAll, freeBlocks) || "";
 }
-/* Agenda: one grey rectangle per day, every day of the week (never skipped,
-   never a "Nothing planned" line -- an empty day is just a day card with
-   nothing in it). */
-function agendaDay(d, freeDays) {
+/* Agenda: one card per day, straight in a run -- no week-card wrapper
+   holding several of them (Isa: "no card containing all the individual day
+   cards"). Every day still shows, never skipped, never a "Nothing planned"
+   line -- an empty day is just a day card with nothing in it. Black
+   (var(--panel)), same as Grid's own square; a weekend gets the branding's
+   own card grey (--surface-2) instead, unconditionally -- Clear/Open and
+   today still win over it, same priority as before. data-week carries the
+   week's Monday on every one of its days (not a separate wrapper), so a
+   jump target still has something to scroll to. */
+function agendaDay(d, m, freeDays, note) {
   const evs = frame.on(d);
   const away = evs.filter(isAway), rest = evs.filter((e) => !isAway(e));
+  const weekend = dayOfWeek(d) >= 5 ? " weekend" : "";
   const label = `${DOW[dayOfWeek(d)][0]}${DOW[dayOfWeek(d)].slice(1).toLowerCase()} ${Number(d.slice(8))}`;
   const tap = tappable(evs) ? ` role="button" tabindex="0" data-act="day" data-d="${d}"` : "";
-  return `<div class="daycard ${periodState(d, freeDays)}"${tap}><span class="cd">${label}</span>`
+  /* A plain free weekend is colour only (Clear/Open, above); only a real
+     long weekend or opportunity earns the 🔍 and its explanatory text, on
+     the day its window opens. */
+  const noteLine = (note && note.kind === "long" && note.on === d)
+    ? `<li style="--n:1"><span class="c-i">🔍</span><span class="c-t">${esc(note.text)}</span></li>` : "";
+  return `<div class="daycard ${periodState(d, freeDays)}${weekend}" data-week="${m}"${tap}><span class="cd">${label}</span>`
     + away.map((e) => `<span class="away${frame.grey.has(e.id) ? " grey" : ""}">${esc(icons(e)[0])} ${esc(awayText(e, frame.thisYear))}</span>`).join("")
-    + `<ul class="rows">${rest.map((e) => row(e, false, false)).join("")}</ul></div>`;
+    + `<ul class="rows">${rest.map((e) => row(e, false, false)).join("")}${noteLine}</ul></div>`;
 }
 function agendaWeek(m) {
   const freeDays = S.freeOn ? new Set(weekFreeDays(m, HOLIDAYS, frame.onAll, frame.today, freeBlocks)) : new Set();
-  const days = [0, 1, 2, 3, 4, 5, 6].map((k) => addDays(m, k));
-  return `<div class="weekCard" data-week="${m}">${days.map((d) => agendaDay(d, freeDays)).join("")}</div>`;
+  const note = S.freeOn ? weekFreeNote(m, HOLIDAYS, frame.onAll, frame.today, freeBlocks) : null;
+  /* Only the week underway trims to today -- Isa: Agenda opens on today at
+     the top, but "load older" must still reveal real past weeks in full,
+     not empty cards (m !== frame.thisMonday is always entirely in the past
+     or entirely in the future here, never split by today). */
+  const days = [0, 1, 2, 3, 4, 5, 6].map((k) => addDays(m, k)).filter((d) => m !== frame.thisMonday || d >= frame.today);
+  return days.map((d) => agendaDay(d, m, freeDays, note)).join("");
 }
 function weekBlocks(from, count) {
   let out = "", cur = "";
@@ -185,7 +200,11 @@ function weeks() {
 /* ---- Grid: a real Monday-first month grid, one card per month ---- */
 const ymOf = (y, mo) => `${y}-${String(mo + 1).padStart(2, "0")}`;
 const daysIn = (y, mo) => new Date(Date.UTC(y, mo + 1, 0)).getUTCDate();
-const yearHead = (y) => `<p class="year-big">${y}</p>`;
+/* Every month gets its own big heading here (the "2026" year-big treatment,
+   not Agenda's smaller .month heading) -- same label text and same
+   year-suffix rule as Agenda's monthHead (monthLabel, shared), just drawn
+   once per month instead of once per year. */
+const gridMonthHead = (d) => `<p class="year-big">${esc(monthLabel(d))}</p>`;
 /* Lead-padded, Monday-first cells for one calendar month, chunked into
    real weeks (each row's own Monday, for weekFreeDays) -- padded only to
    the next multiple of 7, never a whole extra blank row. */
@@ -221,7 +240,7 @@ function gridIcon(d) {
   const more = evs.length > 1 ? `<span class="more"></span>` : "";
   return `<span class="emo${grey ? " grey" : ""}">${iconFor(best.a, best.e, frame.me)}</span>${more}`;
 }
-function gridSquare(d, freeDays) {
+function gridSquare(d, freeDays, note) {
   if (!d) return `<div class="dsq pad"></div>`;
   const st = periodState(d, freeDays);
   /* Unlike Agenda (tappable() -- a day with nothing cannot be tapped),
@@ -231,35 +250,33 @@ function gridSquare(d, freeDays) {
   /* F16's own glyph, reused rather than re-derived: at least one event
      that day still has an unchecked to-do. */
   const todo = frame.on(d).some(hasOpenTodos) ? `<span class="dtodo" aria-label="Open to-dos">${ICON.checkbox}</span>` : "";
-  return `<div class="dsq ${st}" role="button" tabindex="0" data-act="day" data-d="${d}"><span class="num">${Number(d.slice(8))}</span>${todo}${gridIcon(d)}</div>`;
+  /* A plain free weekend is colour only (Clear/Open, above); only a real
+     long weekend or opportunity earns the 🔍, on the day its window opens
+     (kind: "long" -- weekFreeNote's plain-Saturday case never reaches
+     here). */
+  const glass = (note && note.kind === "long" && note.on === d) ? `<span class="note" aria-label="Long weekend">🔍</span>` : "";
+  const weekend = dayOfWeek(d) >= 5 ? " weekend" : "";
+  return `<div class="dsq ${st}${weekend}" role="button" tabindex="0" data-act="day" data-d="${d}"><span class="num">${Number(d.slice(8))}</span>${todo}${glass}${gridIcon(d)}</div>`;
 }
 function gridMonth(y, mo) {
   const key = ymOf(y, mo), n = daysIn(y, mo), now = key === frame.today.slice(0, 7);
-  const label = `${MONTHS[mo].toUpperCase()}${key.slice(0, 4) !== frame.thisYear ? " " + key.slice(0, 4) : ""}`;
   const rows = gridRows(key, n).map((r) => {
     const freeDays = S.freeOn ? new Set(weekFreeDays(r.monday, HOLIDAYS, frame.onAll, frame.today, freeBlocks)) : new Set();
-    return `<div class="grid7">${r.days.map((d) => gridSquare(d, freeDays)).join("")}</div>`;
+    const note = S.freeOn ? weekFreeNote(r.monday, HOLIDAYS, frame.onAll, frame.today, freeBlocks) : null;
+    return `<div class="grid7">${r.days.map((d) => gridSquare(d, freeDays, note)).join("")}</div>`;
   }).join("");
   const wdhead = readPrefs(store.state.settings).showWeekdayHeader
     ? `<div class="wdhead">${DOW.map((w) => `<span>${w[0]}</span>`).join("")}</div>` : "";
-  return `<div class="gridCard${now ? " now" : ""}" data-month="${key}">`
-    + `<p class="mh"><span class="lbl-pill${now ? " on" : ""}">${label}</span></p>`
-    + wdhead
-    + `<div class="monthgrid">${rows}</div></div>`;
+  return `<div class="gridCard${now ? " now" : ""}" data-month="${key}">${wdhead}<div class="monthgrid">${rows}</div></div>`;
 }
 function grid() {
   const y0 = Number(frame.thisYear), m0 = Number(frame.today.slice(5, 7)) - 1;
   const shown = pastMonths(frame.today, S.floor, S.past.grid);
-  let past = "", pastYear = null;
-  for (const ym of shown) {
-    const y = Number(ym.slice(0, 4));
-    if (y !== pastYear) { past += yearHead(y); pastYear = y; }
-    past += gridMonth(y, Number(ym.slice(5, 7)) - 1);
-  }
-  let future = "", curYear = pastYear;
+  let past = "";
+  for (const ym of shown) past += gridMonthHead(ym + "-01") + gridMonth(Number(ym.slice(0, 4)), Number(ym.slice(5, 7)) - 1);
+  let future = "";
   for (let y = y0, mo = m0, n = 0; ymOf(y, mo) + "-01" <= frame.range.max && n < S.future.grid; n++) {
-    if (y !== curYear) { future += yearHead(y); curYear = y; }
-    future += gridMonth(y, mo);
+    future += gridMonthHead(ymOf(y, mo) + "-01") + gridMonth(y, mo);
     if (++mo === 12) { mo = 0; y++; }
   }
   return { past, future };
