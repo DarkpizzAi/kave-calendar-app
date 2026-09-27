@@ -143,12 +143,19 @@ function periodState(d, freeDays) {
   if (!S.freeOn || !freeDays.has(d)) return "";
   return dayFreeState(d, frame.onAll, freeBlocks) || "";
 }
-/* Agenda: one grey rectangle per day, every day of the week (never skipped,
-   never a "Nothing planned" line -- an empty day is just a day card with
-   nothing in it). */
-function agendaDay(d, freeDays, note) {
+/* Agenda: one card per day, straight in a run -- no week-card wrapper
+   holding several of them (Isa: "no card containing all the individual day
+   cards"). Every day still shows, never skipped, never a "Nothing planned"
+   line -- an empty day is just a day card with nothing in it. Black
+   (var(--panel)), same as Grid's own square; a weekend gets the branding's
+   own card grey (--surface-2) instead, unconditionally -- Clear/Open and
+   today still win over it, same priority as before. data-week carries the
+   week's Monday on every one of its days (not a separate wrapper), so a
+   jump target still has something to scroll to. */
+function agendaDay(d, m, freeDays, note) {
   const evs = frame.on(d);
   const away = evs.filter(isAway), rest = evs.filter((e) => !isAway(e));
+  const weekend = dayOfWeek(d) >= 5 ? " weekend" : "";
   const label = `${DOW[dayOfWeek(d)][0]}${DOW[dayOfWeek(d)].slice(1).toLowerCase()} ${Number(d.slice(8))}`;
   const tap = tappable(evs) ? ` role="button" tabindex="0" data-act="day" data-d="${d}"` : "";
   /* A plain free weekend is colour only (Clear/Open, above); only a real
@@ -156,7 +163,7 @@ function agendaDay(d, freeDays, note) {
      the day its window opens. */
   const noteLine = (note && note.kind === "long" && note.on === d)
     ? `<li style="--n:1"><span class="c-i">🔍</span><span class="c-t">${esc(note.text)}</span></li>` : "";
-  return `<div class="daycard ${periodState(d, freeDays)}"${tap}><span class="cd">${label}</span>`
+  return `<div class="daycard ${periodState(d, freeDays)}${weekend}" data-week="${m}"${tap}><span class="cd">${label}</span>`
     + away.map((e) => `<span class="away${frame.grey.has(e.id) ? " grey" : ""}">${esc(icons(e)[0])} ${esc(awayText(e, frame.thisYear))}</span>`).join("")
     + `<ul class="rows">${rest.map((e) => row(e, false, false)).join("")}${noteLine}</ul></div>`;
 }
@@ -168,7 +175,7 @@ function agendaWeek(m) {
      not empty cards (m !== frame.thisMonday is always entirely in the past
      or entirely in the future here, never split by today). */
   const days = [0, 1, 2, 3, 4, 5, 6].map((k) => addDays(m, k)).filter((d) => m !== frame.thisMonday || d >= frame.today);
-  return `<div class="weekCard" data-week="${m}">${days.map((d) => agendaDay(d, freeDays, note)).join("")}</div>`;
+  return days.map((d) => agendaDay(d, m, freeDays, note)).join("");
 }
 function weekBlocks(from, count) {
   let out = "", cur = "";
@@ -248,7 +255,8 @@ function gridSquare(d, freeDays, note) {
      (kind: "long" -- weekFreeNote's plain-Saturday case never reaches
      here). */
   const glass = (note && note.kind === "long" && note.on === d) ? `<span class="note" aria-label="Long weekend">🔍</span>` : "";
-  return `<div class="dsq ${st}" role="button" tabindex="0" data-act="day" data-d="${d}"><span class="num">${Number(d.slice(8))}</span>${todo}${glass}${gridIcon(d)}</div>`;
+  const weekend = dayOfWeek(d) >= 5 ? " weekend" : "";
+  return `<div class="dsq ${st}${weekend}" role="button" tabindex="0" data-act="day" data-d="${d}"><span class="num">${Number(d.slice(8))}</span>${todo}${glass}${gridIcon(d)}</div>`;
 }
 function gridMonth(y, mo) {
   const key = ymOf(y, mo), n = daysIn(y, mo), now = key === frame.today.slice(0, 7);

@@ -386,21 +386,22 @@ a.ticket{color:inherit;text-decoration:none}
 .flag{display:inline-block;border-radius:var(--r-pill);padding:1px var(--sp-2);font-size:var(--fs-meta);font-weight:var(--fw-medium);max-width:100%;overflow:hidden;text-overflow:ellipsis;vertical-align:middle}
 .flag.acc{background:var(--accent);color:var(--accent-text)}
 .flag.soft{background:var(--accent-soft);color:var(--text)}
-/* Agenda's card model: a "period card" -- one calendar week -- in
-   var(--panel), black in dark mode; every day inside it is its own smaller
-   "day card" in var(--surface-2), grey, always (busy or not). No card ever
-   takes a border for this. Today is the one day card whose fill turns
-   solid var(--accent), and that always wins over every other state. Grid
-   (below, .gridCard/.dsq) draws its own month-grid card model instead. */
+/* Agenda's card model: no week wrapper -- one card per day, straight in a
+   run (Grid, below, draws its own separate month-grid card model). Black
+   (var(--panel)), same as Grid's own square; a weekend gets the branding's
+   own card grey (--surface-2) instead, always, unless a stronger state
+   (Clear/Open, today) applies -- those are declared after .weekend below,
+   so they still win on a weekend day exactly as they do on a weekday. */
 .month{margin:var(--sp-3) 0 0;font-size:var(--fs-title-lg);font-weight:var(--fw-strong);letter-spacing:var(--tracking-heading);line-height:var(--lh-title)}
-.weekCard{background:var(--panel);border-radius:var(--r-card);padding:var(--sp-2);margin-bottom:var(--sp-2)}
 .away{margin:0;display:grid;grid-template-columns:20px minmax(0,1fr);column-gap:var(--sp-2);font-size:var(--fs-meta);background:var(--surface-2);border-radius:var(--r-control);padding:var(--sp-1) var(--sp-2)}
 .away.grey{color:var(--text-dim)}
-/* agenda: one grey rectangle per day, every day, always -- an empty day is
-   just a day card with nothing in it, never skipped, never a placeholder line */
-.daycard{background:var(--surface-2);border-radius:var(--r-card);padding:6px var(--sp-2);margin-bottom:var(--sp-2);cursor:pointer}
-.daycard:last-child{margin-bottom:0}
+.daycard{background:var(--panel);border-radius:var(--r-card);padding:6px var(--sp-2);margin-bottom:var(--sp-2);cursor:pointer}
 .daycard > .cd{display:block;font-size:var(--fs-micro);font-weight:500;color:var(--text-dim);margin-bottom:2px}
+/* every card reserves at least one line's height, even an empty one (never
+   an away pill's own day -- that already has visible content); 2+ events
+   grow taller than this floor same as before */
+.daycard:not(:has(.away)) .rows:empty::after{content:"";display:block;height:1.2em}
+.daycard.weekend{background:var(--surface-2)}
 .daycard.today{background:var(--accent)}
 .daycard.today > .cd{color:var(--accent-text)}
 .daycard.clear{background:var(--free-tx);color:var(--free-bg)}
@@ -437,6 +438,10 @@ a.ticket{color:inherit;text-decoration:none}
    emoji's own top-right corner, next to the single one the priority
    rule already chose */
 .dsq .more{position:absolute;top:calc(67% - 11px);left:calc(50% + 8px);width:6px;height:6px;border-radius:var(--r-round);background:var(--accent)}
+/* weekend square: the branding's own card grey, same as Agenda's weekend
+   day cards -- unconditional, but Clear/Open/today (declared after) still
+   win, same priority as everywhere else this app colours a square. */
+.dsq.weekend{background:var(--surface-2)}
 .dsq.today{background:var(--accent)}
 .dsq.today .num{color:var(--accent-text)}
 .dsq.today .more{background:var(--accent-text)}
