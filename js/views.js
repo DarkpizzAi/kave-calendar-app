@@ -49,6 +49,28 @@ export function dayFreeState(day, eventsOn, blocks) {
   return evs.some(blocks) ? "" : "open";
 }
 
+/* One week's worth of free-window note, for Grid: a plain free weekend
+   (Saturday, current/next month only, same as Agenda's own note) if there
+   is one, else a long weekend or opportunity whose block *starts* inside
+   this Monday-to-Sunday week (Yearly/Glance's own longWeekends, scoped to
+   this one week's dates instead of a whole month). Long weekend takes
+   priority when both would otherwise apply, since it is the rarer, more
+   worth-surfacing case. */
+export function weekFreeNote(monday, holidays, eventsOn, today, blocks) {
+  const sunday = addDays(monday, 6);
+  /* weekendBlocks (inside longWeekends) filters candidate holiday anchors by
+     this range -- a holiday's anchor can fall several days after its grown
+     block's start (Pilar: anchor Mon 2026-10-12, block starts Sat 2026-10-10),
+     so the search range has to reach past this week on both sides, wide
+     enough to catch that anchor, while the result is still filtered down to
+     only a block that actually starts inside this week. */
+  const lw = longWeekends(holidays, addDays(monday, -7), addDays(sunday, 7), eventsOn, blocks)
+    .find((w) => w.start >= monday && w.start <= sunday);
+  if (lw) return { on: lw.start, text: lw.text };
+  const sat = freeWeekendSaturday(monday, eventsOn, today, blocks);
+  return sat ? { on: sat, text: "Free weekend" } : null;
+}
+
 /* ---- long weekends (Yearly), from the bank holidays ---- */
 const offDay = (holidays) => (d) => dayOfWeek(d) >= 5 || !!holidays[d];
 

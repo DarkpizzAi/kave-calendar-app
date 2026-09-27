@@ -1,5 +1,5 @@
 import { test, eq, ok } from "./run.js";
-import { isoWeek, monthOfWeek, firstWeekOf, loadRange, freeWeekendSaturday, weekendBlocks, classifyWeekend, longWeekends, yearStats, dayFreeState } from "../js/views.js";
+import { isoWeek, monthOfWeek, firstWeekOf, loadRange, freeWeekendSaturday, weekendBlocks, classifyWeekend, longWeekends, yearStats, dayFreeState, weekFreeNote } from "../js/views.js";
 import { applyDetail, DETAIL_LEVELS } from "../js/filter.js";
 import { CATEGORIES, iconFor } from "../js/icons.js";
 import { HOLIDAYS } from "../js/holidays.js";
@@ -81,6 +81,26 @@ test("dayFreeState: Clear when nobody has anything, Open when they do but it doe
   eq(dayFreeState("2026-10-04", noEvents, blocksTransport), "clear");
   eq(dayFreeState("2026-10-04", flexibleOnly, blocksTransport), "open");
   eq(dayFreeState("2026-10-04", withBlocking, blocksTransport), "", "a day with a blocking event on it is neither");
+});
+
+test("weekFreeNote: a plain free weekend note attaches to the Saturday", () => {
+  /* an empty holidays object here, deliberately -- this test is only about
+     freeWeekendSaturday's own behaviour, not about which real 2026 holidays
+     happen to fall near this week */
+  const blocksAll = () => true;
+  eq(weekFreeNote("2026-09-21", {}, on([]), "2026-09-24", blocksAll), { on: "2026-09-26", text: "Free weekend" });
+  eq(weekFreeNote("2026-11-16", {}, on([]), "2026-09-24", blocksAll), null, "outside the current/next month freeWeekendSaturday itself checks");
+});
+test("weekFreeNote: a long weekend or opportunity starting inside this week takes priority", () => {
+  const blocksAll = () => true;
+  // 2026-10-12 (Pilar) is a Monday holiday, weekendBlocks grows it back to Saturday 2026-10-10
+  const note = weekFreeNote("2026-10-05", HOLIDAYS, on([]), "2026-09-24", blocksAll);
+  eq(note.on, "2026-10-10");
+  eq(note.text, "Free long weekend");
+});
+test("weekFreeNote: nothing qualifying this week is null", () => {
+  const blocksAll = () => true;
+  eq(weekFreeNote("2026-09-21", {}, on([ev("x", "2026-09-26")]), "2026-09-24", blocksAll), null);
 });
 
 /* ---- the Yearly stats card ---- */
