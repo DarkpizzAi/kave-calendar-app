@@ -16,7 +16,7 @@ import { status as syncStatus, checkToken } from "./sync.js";
 import { ICON } from "./chrome-icons.js";
 import { calendarHtml, afterCalendar, onScroll, backToToday, todaysCount } from "./calendar.js";
 import { refreshSheet, openLevel, registerLevel } from "./sheet.js";
-import { readPrefs, defaultsSummary, VIEW_NAMES, DETAIL_NAMES, STYLE_NAMES, blocksFreeTime, toggleBlocking, freeTimeSummary } from "./prefs.js";
+import { readPrefs, defaultsSummary, VIEW_NAMES, DETAIL_NAMES, STYLE_NAMES, blocksFreeTime, toggleBlocking, freeTimeSummary, toggleWeekdayHeader } from "./prefs.js";
 import { CATEGORIES, iconFor } from "./icons.js";
 import { resetCalendarDefaults } from "./calendar.js";
 import { checkForUpdate, ensureVersionAsked, updateStatusLines, updateBusy, updateButtonText, updateReady } from "./updates.js";
@@ -154,10 +154,15 @@ registerLevel("set-defaults", {
     const p = readPrefs(store.state.settings);
     return `<div class="fields">${field("Default view", choices("pref-view", VIEW_NAMES, p.defaultView), "Where the Calendar opens.")}`
       + field("Default detail level", choices("pref-detail", DETAIL_NAMES, p.defaultDetail), "Full: both of you. Partial: the other person greyed. Minimal: yours and shared only.")
-      + field("Card style", choices("pref-style", STYLE_NAMES, p.cardStyle), "How events look in Weekly's day cards.") + "</div>";
+      + field("Card style", choices("pref-style", STYLE_NAMES, p.cardStyle), "How events look in Weekly's day cards.")
+      + field("Weekday letters",
+          `<button class="tick${p.showWeekdayHeader ? " on" : ""}" role="checkbox" aria-checked="${p.showWeekdayHeader}" aria-label="Show weekday letters in Glance" data-tick-weekday>${p.showWeekdayHeader ? ICON.check : ""}</button>`,
+          "The M T W T F S S row above each month in Glance.")
+      + "</div>";
   },
   onAction(b) {
     const d = b.dataset;
+    if (d.tickWeekday != null) { store.setSetting("showWeekdayHeader", toggleWeekdayHeader(readPrefs(store.state.settings)).showWeekdayHeader); return; }
     const pick = d.prefView != null ? ["defaultView", d.prefView] : d.prefDetail != null ? ["defaultDetail", d.prefDetail]
       : d.prefStyle != null ? ["cardStyle", d.prefStyle] : null;
     if (!pick || !PREF_KEYS.includes(pick[0])) return;

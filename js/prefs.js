@@ -63,9 +63,14 @@ export function readPrefs(settings) {
     defaultView: oneOf(VIEW_NAMES, migrateViewKey(s.defaultView), "glance"),
     defaultDetail: oneOf(DETAIL_NAMES, s.defaultDetail, "full"),
     cardStyle: oneOf(STYLE_NAMES, s.cardStyle, "lines"),
+    showWeekdayHeader: s.showWeekdayHeader !== false,
     hiddenCategories,
     blockingCategories,
   };
+}
+
+export function toggleWeekdayHeader(prefs) {
+  return { ...prefs, showWeekdayHeader: !prefs.showWeekdayHeader };
 }
 
 /* Reset restores nothing-hidden, the same set defaultHidden() already
