@@ -33,10 +33,19 @@ const S = {
   past: { grid: 0, agenda: 0 }, future: { grid: 15, agenda: 10 },
   searchOpen: false, freeOn: false, query: "", menu: false,
   scrollTo: null, keepAnchor: false, pending: false,
-  /* older years, loaded on demand: the oldest year shown, and whether
-     kave-hub has anything older */
-  floor: null, exhausted: false, loadingOlder: false,
+  /* older years, loaded on demand for search: the oldest year fetched from
+     kave-hub, and whether it has anything older still */
+  floor: null, exhausted: false,
 };
+
+/* ---- Archive: the popup opened by the "older" control button. Unlike the
+   main view (always pinned to today), Archive shows only the past -- newest
+   at the bottom, oldest at the top -- with no future, no scroll-triggered
+   loading and no category/detail filtering (Isa: "all events, no filters").
+   It draws with the exact same gridMonth/agendaWeek machinery as the main
+   view (frame is swapped for the duration of the draw, see archiveFrame),
+   so grid and agenda look identical in and out of Archive. */
+const AR = { open: false, view: null, floor: null, exhausted: false, loading: false, keepAnchor: false };
 
 let ctx = null;          // { data, render, isCalendar, sync }
 let frame = null;        // what this draw is built from; rebuilt every draw
@@ -110,9 +119,9 @@ function controls() {
   const detail = `<button class="ib" data-act="menu" aria-label="Detail level" aria-expanded="${S.menu}">${ICON.eye}</button>`;
   const free = `<button class="ib${S.freeOn ? " on" : ""}" data-act="free" aria-label="Highlight free time" aria-pressed="${S.freeOn}">${ICON.leaf}</button>`;
   /* F29: "load older" is now one of three inline control buttons, sitting
-     between detail and search, not a floating round button (F6's mechanism
-     is unchanged, only where its trigger sits); its icon is an archive box. */
-  const older = showLoadOlder() ? `<button class="ib" data-act="older" aria-label="Load older years">${ICON.older}</button>` : "";
+     between detail and search, not a floating round button; it opens the
+     Archive popup instead of growing the main view in place. */
+  const older = showLoadOlder() ? `<button class="ib" data-act="older" aria-label="Open archive">${ICON.older}</button>` : "";
   const search = S.searchOpen
     ? `<div class="sfield"><span class="si">${ICON.search}</span><input id="q" type="search" placeholder="Search every event" value="${esc(S.query)}" autocomplete="off"><button class="clr" data-act="closesearch" aria-label="Close search">${ICON.x}</button></div>`
     : `<button class="ib" data-act="search" aria-label="Search">${ICON.search}</button>`;
@@ -402,23 +411,89 @@ async function loadAllOlder() {
   for (let i = 0; i < 15 && !S.exhausted; i++) if (!(await loadOlder())) break;
   if (S.searchOpen) ctx.render();
 }
-/* F7: one tap loads straight to 1 January of the floor year (the range
-   already starts there); a further tap once that is fully shown loads the
-   year before it from kave-hub, then reveals that too, in one go each time. */
-async function loadOlderFull() {
-  if (S.view === "grid") {
-    const need = fullPastMonths(frame.today, S.floor);
-    if (S.past.grid < need) { S.past.grid = need; S.keepAnchor = true; ctx.render(); return; }
-    if (!(await loadOlder())) { ctx.render(); return; }
-    S.past.grid = fullPastMonths(frame.today, S.floor);
-  } else {
-    const need = fullPastWeeks(frame.thisMonday, S.floor);
-    if (S.past[S.view] < need) { S.past[S.view] = need; S.keepAnchor = true; ctx.render(); return; }
-    if (!(await loadOlder())) { ctx.render(); return; }
-    S.past[S.view] = fullPastWeeks(frame.thisMonday, S.floor);
+/* ---- Archive: the popup the "older" control button opens. It replaces the
+   old in-place "load older" growth of the main view (F6/F7): the main view
+   never grows into the past any more, it always opens on today. Archive
+   shows only the past -- oldest at the top, most recent at the bottom, only
+   scrollable upward -- starting at 1 January of this year and stepping back
+   a further January on each "Load more" tap. It has its own floor/exhausted,
+   independent of S.floor/S.exhausted above (those still track how far back
+   Search has fetched). All events, no detail or category filtering.
+
+   Archive draws with the exact same gridMonth/agendaWeek/weekBlocks
+   functions the main view uses, against a swapped-in frame, so grid and
+   agenda look identical whether you're looking at today or the archive. */
+function archiveFrame() {
+  const today = todayKey(), thisYear = today.slice(0, 4);
+  const events = hideCancelled(ctx.data.events(), AR.view);
+  const idx = indexByDay(events);
+  return { me: store.state.settings.me, style: prefs().style, today, thisYear,
+    events, idx, grey: new Set(), on: (d) => idx.get(d) || [], onAll: (d) => idx.get(d) || [],
+    thisMonday: mondayOf(today), range: { max: today } };
+}
+function archiveBody() {
+  const saved = frame;
+  frame = archiveFrame();
+  const html = AR.view === "grid"
+    ? pastMonths(frame.today, AR.floor, fullPastMonths(frame.today, AR.floor))
+      .map((ym) => gridMonthHead(ym + "-01") + gridMonth(Number(ym.slice(0, 4)), Number(ym.slice(5, 7)) - 1)).join("")
+    : weekBlocks(mondayOf(`${AR.floor}-01-01`), fullPastWeeks(frame.thisMonday, AR.floor));
+  frame = saved;
+  return html;
+}
+function archiveHtml() {
+  const body = archiveBody() || '<p class="hint">Nothing archived yet.</p>';
+  const more = AR.exhausted ? "" : `<button class="archive-more" data-act="archivemore"${AR.loading ? " disabled" : ""}>${AR.loading ? "Loading…" : "Load more"}</button>`;
+  return '<div class="shade" data-act="archiveclose"></div>'
+    + '<section class="sheet in archive" role="dialog" aria-modal="true" aria-labelledby="archtitle">'
+    + '<header class="sbar" data-act="archiveclose"><span class="grab" aria-hidden="true"></span>'
+    + '<div class="stitle-wrap"><h2 class="stitle" id="archtitle">Archive</h2></div></header>'
+    + `<div class="sstage"><div class="sbody archive-body">${more}${body}</div></div></section>`;
+}
+function renderArchive() {
+  const root = document.getElementById("archiveRoot");
+  if (!root) return;
+  if (!AR.open) { root.innerHTML = ""; return; }
+  const old = root.querySelector(".archive-body");
+  const before = old ? { top: old.scrollTop, height: old.scrollHeight } : null;
+  root.innerHTML = archiveHtml();
+  const fresh = root.querySelector(".archive-body");
+  if (fresh) fresh.scrollTop = AR.keepAnchor && before ? before.top + (fresh.scrollHeight - before.height) : fresh.scrollHeight;
+  AR.keepAnchor = false;
+}
+function openArchive() {
+  if (!frame) return;
+  Object.assign(AR, { open: true, view: S.view, floor: frame.thisYear, exhausted: false, loading: false, keepAnchor: false });
+  renderArchive();
+}
+function closeArchive() { AR.open = false; renderArchive(); }
+async function loadMoreArchive() {
+  if (AR.loading || AR.exhausted) return;
+  AR.loading = true;
+  renderArchive();
+  const y = String(Number(AR.floor) - 1);
+  try {
+    await ctx.data.ensureYear(y);
+    if (ctx.data.events().some((e) => e.start.startsWith(y))) AR.floor = y; else AR.exhausted = true;
+  } catch {
+    if (ctx.data.events().some((e) => e.start.startsWith(y))) AR.floor = y;
+  } finally {
+    AR.loading = false;
+    AR.keepAnchor = true;
+    renderArchive();
   }
-  S.keepAnchor = true;
-  ctx.render();
+}
+function archiveClick(e) {
+  const b = e.target.closest("[data-act]");
+  if (!b) return;
+  const a = b.dataset.act;
+  if (a === "archiveclose") closeArchive();
+  else if (a === "archivemore") loadMoreArchive();
+  else if (a === "day") openLevel({ kind: "day", d: b.dataset.d });
+  else if (a === "week") openLevel({ kind: "week", m: b.dataset.m });
+  else if (a === "event") { e.stopPropagation(); openLevel({ kind: "event", id: b.dataset.id }); }
+  else return;
+  e.preventDefault();
 }
 
 function setView(v, target) {
@@ -438,7 +513,6 @@ function setView(v, target) {
    above, not with the round buttons); hidden while searching, where it
    makes no sense. */
 export const showLoadOlder = () => !S.searchOpen;
-export { loadOlderFull };
 
 /* F3: the nav icon's badge. Independent of whatever view is drawn (the
    badge shows even before the Calendar has been opened this session), so it
@@ -466,8 +540,9 @@ function onClick(e) {
   else if (a === "search") { S.searchOpen = true; S.menu = false; ctx.render(); loadAllOlder(); }
   else if (a === "closesearch") { S.searchOpen = false; S.query = ""; ctx.render(); }
   /* F29: "load older" is now one of the inline control buttons, not a
-     floating round button; same loadOlderFull mechanism (F6/F7). */
-  else if (a === "older") loadOlderFull();
+     floating round button; it now opens the Archive popup (F6/F7's
+     "load straight to 1 January" idea lives on inside it). */
+  else if (a === "older") openArchive();
   else if (a === "zoomweek") { e.stopPropagation(); setView("agenda", zoomWeekTarget(b.dataset.m)); }
   else if (a === "zoommonth") setView("agenda", zoomMonthTarget(b.dataset.ym));
   else if (a === "day") openLevel({ kind: "day", d: b.dataset.d });
@@ -499,6 +574,7 @@ export const detailGrey = (e) => !!frame && frame.grey.has(e.id);
 export function resetCalendarDefaults() { S.view = null; S.detail = null; }
 
 export function closeMenus() {
+  if (AR.open) { closeArchive(); return true; }
   if (S.menu) { S.menu = false; ctx.render(); return true; }
   if (S.searchOpen) { S.searchOpen = false; S.query = ""; ctx.render(); return true; }
   return false;
@@ -511,6 +587,8 @@ export function initCalendar(c) {
   mn.addEventListener("scroll", () => { onScroll(); if (ctx.isCalendar()) loadMore(mn); }, { passive: true });
   window.addEventListener("scroll", onScroll, { passive: true });
   document.addEventListener("click", onClick);
+  const ar = document.getElementById("archiveRoot");
+  if (ar) ar.addEventListener("click", archiveClick);
 
   /* Gestures: swipe the list sideways to change view; pull down at the top
      (or wheel up) to reveal See previous. */

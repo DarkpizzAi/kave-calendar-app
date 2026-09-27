@@ -228,6 +228,12 @@ button:disabled { opacity: .5; cursor: default; }
 .sstage{flex:1;min-height:0;position:relative;display:flex;flex-direction:column;overflow:hidden}
 .sbody{flex:1;min-height:0;overflow-y:auto;padding:var(--sp-4);display:flex;flex-direction:column;gap:var(--sp-3)}
 .sbody.leaving{position:absolute;inset:0;pointer-events:none}
+/* Archive: newest at the bottom, scrolled there on open/load, only scrolls
+   up (js/calendar.js pins scrollTop, no CSS direction trick needed) --
+   "Load more" is its own first child so it sits above the oldest month/week
+   shown, exactly where scrolling further up leads. */
+.archive-more{align-self:center;border:0;border-radius:var(--r-pill);background:var(--surface-2);color:var(--text-dim);font:inherit;font-size:var(--fs-ui);font-weight:var(--fw-medium);padding:var(--sp-2) var(--sp-4);margin-bottom:var(--sp-2)}
+.archive-more[disabled]{opacity:.6}
 .sheet.lv-day .sbody,.sheet.lv-event .sbody{padding:0;gap:0}
 /* depth moves vertically: deeper, the old level leaves upwards and the new
    one rises from the bottom; Back reverses */
