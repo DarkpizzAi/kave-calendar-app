@@ -129,6 +129,8 @@ button:disabled { opacity: .5; cursor: default; }
 /* the Categories grid, straight on the sheet */
 .grid { display: flex; flex-direction: column; }
 .grid-h, .grid-r { display: grid; grid-template-columns: minmax(0, 1fr) repeat(3, 52px); align-items: center; column-gap: var(--sp-1); }
+/* Free time: the same row, one tick column instead of one per view */
+.grid-r.single { grid-template-columns: minmax(0, 1fr) 52px; }
 .grid-h { position: sticky; top: calc(-1 * var(--sp-4)); background: var(--surface); padding: var(--sp-2) 0; font-size: var(--fs-micro); font-weight: 500; letter-spacing: var(--tracking-label); color: var(--text-dim); text-transform: uppercase; text-align: center; z-index: 1; }
 .grid-h .full { display: none; }
 .grid-r { padding: 6px 0; border-top: 1px solid var(--rule); }
@@ -140,6 +142,7 @@ button:disabled { opacity: .5; cursor: default; }
 @media (min-width: 900px) {
   .grid-h .full { display: inline; }
   .grid-h, .grid-r { grid-template-columns: minmax(0, 1fr) repeat(3, 88px); }
+  .grid-r.single { grid-template-columns: minmax(0, 1fr) 88px; }
 }
 @media (prefers-reduced-motion: reduce) { button:active { transform: none; } }
 

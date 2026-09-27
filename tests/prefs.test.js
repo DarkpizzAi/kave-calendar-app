@@ -1,5 +1,5 @@
 import { test, eq, ok } from "./run.js";
-import { readPrefs, isShown, toggleCategory, byCategories, defaultsSummary, categoriesSummary, resetCategories, blocksFreeTime, toggleBlocking, eventBlocksFreeTime, BLOCKING_DEFAULT } from "../js/prefs.js";
+import { readPrefs, isShown, toggleCategory, byCategories, defaultsSummary, categoriesSummary, resetCategories, blocksFreeTime, toggleBlocking, eventBlocksFreeTime, BLOCKING_DEFAULT, freeTimeSummary } from "../js/prefs.js";
 
 const ev = (id, types) => ({ id, activities: types.map((type) => ({ type })) });
 
@@ -70,6 +70,12 @@ test("prefs: eventBlocksFreeTime is per category, never per owner", () => {
 test("prefs: stored blocking junk falls back to the default", () => {
   eq(readPrefs({ blockingCategories: "nonsense" }).blockingCategories, BLOCKING_DEFAULT);
   eq(readPrefs({ blockingCategories: ["transport", "not-a-real-type"] }).blockingCategories, ["transport"]);
+});
+test("prefs: freeTimeSummary counts how many categories block", () => {
+  let p = readPrefs({});
+  eq(freeTimeSummary(p), `${BLOCKING_DEFAULT.length} of 19 block`);
+  p = toggleBlocking(p, "transport");
+  eq(freeTimeSummary(p), `${BLOCKING_DEFAULT.length - 1} of 19 block`);
 });
 test("prefs: an event hides only when none of its activities' categories shows", () => {
   let p = toggleCategory(readPrefs({}), "isa", "weekly", "eating");

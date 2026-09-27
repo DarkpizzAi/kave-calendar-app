@@ -16,7 +16,7 @@ import { status as syncStatus, checkToken } from "./sync.js";
 import { ICON } from "./chrome-icons.js";
 import { calendarHtml, afterCalendar, onScroll, backToToday, todaysCount } from "./calendar.js";
 import { refreshSheet, openLevel, registerLevel } from "./sheet.js";
-import { readPrefs, isShown, toggleCategory, resetCategories, defaultsSummary, categoriesSummary, VIEW_NAMES, DETAIL_NAMES, STYLE_NAMES } from "./prefs.js";
+import { readPrefs, isShown, toggleCategory, resetCategories, defaultsSummary, categoriesSummary, VIEW_NAMES, DETAIL_NAMES, STYLE_NAMES, blocksFreeTime, toggleBlocking, freeTimeSummary } from "./prefs.js";
 import { CATEGORIES, iconFor } from "./icons.js";
 import { resetCalendarDefaults } from "./calendar.js";
 import { checkForUpdate, ensureVersionAsked, updateStatusLines, updateBusy, updateButtonText, updateReady } from "./updates.js";
@@ -124,6 +124,7 @@ function renderSettings() {
     ${field("Theme", theme, "Light and dark follow the phone.")}
     ${opener("Calendar defaults", "set-defaults", defaultsSummary(prefs))}
     ${me ? opener("Categories", "set-cats", categoriesSummary(prefs, me)) : ""}
+    ${opener("Free time", "set-freetime", freeTimeSummary(prefs))}
     ${field("Who am I", choices("me", [["isa", "Isa"], ["hugo", "Hugo"]], me), "Stamps every edit you make. Nothing is saved until it is set.")}
     ${field("Sync", `<div class="sync-status"><p class="sync-line ${dot}"><i></i>${escapeHtml(syncLine)}</p>${when ? `<p class="sync-line muted">${escapeHtml(when)}</p>` : ""}</div>`
       + `<button id="syncNow"${s.token ? "" : " disabled"}>Sync now</button>`)}
@@ -188,6 +189,23 @@ registerLevel("set-cats", {
     const v = b.dataset.tickView, t = b.dataset.tickType;
     if (!v || !t || !s.me) return;
     store.setSetting("hiddenCategories", toggleCategory(readPrefs(s), s.me, v, t).hiddenCategories);
+  },
+});
+registerLevel("set-freetime", {
+  title: () => "Free time",
+  body() {
+    const s = store.state.settings, p = readPrefs(s);
+    const rowsHtml = CATEGORIES.map((c) => {
+      const on = blocksFreeTime(p, c.type);
+      return `<div class="grid-r single"><span class="gl"><span class="gi">${escapeHtml(iconFor({ type: c.type }, { owner: s.me }, s.me))}</span>${escapeHtml(c.label)}</span>`
+        + `<button class="tick${on ? " on" : ""}" role="checkbox" aria-checked="${on}" aria-label="${escapeHtml(c.label)} blocks free time" data-tick-block="${escapeHtml(c.type)}">${on ? ICON.check : ""}</button></div>`;
+    }).join("");
+    return `<p class="fhint">Which categories count as "not free" when a weekend or long weekend could otherwise show as free. Shared by both of you.</p><div class="grid">${rowsHtml}</div>`;
+  },
+  onAction(b) {
+    const t = b.dataset.tickBlock;
+    if (!t) return;
+    store.setSetting("blockingCategories", toggleBlocking(readPrefs(store.state.settings), t).blockingCategories);
   },
 });
 

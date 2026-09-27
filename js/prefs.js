@@ -100,6 +100,8 @@ export function eventBlocksFreeTime(prefs, event) {
   return types.some((t) => blocksFreeTime(prefs, t));
 }
 
+export const freeTimeSummary = (p) => `${p.blockingCategories.length} of ${TYPES.length} block`;
+
 /* An event shows while any of its activities' categories shows; an event
    with no activity counts as Other. Dinner then drinks stays visible to
    someone who hides eating out but not drinks. */
