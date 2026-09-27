@@ -386,21 +386,32 @@ a.ticket{color:inherit;text-decoration:none}
 .flag{display:inline-block;border-radius:var(--r-pill);padding:1px var(--sp-2);font-size:var(--fs-meta);font-weight:var(--fw-medium);max-width:100%;overflow:hidden;text-overflow:ellipsis;vertical-align:middle}
 .flag.acc{background:var(--accent);color:var(--accent-text)}
 .flag.soft{background:var(--accent-soft);color:var(--text)}
-/* weekly */
+/* Grid, Agenda and Glance all share one card model: a "period card" -- one
+   calendar week (Grid/Agenda) or month (Glance) -- in var(--panel), black in
+   dark mode; every day inside it is its own smaller "day card" in
+   var(--surface-2), grey, always (busy or not). No card ever takes a
+   border for this. Today is the one day card whose fill turns solid
+   var(--accent), and that always wins over every other state. */
 .month{margin:var(--sp-3) 0 0;font-size:var(--fs-title-lg);font-weight:var(--fw-strong);letter-spacing:var(--tracking-heading);line-height:var(--lh-title)}
-.week{display:flex;flex-direction:column;gap:var(--sp-2);margin-bottom:var(--sp-2)}
-/* grid: weekend-spotlight */
+.gridCard{background:var(--panel);border-radius:var(--r-card);padding:var(--sp-2);margin-bottom:var(--sp-2)}
+.mh{margin:0 0 var(--sp-2);display:flex;justify-content:space-between;align-items:center}
+.away{margin:0;display:grid;grid-template-columns:20px minmax(0,1fr);column-gap:var(--sp-2);font-size:var(--fs-meta);background:var(--surface-2);border-radius:var(--r-control);padding:var(--sp-1) var(--sp-2)}
+.away.grey{color:var(--text-dim)}
+/* grid: weekend-spotlight. The gap between the 5 weekday cards and the gap
+   above the weekend cards are the same value (--sp-2), so the rhythm reads
+   as one consistent grid, not two different spacings. */
 .wk-row2{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:var(--sp-2);margin-bottom:var(--sp-2)}
-.bsq2{background:var(--panel);border-radius:var(--r-card);min-height:64px;padding:6px 4px;display:flex;flex-direction:column;align-items:center;justify-content:flex-start;gap:4px;cursor:pointer}
+.bsq2{background:var(--surface-2);border-radius:var(--r-card);min-height:64px;padding:6px 4px;display:flex;flex-direction:column;align-items:center;justify-content:flex-start;gap:4px;cursor:pointer}
 .bsq2 .lbl{font-size:var(--fs-micro);font-weight:500;color:var(--text-dim)}
-.bsq2 .emorow{display:flex;flex-direction:row;justify-content:flex-start;gap:2px;width:100%;overflow:hidden}
+/* up to 4 emoji, 2x2, centred -- never a single left-aligned row */
+.bsq2 .emogrid{display:grid;grid-template-columns:repeat(2,1fr);justify-items:center;align-content:center;gap:2px;flex:1;width:100%}
 .bsq2.today{background:var(--accent)}
 .bsq2.today .lbl{color:var(--accent-text)}
 .bsq2.clear{background:var(--good-tx);color:var(--good-bg)}
 .bsq2.clear .lbl{color:var(--good-bg)}
 .bsq2.open{background:var(--good-bg);color:var(--good-tx)}
 .bsq2.open .lbl{color:var(--good-tx)}
-.werect{background:var(--panel);border-radius:var(--r-card);min-height:64px;padding:6px var(--sp-2);display:flex;flex-direction:column;gap:3px;cursor:pointer;margin-bottom:var(--sp-2)}
+.werect{background:var(--surface-2);border-radius:var(--r-card);min-height:64px;padding:6px var(--sp-2);display:flex;flex-direction:column;gap:3px;cursor:pointer;margin-bottom:var(--sp-2)}
 .werect:last-child{margin-bottom:0}
 .werect .lbl{font-size:var(--fs-micro);font-weight:500;color:var(--text-dim)}
 .werect.today{background:var(--accent)}
@@ -409,22 +420,38 @@ a.ticket{color:inherit;text-decoration:none}
 .werect.clear .lbl{color:var(--good-bg)}
 .werect.open{background:var(--good-bg);color:var(--good-tx)}
 .werect.open .lbl{color:var(--good-tx)}
-.icons{display:flex;flex-wrap:wrap;gap:4px;font-size:18px;line-height:1.15}
-/* monthly and yearly cards. F11: the month card itself is no longer a tap
-   target (only its "N plans" line is), so it takes no pointer cursor. */
-.wcard,.mcard{background:var(--panel);border-radius:var(--r-card);padding:var(--sp-3);display:flex;flex-direction:column;gap:var(--sp-2);border:2px solid transparent}
-.wcard{cursor:pointer}
-.wcard.now,.mcard.now{border-color:var(--accent)}
-.wh{display:flex;gap:var(--sp-2);align-items:center;flex-wrap:wrap}
-.away{margin:0;display:grid;grid-template-columns:20px minmax(0,1fr);column-gap:var(--sp-2);font-size:var(--fs-meta);background:var(--surface-2);border-radius:var(--r-control);padding:var(--sp-1) var(--sp-2)}
-.away.grey{color:var(--text-dim)}
-.mh{margin:0;display:flex;justify-content:space-between;align-items:center}
-.heat{display:grid;grid-template-columns:repeat(var(--n),minmax(0,1fr));gap:2px}
-.heat i{height:16px;border-radius:2px;background:var(--surface-2)}
-/* F74: the .mcard's flex gap (--sp-2) between the heat-strip and the event
-   lines below it read as too tight (checked live). Give that one pairing
-   extra breathing room without touching the rest of the card's rhythm. */
-.mcard .heat + .rows{margin-top:var(--sp-2)}
+/* agenda: one grey rectangle per day, every day, always -- an empty day is
+   just a day card with nothing in it, never skipped, never a placeholder line */
+.daycard{background:var(--surface-2);border-radius:var(--r-card);padding:6px var(--sp-2);margin-bottom:var(--sp-2);cursor:pointer}
+.daycard:last-child{margin-bottom:0}
+.daycard > .cd{display:block;font-size:var(--fs-micro);font-weight:500;color:var(--text-dim);margin-bottom:2px}
+.daycard.today{background:var(--accent)}
+.daycard.today > .cd{color:var(--accent-text)}
+.daycard.clear{background:var(--good-tx);color:var(--good-bg)}
+.daycard.clear > .cd{color:var(--good-bg)}
+.daycard.open{background:var(--good-bg);color:var(--good-tx)}
+.daycard.open > .cd{color:var(--good-tx)}
+/* glance: a real Monday-first month grid, blank pad cells outside the month */
+.glanceCard{background:var(--panel);border-radius:var(--r-card);padding:var(--sp-3);margin-bottom:var(--sp-2);border:2px solid transparent}
+.glanceCard.now{border-color:var(--accent)}
+.wdhead{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));margin-bottom:2px}
+.wdhead span{text-align:center;font-size:var(--fs-micro);font-weight:var(--fw-medium);color:var(--text-dim)}
+.monthgrid{display:flex;flex-direction:column;gap:4px}
+.grid7{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));gap:4px}
+.dsq{aspect-ratio:1;border-radius:8px;background:var(--surface-2);display:flex;align-items:center;justify-content:center;cursor:pointer;border:2px solid transparent}
+.dsq.pad{background:transparent;border-color:transparent;cursor:default}
+.dsq .num{font-size:var(--fs-micro);font-weight:var(--fw-medium);color:var(--text-dim)}
+/* busy in Glance is a border, not a fill -- the card stays grey underneath.
+   Solid = I have something that day, dotted = only the other person does;
+   if we both do, mine wins (never both borders at once). */
+.dsq.mine{border-color:var(--accent)}
+.dsq.other{border-style:dotted;border-color:var(--accent)}
+.dsq.today{background:var(--accent);border-color:transparent}
+.dsq.today .num{color:var(--accent-text)}
+.dsq.clear{background:var(--good-tx);border-color:transparent}
+.dsq.clear .num{color:var(--good-bg)}
+.dsq.open{background:var(--good-bg);border-color:transparent}
+.dsq.open .num{color:var(--good-tx)}
 /* search */
 .hint{margin:0;color:var(--text-dim);font-size:var(--fs-meta)}
 .card{background:var(--panel);border-radius:var(--r-card);padding:var(--sp-3)}
@@ -492,7 +519,6 @@ a.ticket{color:inherit;text-decoration:none}
 .dchev{flex:none;display:grid;place-items:center;color:var(--text-dim)}
 .dchev .chev{width:20px;height:20px;margin:0}
 .day.empty,.lrow.empty,.wcard.empty{cursor:default}
-.wh .away{display:inline-block;margin:0;padding:1px var(--sp-2);border-radius:var(--r-pill);background:var(--surface-2);font-size:var(--fs-meta)}
 /* F70: a jump (e.g. Yearly's "N plans >") lands the target week at the top
    of Monthly, but the month heading sits just above that week in the flow
    and was landing flush against, or even partly behind, the header (measured
@@ -519,33 +545,6 @@ a.ticket{color:inherit;text-decoration:none}
 /* ---- F10: the year heading, big and once, like Monthly's big month
    heading; no border on the heading itself (Isa's correction). ---- */
 .year-big{font-size:var(--fs-display);font-weight:var(--fw-strong);letter-spacing:var(--tracking-heading);margin:var(--sp-3) 0 0;display:block}
-/* F11: "N plans >" is the only tap target into Monthly, set in the same
-   font as the rest of the line, not a heading and not the chevron glyph. */
-.plans-line{margin:0;font-size:var(--fs-meta);color:var(--text-dim);background:none;border:0;padding:0;min-height:0;text-align:right;white-space:nowrap}
-
-/* ---- F58 (revises F12/F31): the heat strip. Today is marked independent
-   of fill. Current month: an other-person-only day fills accent-soft,
-   empty is unfilled (the plain .heat i background above, var(--surface-2)).
-   Future months: the viewer's own or a joint event fills a muted, darker
-   "accent fade" (.future); every other day (empty, or another person only)
-   is unfilled -- the SAME empty colour as the current month's, not a
-   separate flatter grey (that was F31's bug: every future square, including
-   ones with no fill at all, drew as one flat grey with nothing to tell them
-   apart).
-   --accent-soft turned out to read as a PALE tint next to that empty fill,
-   not a dark one (checked live at 16px against .heat i.mine and the plain
-   empty square) -- so .future is a deliberately darkened accent, a one-off
-   kept out of the token system, the same reasoning F12's own open question
-   about --accent-soft already raised.
-   F72: the current month's own/joint fill (.mine) now uses the SAME muted
-   accent fade as .future, not the brighter full --accent -- one consistent
-   look across the whole Yearly grid, current month included. Only this
-   fill colour changed; heatFill()'s "mine"/"other"/"future" labels and the
-   other-person / empty-day logic are untouched. */
-.heat i.mine{background:color-mix(in srgb, var(--accent) 55%, var(--text) 25%)}
-.heat i.other{background:var(--accent-soft)}
-.heat i.future{background:color-mix(in srgb, var(--accent) 55%, var(--text) 25%)}
-.heat i.t{outline:2px solid var(--text);outline-offset:-2px}
 
 /* ---- F16: a tiny inline SVG checkbox glyph marks an event with open
    to-dos, replacing the plain dot (never an emoji). ---- */

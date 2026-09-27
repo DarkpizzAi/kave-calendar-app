@@ -9,14 +9,14 @@
 
 import { escapeHtml as esc } from "./util.js";
 import { addDays, dayOfWeek, mondayOf, todayKey } from "./dates.js";
-import { isoWeek, monthOfWeek, loadRange, freeWeekendSaturday, longWeekends, dayFreeState, weekFreeNote } from "./views.js";
+import { monthOfWeek, loadRange, dayFreeState, weekFreeNote, weekFreeDays } from "./views.js";
 import { HOLIDAYS } from "./holidays.js";
 import { applyDetail } from "./filter.js";
 import { store } from "./store.js";
 import { indexByDay, tappable, zoomWeekTarget, zoomMonthTarget, isAway, awayText,
   shouldLoadMore, nextCount, iconsOf, searchEvents, shortDate, pastMonths, gesture, lastEventDay,
-  fullPastWeeks, fullPastMonths, backToTodayState, todaysCount as cmTodaysCount, eventsInMonth, hideCancelled,
-  hasLoadedOlder, hasOpenTodos, heatFill } from "./cal-model.js";
+  fullPastWeeks, fullPastMonths, backToTodayState, todaysCount as cmTodaysCount, hideCancelled,
+  hasLoadedOlder, hasOpenTodos } from "./cal-model.js";
 import { openLevel, sheetOpen } from "./sheet.js";
 import { ICON } from "./chrome-icons.js";
 import { readPrefs, byCategories, eventBlocksFreeTime } from "./prefs.js";
@@ -87,12 +87,6 @@ function row(e, withDate, click) {
 }
 const list = (items, dated) => (items ? `<ul class="rows${dated ? " dated" : ""}">${items}</ul>` : "");
 export const rows = (evs, dated, click) => list(evs.map((e) => row(e, dated, click)).join(""), dated);
-const noteRow = (d, text) => `<li class="note" style="--n:0"><span class="c-d">${esc(shortDate(d, frame.thisYear))}</span><span class="c-i"></span><span class="c-t"><span class="flag acc">${esc(text)}</span></span></li>`;
-/* F10: a long weekend line is now a normal event line -- Other's icon (📌),
-   no accent-ink, nothing special. */
-const noteRowPlain = (d, text) => `<li style="--n:1"><span class="c-d">${esc(shortDate(d, frame.thisYear))}</span><span class="c-i">📌</span><span class="c-t">${esc(text)}</span></li>`;
-const iconSpans = (e) => icons(e).map((g) => `<span class="ic ${cls(e)}">${esc(g)}</span>`).join("");
-const sortByDay = (items) => items.sort((a, b) => (a.d < b.d ? -1 : a.d > b.d ? 1 : 0)).map((x) => x.html).join("");
 
 /* ---- Today (F4: the Today card is gone; a bare anchor keeps the scroll
    machinery -- Back to today, onScroll's visibility check -- working at the
@@ -135,67 +129,71 @@ const monthHead = (d) => {
   const label = `${MONTHS[Number(d.slice(5, 7)) - 1]}${d.slice(0, 4) !== frame.thisYear ? " " + d.slice(0, 4) : ""}`;
   return `<h3 class="month">${esc(label)}</h3>`;
 };
-const weekLabel = (m) => `WEEK ${isoWeek(m)}`;
-
-/* Grid: Mon-Fri as small emoji-only squares (never title text, for anyone,
-   at any setting -- a layout rule, not a display choice); Sat-Sun as two
-   full-width event-line rectangles. Free time (S.freeOn) colours Clear
-   (nothing at all) or Open (something, but nothing blocking) inside a
-   qualifying week; today is solid accent and wins over Clear/Open. */
+/* Both Grid and Agenda share one card model: a "period card" (one calendar
+   week, var(--panel), black in dark mode) holding one smaller "day card"
+   per day (var(--surface-2), grey, CSS) -- never a border. Today is the one
+   day card whose FILL turns solid accent, always wins over Clear/Open.
+   Free time (S.freeOn) colours Clear/Open only on days that are actually
+   part of a detected free weekend/long weekend/opportunity (weekFreeDays) --
+   never a bare weekday just because nothing happens to land on it. */
 function gridBlocks(e) { return eventBlocksFreeTime(readPrefs(store.state.settings), e); }
-function gridState(d) {
+function periodState(d, freeDays) {
   if (d === frame.today) return "today";
-  if (!S.freeOn) return "";
-  return dayFreeState(d, frame.onAll, gridBlocks);
+  if (!S.freeOn || !freeDays.has(d)) return "";
+  return dayFreeState(d, frame.onAll, gridBlocks) || "";
 }
 function gridLabel(d) {
   const dow = DOW[dayOfWeek(d)];
   return `${dow[0]}${dow.slice(1).toLowerCase()} ${Number(d.slice(8))}`;
 }
-function gridWeekday(d) {
+/* Up to 4 emoji, 2x2, across every event of the day -- event boundaries
+   don't matter here, only the icons themselves (a weekday square never
+   shows title text, for anyone, at any setting). The 🔍 free-window note
+   joins the same grid when this day opens a window whose first date is a
+   weekday (a Friday bridge day, say) -- weekdays never get the note's text,
+   only its emoji, per spec. */
+function gridEmojis(d, evs, note) {
+  const icons_ = evs.flatMap((e) => icons(e).map((g) => `<span class="ic ${cls(e)}">${esc(g)}</span>`));
+  if (note && note.on === d) icons_.unshift('<span class="ic">🔍</span>');
+  return icons_.slice(0, 4).join("");
+}
+function gridWeekday(d, freeDays, note) {
   const evs = frame.on(d);
   const tap = tappable(evs) ? ` role="button" tabindex="0" data-act="day" data-d="${d}"` : "";
-  return `<div class="bsq2 ${gridState(d)}"${tap}><span class="lbl">${gridLabel(d)}</span>`
-    + `<span class="emorow">${evs.map(iconSpans).join("")}</span></div>`;
+  return `<div class="bsq2 ${periodState(d, freeDays)}"${tap}><span class="lbl">${gridLabel(d)}</span>`
+    + `<span class="emogrid">${gridEmojis(d, evs, note)}</span></div>`;
 }
-function gridWeekend(d, note) {
+function gridWeekend(d, freeDays, note) {
   const evs = frame.on(d);
   const tap = tappable(evs) ? ` role="button" tabindex="0" data-act="day" data-d="${d}"` : "";
   const noteLine = (note && note.on === d) ? `<li style="--n:1"><span class="c-i">🔍</span><span class="c-t">${esc(note.text)}</span></li>` : "";
-  return `<div class="werect ${gridState(d)}"${tap}><span class="lbl">${gridLabel(d)}</span>`
+  return `<div class="werect ${periodState(d, freeDays)}"${tap}><span class="lbl">${gridLabel(d)}</span>`
     + `<ul class="rows">${evs.map((e) => row(e, false, false)).join("")}${noteLine}</ul></div>`;
 }
 function weekRow(m) {
   const days = [0, 1, 2, 3, 4, 5, 6].map((k) => addDays(m, k));
+  const freeDays = S.freeOn ? new Set(weekFreeDays(m, HOLIDAYS, frame.onAll, frame.today, gridBlocks)) : new Set();
   const note = S.freeOn ? weekFreeNote(m, HOLIDAYS, frame.onAll, frame.today, gridBlocks) : null;
-  const weekdays = days.slice(0, 5).map(gridWeekday).join("");
-  const weekend = days.slice(5, 7).map((d) => gridWeekend(d, note)).join("");
-  return `<section class="week" data-week="${m}"><div class="wk-row2">${weekdays}</div>${weekend}</section>`;
+  const weekdays = days.slice(0, 5).map((d) => gridWeekday(d, freeDays, note)).join("");
+  const weekend = days.slice(5, 7).map((d) => gridWeekend(d, freeDays, note)).join("");
+  return `<div class="gridCard" data-week="${m}"><div class="wk-row2">${weekdays}</div>${weekend}</div>`;
 }
-function weekEvents(m) {
-  const out = [];
-  for (let k = 0; k < 7; k++) for (const e of frame.on(addDays(m, k))) if (!out.includes(e)) out.push(e);
-  return out;
-}
-function weekCard(m) {
-  const evs = weekEvents(m);
+/* Agenda: the same period-card/day-card model, one grey rectangle per day,
+   every day of the week (never skipped, never a "Nothing planned" line --
+   an empty day is just a day card with nothing in it). */
+function agendaDay(d, freeDays) {
+  const evs = frame.on(d);
   const away = evs.filter(isAway), rest = evs.filter((e) => !isAway(e));
-  const items = rest.map((e) => ({ d: e.start < m ? m : e.start, html: row(e, true, false) }));
-  /* free-time blocking is per category, shared by both people, and must
-     never depend on the viewer's own display filters -- so it reads
-     straight from settings and from frame.onAll (unfiltered), not frame.on */
-  const blocks = (e) => eventBlocksFreeTime(readPrefs(store.state.settings), e);
-  const sat = freeWeekendSaturday(m, frame.onAll, frame.today, blocks);
-  if (sat) items.push({ d: sat, html: noteRow(sat, "Free weekend") });
-  const now = m <= frame.today && frame.today <= addDays(m, 6);
-  const tap = tappable(evs) ? ` data-act="week" data-m="${m}" role="button" tabindex="0"` : "";
-  /* F27: only the current week's label keeps the pill, filled accent; every
-     other week's is plain text, no pill, no border (.lbl-pill carries no
-     background of its own any more -- only .on does, CSS). */
-  return `<div class="wcard${now ? " now" : ""}${evs.length ? "" : " empty"}" data-week="${m}"${tap}>`
-    + `<div class="wh"><span class="lbl-pill${now ? " on" : ""}">${weekLabel(m)}</span>`
+  const label = `${DOW[dayOfWeek(d)][0]}${DOW[dayOfWeek(d)].slice(1).toLowerCase()} ${Number(d.slice(8))}`;
+  const tap = tappable(evs) ? ` role="button" tabindex="0" data-act="day" data-d="${d}"` : "";
+  return `<div class="daycard ${periodState(d, freeDays)}"${tap}><span class="cd">${label}</span>`
     + away.map((e) => `<span class="away${frame.grey.has(e.id) ? " grey" : ""}">${esc(icons(e)[0])} ${esc(awayText(e, frame.thisYear))}</span>`).join("")
-    + "</div>" + list(sortByDay(items), true) + "</div>";
+    + `<ul class="rows">${rest.map((e) => row(e, false, false)).join("")}</ul></div>`;
+}
+function agendaWeek(m) {
+  const freeDays = S.freeOn ? new Set(weekFreeDays(m, HOLIDAYS, frame.onAll, frame.today, gridBlocks)) : new Set();
+  const days = [0, 1, 2, 3, 4, 5, 6].map((k) => addDays(m, k));
+  return `<div class="gridCard" data-week="${m}">${days.map((d) => agendaDay(d, freeDays)).join("")}</div>`;
 }
 function weekBlocks(from, count, kind) {
   let out = "", cur = "";
@@ -205,7 +203,7 @@ function weekBlocks(from, count, kind) {
     const first = [0, 1, 2, 3, 4, 5, 6].map((k) => addDays(m, k)).find((x) => x.slice(8) === "01");
     const monthOf = kind === "grid" ? (first || m) : monthOfWeek(m) + "-01";
     if (monthOf.slice(0, 7) !== cur && (i === 0 || first || kind === "agenda")) { cur = monthOf.slice(0, 7); out += monthHead(monthOf); }
-    out += kind === "grid" ? weekRow(m) : weekCard(m);
+    out += kind === "grid" ? weekRow(m) : agendaWeek(m);
   }
   return out;
 }
@@ -218,81 +216,65 @@ function weeks(kind) {
     future: weekBlocks(frame.thisMonday, S.future[kind], kind) };
 }
 
-/* ---- Yearly: a card per month ---- */
+/* ---- Glance: a real Monday-first month grid, one card per month ---- */
 const ymOf = (y, mo) => `${y}-${String(mo + 1).padStart(2, "0")}`;
 const daysIn = (y, mo) => new Date(Date.UTC(y, mo + 1, 0)).getUTCDate();
-/* F10: the year heading is big, once, like Monthly's big month heading. Isa's
-   correction in the mock-up round: the year heading itself takes no border
-   -- only the current month's card does, the same accent outline as
-   Weekly's today-card and Monthly's current-week card. */
 const yearHead = (y) => `<p class="year-big">${y}</p>`;
-function monthCard(y, mo) {
-  const key = ymOf(y, mo), n = daysIn(y, mo), now = key === frame.today.slice(0, 7);
-  const evs = []; let cells = "";
-  for (let dd = 1; dd <= n; dd++) {
-    const d = `${key}-${String(dd).padStart(2, "0")}`;
-    const on = frame.on(d);
-    for (const e of on) if (!evs.includes(e)) evs.push(e);
-    /* F58 (revises F12/F31), corrected by F61: the current month is
-       colour-coded -- the viewer's own or a joint event in the accent, an
-       other-person-only day in accent-soft. Future months: the viewer's
-       own or a joint event fills in a muted, darker "accent fade"
-       (.future, CSS); every other future square is empty, the same empty
-       fill as the current month's (no class at all -- "grey" no longer
-       exists as a separate, flatter colour). Today is marked independent
-       of fill.
-       F61: the fill reads from frame.onAll (unfiltered), the same source
-       "N plans" below already uses (F20) -- only evs, the itemised lines
-       above, stays built from frame.on (filtered). Squares must colour in
-       every plan, hidden categories included. */
-    const fill = heatFill(frame.onAll, d, now, frame.me);
-    cells += `<i class="${fill}${d === frame.today ? " t" : ""}"></i>`;
-  }
-  /* F10: a long weekend or opportunity that has already passed does not
-     show; the line is a normal event line (no 🔍, no accent-ink). */
-  const blocks = (e) => eventBlocksFreeTime(readPrefs(store.state.settings), e);
-  const lw = longWeekends(HOLIDAYS, key + "-01", `${key}-${n}`, frame.onAll, blocks)
-    .filter((w) => (w.start.slice(0, 7) === key || w.end.slice(0, 7) === key) && w.end >= frame.today);
-  /* F17: no second, hard-coded gate here any more -- evs already carries only
-     the viewer's Yearly categories (prefs.js's byCategories, applied in
-     buildFrame), whose default is now the real "big things" set. Toggling
-     Categories in Settings genuinely changes what a month's card lists. */
-  /* F56: each plan line renders through the same row()/noteRowPlain() the
-     rest of the app uses -- no separate per-line colour/heat tint exists
-     here (checked: cls() only ever adds "grey" for partial-detail's other
-     person, unchanged everywhere else, "idea" and "cancelled", none of them
-     Yearly-specific). Confirmed live: a month card's lines are plain text,
-     same colours as Weekly/Monthly's own rows. F56 is a verification, not a
-     code change; F58 above is the actual bug it was seen alongside (the
-     heat-strip squares, not these lines). */
-  const items = evs.map((e) => ({ d: e.start, html: row(e, true, true) }))
-    .concat(lw.map((w) => ({ d: w.start, html: noteRowPlain(w.start, `${w.text}, ${w.names}`) })));
-  /* F20: the count is unfiltered by category (frame.onAll), a partial
-     revert of F17 -- it has to match what Monthly will show once you jump
-     there. The heat-strip fill above is unaffected, still built from
-     frame.on (filtered). */
-  const plansCount = eventsInMonth(frame.onAll, key, n).length;
-  /* F11: the month heading is plain text, no chevron, not a tap target; "N
-     plans" plus a literal ">" is the only jump into Monthly. */
-  /* F27: only the current month's card label keeps the pill (accent). */
-  return `<div class="mcard${now ? " now" : ""}" data-month="${key}">`
-    + `<p class="mh"><span class="lbl-pill${now ? " on" : ""}">${MONTHS[mo].toUpperCase()}</span>`
-    + `<button class="plans-line" data-act="zoommonth" data-ym="${key}">${plansCount} plan${plansCount === 1 ? "" : "s"} &gt;</button></p>`
-    + `<div class="heat" style="--n:${n}" aria-hidden="true">${cells}</div>` + list(sortByDay(items), true) + "</div>";
+function glanceBlocks(e) { return eventBlocksFreeTime(readPrefs(store.state.settings), e); }
+/* Lead-padded, Monday-first cells for one calendar month, chunked into
+   real weeks (each row's own Monday, for weekFreeDays) -- padded only to
+   the next multiple of 7, never a whole extra blank row. */
+function glanceRows(key, n) {
+  const lead = dayOfWeek(`${key}-01`);
+  const cells = [];
+  for (let i = 0; i < lead; i++) cells.push(null);
+  for (let dd = 1; dd <= n; dd++) cells.push(`${key}-${String(dd).padStart(2, "0")}`);
+  while (cells.length % 7 !== 0) cells.push(null);
+  const start = addDays(`${key}-01`, -lead);
+  const rows = [];
+  for (let i = 0; i < cells.length; i += 7) rows.push({ monday: addDays(start, i), days: cells.slice(i, i + 7) });
+  return rows;
 }
-function yearly() {
+/* Busy in Glance is a border, not a fill -- the card stays grey underneath.
+   Solid accent = I have something that day; dotted accent = only the other
+   person does. If we both do, mine wins (never both borders at once). */
+function glanceBorder(d) {
+  const evs = frame.on(d);
+  if (!evs.length) return "";
+  return evs.some((e) => e.owner === frame.me || e.owner === "shared") ? "mine" : "other";
+}
+function glanceSquare(d, freeDays) {
+  if (!d) return `<div class="dsq pad"></div>`;
+  const st = periodState(d, freeDays);
+  const border = st === "today" ? "" : glanceBorder(d);
+  const tap = tappable(frame.on(d)) ? ` role="button" tabindex="0" data-act="day" data-d="${d}"` : "";
+  return `<div class="dsq ${st} ${border}"${tap}><span class="num">${Number(d.slice(8))}</span></div>`;
+}
+function glanceMonth(y, mo) {
+  const key = ymOf(y, mo), n = daysIn(y, mo), now = key === frame.today.slice(0, 7);
+  const label = `${MONTHS[mo].toUpperCase()}${key.slice(0, 4) !== frame.thisYear ? " " + key.slice(0, 4) : ""}`;
+  const rows = glanceRows(key, n).map((r) => {
+    const freeDays = S.freeOn ? new Set(weekFreeDays(r.monday, HOLIDAYS, frame.onAll, frame.today, glanceBlocks)) : new Set();
+    return `<div class="grid7">${r.days.map((d) => glanceSquare(d, freeDays)).join("")}</div>`;
+  }).join("");
+  return `<div class="glanceCard${now ? " now" : ""}" data-month="${key}">`
+    + `<p class="mh"><span class="lbl-pill${now ? " on" : ""}">${label}</span></p>`
+    + `<div class="wdhead">${DOW.map((w) => `<span>${w[0]}</span>`).join("")}</div>`
+    + `<div class="monthgrid">${rows}</div></div>`;
+}
+function glance() {
   const y0 = Number(frame.thisYear), m0 = Number(frame.today.slice(5, 7)) - 1;
   const shown = pastMonths(frame.today, S.floor, S.past.glance);
   let past = "", pastYear = null;
   for (const ym of shown) {
     const y = Number(ym.slice(0, 4));
     if (y !== pastYear) { past += yearHead(y); pastYear = y; }
-    past += monthCard(y, Number(ym.slice(5, 7)) - 1);
+    past += glanceMonth(y, Number(ym.slice(5, 7)) - 1);
   }
   let future = "", curYear = pastYear;
   for (let y = y0, mo = m0, n = 0; ymOf(y, mo) + "-01" <= frame.range.max && n < S.future.glance; n++) {
     if (y !== curYear) { future += yearHead(y); curYear = y; }
-    future += monthCard(y, mo);
+    future += glanceMonth(y, mo);
     if (++mo === 12) { mo = 0; y++; }
   }
   return { past, future };
@@ -334,7 +316,7 @@ export function calendarHtml() {
   frame = buildFrame();
   ensureYears();
   if (S.searchOpen) return `<div class="page">${controls()}${searchPage()}</div>`;
-  const v = S.view === "glance" ? yearly() : weeks(S.view);
+  const v = S.view === "glance" ? glance() : weeks(S.view);
   return `<div class="page">${controls()}<div class="content ${S.slide}">${v.past}${todayAnchor()}${v.future}</div></div>`;
 }
 

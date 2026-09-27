@@ -71,6 +71,26 @@ export function weekFreeNote(monday, holidays, eventsOn, today, blocks) {
   return sat ? { on: sat, text: "Free weekend" } : null;
 }
 
+/* Which of this week's days are actually part of a qualifying free window --
+   Clear/Open colouring must never land on an ordinary weekday just because
+   nothing happens to be on it that day; only a day inside a real free
+   weekend, long weekend, or opportunity block counts (a bridge weekday, e.g.
+   the Friday in a Thursday-holiday opportunity, does count -- it's genuinely
+   part of the block). Same priority as weekFreeNote: a long weekend/
+   opportunity starting this week wins over the plain Saturday check. */
+export function weekFreeDays(monday, holidays, eventsOn, today, blocks) {
+  const sunday = addDays(monday, 6);
+  const lw = longWeekends(holidays, addDays(monday, -7), addDays(sunday, 7), eventsOn, blocks)
+    .find((w) => w.start >= monday && w.start <= sunday);
+  if (lw) {
+    const days = [];
+    for (let d = lw.start; d <= lw.end; d = addDays(d, 1)) if (d >= monday && d <= sunday) days.push(d);
+    return days;
+  }
+  const sat = freeWeekendSaturday(monday, eventsOn, today, blocks);
+  return sat ? [sat, addDays(sat, 1)] : [];
+}
+
 /* ---- long weekends (Yearly), from the bank holidays ---- */
 const offDay = (holidays) => (d) => dayOfWeek(d) >= 5 || !!holidays[d];
 

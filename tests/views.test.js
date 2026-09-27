@@ -1,5 +1,5 @@
 import { test, eq, ok } from "./run.js";
-import { isoWeek, monthOfWeek, firstWeekOf, loadRange, freeWeekendSaturday, weekendBlocks, classifyWeekend, longWeekends, yearStats, dayFreeState, weekFreeNote } from "../js/views.js";
+import { isoWeek, monthOfWeek, firstWeekOf, loadRange, freeWeekendSaturday, weekendBlocks, classifyWeekend, longWeekends, yearStats, dayFreeState, weekFreeNote, weekFreeDays } from "../js/views.js";
 import { applyDetail, DETAIL_LEVELS } from "../js/filter.js";
 import { CATEGORIES, iconFor } from "../js/icons.js";
 import { HOLIDAYS } from "../js/holidays.js";
@@ -101,6 +101,21 @@ test("weekFreeNote: a long weekend or opportunity starting inside this week take
 test("weekFreeNote: nothing qualifying this week is null", () => {
   const blocksAll = () => true;
   eq(weekFreeNote("2026-09-21", {}, on([ev("x", "2026-09-26")]), "2026-09-24", blocksAll), null);
+});
+
+test("weekFreeDays: a plain free weekend covers only Saturday and Sunday", () => {
+  const blocksAll = () => true;
+  eq(weekFreeDays("2026-09-21", {}, on([]), "2026-09-24", blocksAll), ["2026-09-26", "2026-09-27"]);
+});
+test("weekFreeDays: an opportunity block includes its bridge weekday, not the whole week", () => {
+  const blocksAll = () => true;
+  // 2026-09-24 (Thu) is an opportunity holiday, block runs Thu-Sun (bridge Friday)
+  eq(weekFreeDays("2026-09-21", HOLIDAYS, on([]), "2026-09-24", blocksAll),
+     ["2026-09-24", "2026-09-25", "2026-09-26", "2026-09-27"]);
+});
+test("weekFreeDays: nothing qualifying this week is an empty list", () => {
+  const blocksAll = () => true;
+  eq(weekFreeDays("2026-09-21", {}, on([ev("x", "2026-09-26")]), "2026-09-24", blocksAll), []);
 });
 
 /* ---- the Yearly stats card ---- */
