@@ -9,14 +9,14 @@
 
 import { escapeHtml as esc } from "./util.js";
 import { addDays, dayOfWeek, mondayOf, todayKey } from "./dates.js";
-import { isoWeek, monthOfWeek, loadRange, freeWeekendSaturday, longWeekends, dayFreeState, weekFreeNote } from "./views.js";
+import { isoWeek, monthOfWeek, loadRange, dayFreeState, weekFreeNote } from "./views.js";
 import { HOLIDAYS } from "./holidays.js";
 import { applyDetail } from "./filter.js";
 import { store } from "./store.js";
 import { indexByDay, tappable, zoomWeekTarget, zoomMonthTarget, isAway, awayText,
   shouldLoadMore, nextCount, iconsOf, searchEvents, shortDate, pastMonths, gesture, lastEventDay,
   fullPastWeeks, fullPastMonths, backToTodayState, todaysCount as cmTodaysCount, eventsInMonth, hideCancelled,
-  hasLoadedOlder, hasOpenTodos, heatFill } from "./cal-model.js";
+  hasLoadedOlder, hasOpenTodos, monthGrid, glanceBusy } from "./cal-model.js";
 import { openLevel, sheetOpen } from "./sheet.js";
 import { ICON } from "./chrome-icons.js";
 import { readPrefs, byCategories, eventBlocksFreeTime } from "./prefs.js";
@@ -87,12 +87,7 @@ function row(e, withDate, click) {
 }
 const list = (items, dated) => (items ? `<ul class="rows${dated ? " dated" : ""}">${items}</ul>` : "");
 export const rows = (evs, dated, click) => list(evs.map((e) => row(e, dated, click)).join(""), dated);
-const noteRow = (d, text) => `<li class="note" style="--n:0"><span class="c-d">${esc(shortDate(d, frame.thisYear))}</span><span class="c-i"></span><span class="c-t"><span class="flag acc">${esc(text)}</span></span></li>`;
-/* F10: a long weekend line is now a normal event line -- Other's icon (📌),
-   no accent-ink, nothing special. */
-const noteRowPlain = (d, text) => `<li style="--n:1"><span class="c-d">${esc(shortDate(d, frame.thisYear))}</span><span class="c-i">📌</span><span class="c-t">${esc(text)}</span></li>`;
 const iconSpans = (e) => icons(e).map((g) => `<span class="ic ${cls(e)}">${esc(g)}</span>`).join("");
-const sortByDay = (items) => items.sort((a, b) => (a.d < b.d ? -1 : a.d > b.d ? 1 : 0)).map((x) => x.html).join("");
 
 /* ---- Today (F4: the Today card is gone; a bare anchor keeps the scroll
    machinery -- Back to today, onScroll's visibility check -- working at the
@@ -177,25 +172,45 @@ function weekEvents(m) {
   for (let k = 0; k < 7; k++) for (const e of frame.on(addDays(m, k))) if (!out.includes(e)) out.push(e);
   return out;
 }
-function weekCard(m) {
-  const evs = weekEvents(m);
-  const away = evs.filter(isAway), rest = evs.filter((e) => !isAway(e));
-  const items = rest.map((e) => ({ d: e.start < m ? m : e.start, html: row(e, true, false) }));
-  /* free-time blocking is per category, shared by both people, and must
-     never depend on the viewer's own display filters -- so it reads
-     straight from settings and from frame.onAll (unfiltered), not frame.on */
-  const blocks = (e) => eventBlocksFreeTime(readPrefs(store.state.settings), e);
-  const sat = freeWeekendSaturday(m, frame.onAll, frame.today, blocks);
-  if (sat) items.push({ d: sat, html: noteRow(sat, "Free weekend") });
+/* Agenda: same Clear/Open/today state as Grid, but per whole day rather
+   than per weekday/weekend split -- reused, not re-derived. */
+function agendaState(d) {
+  if (d === frame.today) return "today";
+  if (!S.freeOn) return "";
+  return dayFreeState(d, frame.onAll, gridBlocks);
+}
+/* Agenda: one line per event, dated once on the card (never per line, spec
+   section 2); a day with nothing still gets a card (date only, blank --
+   never a placeholder line). The note, if this day is where it lands, is
+   an extra line, additive to whatever real events the day already has. */
+function agendaDay(d, note, rtop, rbot) {
+  const evs = frame.on(d);
+  const tap = tappable(evs) ? ` role="button" tabindex="0" data-act="day" data-d="${d}"` : "";
+  const st = agendaState(d);
+  const merge = (st === "clear" || st === "open") ? `${rtop ? "" : " noTop"}${rbot ? "" : " noBot"}` : "";
+  const noteLine = (note && note.on === d) ? `<li style="--n:1"><span class="c-i">🔍</span><span class="c-t">${esc(note.text)}</span></li>` : "";
+  return `<div class="daycard ${st}${merge}"${tap}><span class="cd">${gridLabel(d)}</span>`
+    + `<ul class="rows">${evs.map((e) => row(e, false, false)).join("")}${noteLine}</ul></div>`;
+}
+function agendaWeek(m) {
+  const days = [0, 1, 2, 3, 4, 5, 6].map((k) => addDays(m, k));
+  const away = weekEvents(m).filter(isAway);
+  const note = S.freeOn ? weekFreeNote(m, HOLIDAYS, frame.onAll, frame.today, gridBlocks) : null;
+  /* a Clear/Open run never includes today (today is blue, not green) --
+     computed against this filtered boolean, not against agendaState's raw
+     string, so today always breaks a run on both sides. */
+  const green = days.map((d) => S.freeOn && d !== frame.today && !!dayFreeState(d, frame.onAll, gridBlocks));
   const now = m <= frame.today && frame.today <= addDays(m, 6);
-  const tap = tappable(evs) ? ` data-act="week" data-m="${m}" role="button" tabindex="0"` : "";
-  /* F27: only the current week's label keeps the pill, filled accent; every
-     other week's is plain text, no pill, no border (.lbl-pill carries no
-     background of its own any more -- only .on does, CSS). */
-  return `<div class="wcard${now ? " now" : ""}${evs.length ? "" : " empty"}" data-week="${m}"${tap}>`
+  const cards = days.map((d, i) => {
+    const rtop = green[i] && (i === 0 || !green[i - 1]);
+    const rbot = green[i] && (i === days.length - 1 || !green[i + 1]);
+    return agendaDay(d, note, rtop, rbot);
+  }).join("");
+  /* F27: only the current week's label keeps the pill, filled accent. */
+  return `<div class="wcard${now ? " now" : ""}" data-week="${m}">`
     + `<div class="wh"><span class="lbl-pill${now ? " on" : ""}">${weekLabel(m)}</span>`
     + away.map((e) => `<span class="away${frame.grey.has(e.id) ? " grey" : ""}">${esc(icons(e)[0])} ${esc(awayText(e, frame.thisYear))}</span>`).join("")
-    + "</div>" + list(sortByDay(items), true) + "</div>";
+    + "</div>" + cards + "</div>";
 }
 function weekBlocks(from, count, kind) {
   let out = "", cur = "";
@@ -205,7 +220,7 @@ function weekBlocks(from, count, kind) {
     const first = [0, 1, 2, 3, 4, 5, 6].map((k) => addDays(m, k)).find((x) => x.slice(8) === "01");
     const monthOf = kind === "grid" ? (first || m) : monthOfWeek(m) + "-01";
     if (monthOf.slice(0, 7) !== cur && (i === 0 || first || kind === "agenda")) { cur = monthOf.slice(0, 7); out += monthHead(monthOf); }
-    out += kind === "grid" ? weekRow(m) : weekCard(m);
+    out += kind === "grid" ? weekRow(m) : agendaWeek(m);
   }
   return out;
 }
@@ -226,59 +241,38 @@ const daysIn = (y, mo) => new Date(Date.UTC(y, mo + 1, 0)).getUTCDate();
    -- only the current month's card does, the same accent outline as
    Weekly's today-card and Monthly's current-week card. */
 const yearHead = (y) => `<p class="year-big">${y}</p>`;
+/* Glance: a bare coloured square, no text but the day number (always white
+   -- it's the only text on the tile, spec section 3). Free (Clear/Open)
+   overrides busy/mine/other; today overrides everything. */
+function glanceState(d) {
+  if (d === frame.today) return "today";
+  if (S.freeOn) { const st = dayFreeState(d, frame.onAll, gridBlocks); if (st) return st; }
+  return glanceBusy(frame.onAll, d, frame.me);
+}
+function glanceSquare(d) {
+  if (!d) return `<i class="dsq pad"></i>`;
+  const evs = frame.on(d);
+  const tap = tappable(evs) ? ` role="button" tabindex="0" data-act="day" data-d="${d}"` : "";
+  return `<i class="dsq ${glanceState(d)}"${tap}><span class="num">${Number(d.slice(8))}</span></i>`;
+}
+const WDHEAD = `<div class="wdhead">${DOW.map((w) => `<span>${w[0]}${w.slice(1).toLowerCase()}</span>`).join("")}</div>`;
+/* F10/F58's long-weekend/heat-strip machinery is gone: Glance's new body is
+   the month grid alone (spec section 2, "a bare square, coloured only") --
+   "N plans >" is the only remaining way in from here to Agenda's real lines
+   and long-weekend notes, unchanged from before this plan. */
 function monthCard(y, mo) {
   const key = ymOf(y, mo), n = daysIn(y, mo), now = key === frame.today.slice(0, 7);
-  const evs = []; let cells = "";
-  for (let dd = 1; dd <= n; dd++) {
-    const d = `${key}-${String(dd).padStart(2, "0")}`;
-    const on = frame.on(d);
-    for (const e of on) if (!evs.includes(e)) evs.push(e);
-    /* F58 (revises F12/F31), corrected by F61: the current month is
-       colour-coded -- the viewer's own or a joint event in the accent, an
-       other-person-only day in accent-soft. Future months: the viewer's
-       own or a joint event fills in a muted, darker "accent fade"
-       (.future, CSS); every other future square is empty, the same empty
-       fill as the current month's (no class at all -- "grey" no longer
-       exists as a separate, flatter colour). Today is marked independent
-       of fill.
-       F61: the fill reads from frame.onAll (unfiltered), the same source
-       "N plans" below already uses (F20) -- only evs, the itemised lines
-       above, stays built from frame.on (filtered). Squares must colour in
-       every plan, hidden categories included. */
-    const fill = heatFill(frame.onAll, d, now, frame.me);
-    cells += `<i class="${fill}${d === frame.today ? " t" : ""}"></i>`;
-  }
-  /* F10: a long weekend or opportunity that has already passed does not
-     show; the line is a normal event line (no 🔍, no accent-ink). */
-  const blocks = (e) => eventBlocksFreeTime(readPrefs(store.state.settings), e);
-  const lw = longWeekends(HOLIDAYS, key + "-01", `${key}-${n}`, frame.onAll, blocks)
-    .filter((w) => (w.start.slice(0, 7) === key || w.end.slice(0, 7) === key) && w.end >= frame.today);
-  /* F17: no second, hard-coded gate here any more -- evs already carries only
-     the viewer's Yearly categories (prefs.js's byCategories, applied in
-     buildFrame), whose default is now the real "big things" set. Toggling
-     Categories in Settings genuinely changes what a month's card lists. */
-  /* F56: each plan line renders through the same row()/noteRowPlain() the
-     rest of the app uses -- no separate per-line colour/heat tint exists
-     here (checked: cls() only ever adds "grey" for partial-detail's other
-     person, unchanged everywhere else, "idea" and "cancelled", none of them
-     Yearly-specific). Confirmed live: a month card's lines are plain text,
-     same colours as Weekly/Monthly's own rows. F56 is a verification, not a
-     code change; F58 above is the actual bug it was seen alongside (the
-     heat-strip squares, not these lines). */
-  const items = evs.map((e) => ({ d: e.start, html: row(e, true, true) }))
-    .concat(lw.map((w) => ({ d: w.start, html: noteRowPlain(w.start, `${w.text}, ${w.names}`) })));
-  /* F20: the count is unfiltered by category (frame.onAll), a partial
-     revert of F17 -- it has to match what Monthly will show once you jump
-     there. The heat-strip fill above is unaffected, still built from
-     frame.on (filtered). */
+  const rows = monthGrid(y, mo).map((r) => `<div class="grid7">${r.map(glanceSquare).join("")}</div>`).join("");
+  /* F20: the count is unfiltered by category (frame.onAll) -- it has to
+     match what Agenda will show once you jump there. */
   const plansCount = eventsInMonth(frame.onAll, key, n).length;
   /* F11: the month heading is plain text, no chevron, not a tap target; "N
-     plans" plus a literal ">" is the only jump into Monthly. */
+     plans" plus a literal ">" is the only jump into Agenda. */
   /* F27: only the current month's card label keeps the pill (accent). */
   return `<div class="mcard${now ? " now" : ""}" data-month="${key}">`
     + `<p class="mh"><span class="lbl-pill${now ? " on" : ""}">${MONTHS[mo].toUpperCase()}</span>`
     + `<button class="plans-line" data-act="zoommonth" data-ym="${key}">${plansCount} plan${plansCount === 1 ? "" : "s"} &gt;</button></p>`
-    + `<div class="heat" style="--n:${n}" aria-hidden="true">${cells}</div>` + list(sortByDay(items), true) + "</div>";
+    + `<div class="monthgrid">${WDHEAD}${rows}</div></div>`;
 }
 function yearly() {
   const y0 = Number(frame.thisYear), m0 = Number(frame.today.slice(5, 7)) - 1;
