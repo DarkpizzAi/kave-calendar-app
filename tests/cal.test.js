@@ -10,9 +10,9 @@ const act = (type, icon) => ({ type, icon });
 
 test("cal: F35 -- a cancelled event is hidden in Weekly, kept (for a struck-through title) in Monthly and Yearly", () => {
   const list = [ev("live", "2026-10-01"), ev("dead", "2026-10-01", { status: "cancelled" })];
-  eq(hideCancelled(list, "weekly").map((e) => e.id), ["live"]);
-  eq(hideCancelled(list, "monthly").map((e) => e.id), ["live", "dead"]);
-  eq(hideCancelled(list, "yearly").map((e) => e.id), ["live", "dead"]);
+  eq(hideCancelled(list, "grid").map((e) => e.id), ["live"]);
+  eq(hideCancelled(list, "agenda").map((e) => e.id), ["live", "dead"]);
+  eq(hideCancelled(list, "glance").map((e) => e.id), ["live", "dead"]);
 });
 test("cal: week rows are 3-3-1 on a phone, 7 when wide", () => {
   const days = ["a", "b", "c", "d", "e", "f", "g"];
@@ -169,7 +169,7 @@ test("cal: F20/F61 -- the plans count and the heat-strip fill both ignore catego
   const trip = ev("trip", "2026-10-10", { activities: [act("transport")] });
   const all = [drinks, trip];
   const prefs = readPrefs({}); // Yearly's default already hides "drinks" (F17): no toggle needed
-  const filtered = byCategories(all, prefs, "isa", "yearly");
+  const filtered = byCategories(all, prefs, "isa", "glance");
   const onAll = (d) => (indexByDay(all).get(d) || []);
   const onFiltered = (d) => (indexByDay(filtered).get(d) || []);
   const count = eventsInMonth(onAll, "2026-10", 31).length;

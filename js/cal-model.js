@@ -65,7 +65,7 @@ export function isBig(e) {
    want to see them I'll delete them" is Isa's own escape hatch there); Monthly
    and Yearly keep it visible, struck through instead (calendar.js's cls()
    marks it, the CSS strikes only the title). */
-export const hideCancelled = (events, view) => (view === "weekly" ? events.filter((e) => e.status !== "cancelled") : events);
+export const hideCancelled = (events, view) => (view === "grid" ? events.filter((e) => e.status !== "cancelled") : events);
 
 /* An event's real last day: daysOf caps a span at 62 days and reads an end
    before the start as one day, so a typo'd end (2099) stretches nothing
