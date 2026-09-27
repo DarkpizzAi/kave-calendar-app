@@ -9,7 +9,7 @@ import { CATEGORIES } from "./icons.js";
 import { PEOPLE } from "./model.js";
 import { AWAY } from "./cal-model.js";
 
-export const VIEW_NAMES = [["weekly", "Weekly"], ["monthly", "Monthly"], ["yearly", "Yearly"]];
+export const VIEW_NAMES = [["glance", "Glance"], ["grid", "Grid"], ["agenda", "Agenda"]];
 export const DETAIL_NAMES = [["full", "Full"], ["partial", "Partial"], ["minimal", "Minimal"]];
 export const STYLE_NAMES = [["lines", "Icon and title"], ["icons", "Icons only"]];
 const TYPES = CATEGORIES.map((c) => c.type);
@@ -25,7 +25,7 @@ const labelOf = (list, v) => list.find(([k]) => k === v)[1];
    the Categories grid and the Calendar cannot disagree again. This becomes
    the new default (Isa, 2026-09-25), not a return to "show everything". */
 export const YEARLY_DEFAULT_SHOWN = [...AWAY, "visitor"];
-const defaultHidden = (view) => (view === "yearly" ? TYPES.filter((t) => !YEARLY_DEFAULT_SHOWN.includes(t)) : []);
+const defaultHidden = (view) => (view === "glance" ? TYPES.filter((t) => !YEARLY_DEFAULT_SHOWN.includes(t)) : []);
 
 /* Free-time blocking: which categories count against a free weekend/long
    weekend/opportunity. One list, shared by both people -- symmetric, not
@@ -37,6 +37,13 @@ export const BLOCKING_DEFAULT = [
   "live-music", "clubbing", "cinema", "theatre", "activity",
 ];
 
+/* Old view names, still possibly sitting in someone's saved settings from
+   before the Glance/Grid/Agenda rename. Map them forward once, here, so a
+   real person's hidden-category picks and default view survive rather than
+   silently resetting the first time they open the updated app. */
+const OLD_VIEW_NAME = { weekly: "grid", monthly: "agenda", yearly: "glance" };
+const migrateViewKey = (v) => OLD_VIEW_NAME[v] || v;
+
 /* Settings as stored -> clean preferences. Anything unexpected falls back. */
 export function readPrefs(settings) {
   const s = settings || {};
@@ -44,8 +51,11 @@ export function readPrefs(settings) {
   const hiddenCategories = {};
   for (const p of PEOPLE) {
     hiddenCategories[p] = {};
+    const rawPerson = raw[p] && typeof raw[p] === "object" ? raw[p] : {};
+    const migratedPerson = {};
+    for (const [oldOrNewKey, list] of Object.entries(rawPerson)) migratedPerson[migrateViewKey(oldOrNewKey)] = list;
     for (const [v] of VIEW_NAMES) {
-      const list = raw[p] && raw[p][v];
+      const list = migratedPerson[v];
       hiddenCategories[p][v] = Array.isArray(list) ? list.filter((t) => TYPES.includes(t)) : defaultHidden(v);
     }
   }
@@ -53,7 +63,7 @@ export function readPrefs(settings) {
     ? s.blockingCategories.filter((t) => TYPES.includes(t))
     : BLOCKING_DEFAULT;
   return {
-    defaultView: oneOf(VIEW_NAMES, s.defaultView, "weekly"),
+    defaultView: oneOf(VIEW_NAMES, migrateViewKey(s.defaultView), "glance"),
     defaultDetail: oneOf(DETAIL_NAMES, s.defaultDetail, "full"),
     cardStyle: oneOf(STYLE_NAMES, s.cardStyle, "lines"),
     hiddenCategories,
