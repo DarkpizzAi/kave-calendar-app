@@ -347,7 +347,7 @@ a.ticket{color:inherit;text-decoration:none}
    custom property that .segment reads -- the actual fix, so no ambient
    touch-target rule can push .ib taller than the toggle again. */
 .ib{flex:none;width:var(--ctl-h);height:var(--ctl-h);min-height:var(--ctl-h);border:0;border-radius:var(--r-round);background:var(--surface-2);color:var(--text-dim);display:grid;place-items:center;padding:0}
-.ib.on{background:var(--good-bg);color:var(--good-tx)}
+.ib.on{background:var(--free-bg);color:var(--free-tx)}
 .sfield{flex:1;display:flex;align-items:center;gap:var(--sp-2);height:40px;padding:0 var(--sp-1) 0 var(--sp-3);border-radius:var(--r-control);background:var(--surface-2);transform-origin:right center;animation:grow var(--motion-slow) var(--ease-sheet)}
 @keyframes grow{from{clip-path:inset(0 0 0 calc(100% - 40px) round var(--r-round))}to{clip-path:inset(0 0 0 0 round var(--r-control))}}
 .sfield .si{display:grid;color:var(--text-dim)}
@@ -407,17 +407,17 @@ a.ticket{color:inherit;text-decoration:none}
 .bsq2 .emogrid{display:grid;grid-template-columns:repeat(2,1fr);justify-items:center;align-content:center;gap:2px;flex:1;width:100%}
 .bsq2.today{background:var(--accent)}
 .bsq2.today .lbl{color:var(--accent-text)}
-.bsq2.clear{background:var(--good-tx);color:var(--good-bg)}
-.bsq2.clear .lbl{color:var(--good-bg)}
-.bsq2.open{border:2px solid var(--good-tx)}
+.bsq2.clear{background:var(--free-tx);color:var(--free-bg)}
+.bsq2.clear .lbl{color:var(--free-bg)}
+.bsq2.open{border:2px solid var(--free-tx)}
 .werect{background:var(--surface-2);border-radius:var(--r-card);min-height:64px;padding:6px var(--sp-2);display:flex;flex-direction:column;gap:3px;cursor:pointer;margin-bottom:var(--sp-2)}
 .werect:last-child{margin-bottom:0}
 .werect .lbl{font-size:var(--fs-micro);font-weight:500;color:var(--text-dim)}
 .werect.today{background:var(--accent)}
 .werect.today .lbl{color:var(--accent-text)}
-.werect.clear{background:var(--good-tx);color:var(--good-bg)}
-.werect.clear .lbl{color:var(--good-bg)}
-.werect.open{border:2px solid var(--good-tx)}
+.werect.clear{background:var(--free-tx);color:var(--free-bg)}
+.werect.clear .lbl{color:var(--free-bg)}
+.werect.open{border:2px solid var(--free-tx)}
 /* agenda: one grey rectangle per day, every day, always -- an empty day is
    just a day card with nothing in it, never skipped, never a placeholder line */
 .daycard{background:var(--surface-2);border-radius:var(--r-card);padding:6px var(--sp-2);margin-bottom:var(--sp-2);cursor:pointer}
@@ -425,9 +425,9 @@ a.ticket{color:inherit;text-decoration:none}
 .daycard > .cd{display:block;font-size:var(--fs-micro);font-weight:500;color:var(--text-dim);margin-bottom:2px}
 .daycard.today{background:var(--accent)}
 .daycard.today > .cd{color:var(--accent-text)}
-.daycard.clear{background:var(--good-tx);color:var(--good-bg)}
-.daycard.clear > .cd{color:var(--good-bg)}
-.daycard.open{border:2px solid var(--good-tx)}
+.daycard.clear{background:var(--free-tx);color:var(--free-bg)}
+.daycard.clear > .cd{color:var(--free-bg)}
+.daycard.open{border:2px solid var(--free-tx)}
 /* glance: a real Monday-first month grid, blank pad cells outside the month.
    No card: just the squares, month to month, with no boxed container or
    border around the group. */
@@ -458,9 +458,9 @@ a.ticket{color:inherit;text-decoration:none}
 .dsq.today{background:var(--accent)}
 .dsq.today .num{color:var(--accent-text)}
 .dsq.today .more{background:var(--accent-text)}
-.dsq.clear{background:var(--good-tx)}
-.dsq.clear .num{color:var(--good-bg)}
-.dsq.open{border:2px solid var(--good-tx)}
+.dsq.clear{background:var(--free-tx)}
+.dsq.clear .num{color:var(--free-bg)}
+.dsq.open{border:2px solid var(--free-tx)}
 /* search */
 .hint{margin:0;color:var(--text-dim);font-size:var(--fs-meta)}
 .card{background:var(--panel);border-radius:var(--r-card);padding:var(--sp-3)}
