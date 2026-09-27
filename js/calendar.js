@@ -126,10 +126,8 @@ function controls() {
 /* F54: this heading used to also be F26's sticky-title section boundary
    (data-sec); F26 is fully reverted, so it is back to being just the plain,
    non-sticky "September" heading, drawn once per month. */
-const monthHead = (d) => {
-  const label = `${MONTHS[Number(d.slice(5, 7)) - 1]}${d.slice(0, 4) !== frame.thisYear ? " " + d.slice(0, 4) : ""}`;
-  return `<h3 class="month">${esc(label)}</h3>`;
-};
+const monthLabel = (d) => `${MONTHS[Number(d.slice(5, 7)) - 1]}${d.slice(0, 4) !== frame.thisYear ? " " + d.slice(0, 4) : ""}`;
+const monthHead = (d) => `<h3 class="month">${esc(monthLabel(d))}</h3>`;
 /* Agenda's card model: a "period card" (one calendar week, var(--panel),
    black in dark mode) holding one smaller "day card" per day
    (var(--surface-2), grey, CSS) -- never a border. Today is the one day
@@ -185,7 +183,11 @@ function weeks() {
 /* ---- Grid: a real Monday-first month grid, one card per month ---- */
 const ymOf = (y, mo) => `${y}-${String(mo + 1).padStart(2, "0")}`;
 const daysIn = (y, mo) => new Date(Date.UTC(y, mo + 1, 0)).getUTCDate();
-const yearHead = (y) => `<p class="year-big">${y}</p>`;
+/* Every month gets its own big heading here (the "2026" year-big treatment,
+   not Agenda's smaller .month heading) -- same label text and same
+   year-suffix rule as Agenda's monthHead (monthLabel, shared), just drawn
+   once per month instead of once per year. */
+const gridMonthHead = (d) => `<p class="year-big">${esc(monthLabel(d))}</p>`;
 /* Lead-padded, Monday-first cells for one calendar month, chunked into
    real weeks (each row's own Monday, for weekFreeDays) -- padded only to
    the next multiple of 7, never a whole extra blank row. */
@@ -235,31 +237,22 @@ function gridSquare(d, freeDays) {
 }
 function gridMonth(y, mo) {
   const key = ymOf(y, mo), n = daysIn(y, mo), now = key === frame.today.slice(0, 7);
-  const label = `${MONTHS[mo].toUpperCase()}${key.slice(0, 4) !== frame.thisYear ? " " + key.slice(0, 4) : ""}`;
   const rows = gridRows(key, n).map((r) => {
     const freeDays = S.freeOn ? new Set(weekFreeDays(r.monday, HOLIDAYS, frame.onAll, frame.today, freeBlocks)) : new Set();
     return `<div class="grid7">${r.days.map((d) => gridSquare(d, freeDays)).join("")}</div>`;
   }).join("");
   const wdhead = readPrefs(store.state.settings).showWeekdayHeader
     ? `<div class="wdhead">${DOW.map((w) => `<span>${w[0]}</span>`).join("")}</div>` : "";
-  return `<div class="gridCard${now ? " now" : ""}" data-month="${key}">`
-    + `<p class="mh"><span class="lbl-pill${now ? " on" : ""}">${label}</span></p>`
-    + wdhead
-    + `<div class="monthgrid">${rows}</div></div>`;
+  return `<div class="gridCard${now ? " now" : ""}" data-month="${key}">${wdhead}<div class="monthgrid">${rows}</div></div>`;
 }
 function grid() {
   const y0 = Number(frame.thisYear), m0 = Number(frame.today.slice(5, 7)) - 1;
   const shown = pastMonths(frame.today, S.floor, S.past.grid);
-  let past = "", pastYear = null;
-  for (const ym of shown) {
-    const y = Number(ym.slice(0, 4));
-    if (y !== pastYear) { past += yearHead(y); pastYear = y; }
-    past += gridMonth(y, Number(ym.slice(5, 7)) - 1);
-  }
-  let future = "", curYear = pastYear;
+  let past = "";
+  for (const ym of shown) past += gridMonthHead(ym + "-01") + gridMonth(Number(ym.slice(0, 4)), Number(ym.slice(5, 7)) - 1);
+  let future = "";
   for (let y = y0, mo = m0, n = 0; ymOf(y, mo) + "-01" <= frame.range.max && n < S.future.grid; n++) {
-    if (y !== curYear) { future += yearHead(y); curYear = y; }
-    future += gridMonth(y, mo);
+    future += gridMonthHead(ymOf(y, mo) + "-01") + gridMonth(y, mo);
     if (++mo === 12) { mo = 0; y++; }
   }
   return { past, future };
