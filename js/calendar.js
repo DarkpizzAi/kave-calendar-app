@@ -13,12 +13,13 @@ import { monthOfWeek, loadRange, dayFreeState, weekFreeNote, weekFreeDays } from
 import { HOLIDAYS } from "./holidays.js";
 import { applyDetail } from "./filter.js";
 import { store } from "./store.js";
-import { indexByDay, tappable, zoomWeekTarget, zoomMonthTarget, isAway, awayText,
+import { indexByDay, tappable, zoomWeekTarget, zoomMonthTarget, isAway, awayText, AWAY,
   shouldLoadMore, nextCount, iconsOf, searchEvents, shortDate, pastMonths, gesture, lastEventDay,
   fullPastWeeks, fullPastMonths, backToTodayState, todaysCount as cmTodaysCount, hideCancelled,
   hasLoadedOlder, hasOpenTodos } from "./cal-model.js";
 import { openLevel, sheetOpen } from "./sheet.js";
 import { ICON } from "./chrome-icons.js";
+import { CATEGORIES, iconFor } from "./icons.js";
 import { readPrefs, byCategories, eventBlocksFreeTime } from "./prefs.js";
 
 const MONTHS = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
@@ -235,20 +236,35 @@ function glanceRows(key, n) {
   for (let i = 0; i < cells.length; i += 7) rows.push({ monday: addDays(start, i), days: cells.slice(i, i + 7) });
   return rows;
 }
-/* Busy in Glance is a border, not a fill -- the card stays grey underneath.
-   Solid accent = I have something that day; dotted accent = only the other
-   person does. If we both do, mine wins (never both borders at once). */
-function glanceBorder(d) {
+/* One emoji per day: the day's own busiest activity, by a fixed priority
+   (away -- transport/accommodation/business-trip -- then work, then every
+   social category in the Settings catalogue order, "none" last). A day
+   with several activities across several events still shows only the one
+   that ranks highest; ties keep whichever was found first. */
+const DAY_PRIORITY = [...AWAY, "work", ...CATEGORIES.map((c) => c.type).filter((t) => !AWAY.includes(t) && t !== "work")];
+function glanceIcon(d) {
   const evs = frame.on(d);
-  if (!evs.length) return "";
-  return evs.some((e) => e.owner === frame.me || e.owner === "shared") ? "mine" : "other";
+  let best = null, bestRank = Infinity;
+  for (const e of evs) {
+    const acts = e.activities && e.activities.length ? e.activities : [{ type: "none" }];
+    for (const a of acts) {
+      const rank = DAY_PRIORITY.indexOf(a.type);
+      if (rank < bestRank) { bestRank = rank; best = { a, e }; }
+    }
+  }
+  if (!best) return "";
+  const grey = best.e.owner !== frame.me && best.e.owner !== "shared";
+  const more = evs.length > 1 ? `<span class="more"></span>` : "";
+  return `<span class="emo${grey ? " grey" : ""}">${iconFor(best.a, best.e, frame.me)}</span>${more}`;
 }
 function glanceSquare(d, freeDays) {
   if (!d) return `<div class="dsq pad"></div>`;
   const st = periodState(d, freeDays);
-  const border = st === "today" ? "" : glanceBorder(d);
-  const tap = tappable(frame.on(d)) ? ` role="button" tabindex="0" data-act="day" data-d="${d}"` : "";
-  return `<div class="dsq ${st} ${border}"${tap}><span class="num">${Number(d.slice(8))}</span></div>`;
+  /* Unlike Grid/Agenda (tappable() -- a day with nothing cannot be
+     tapped), every Glance square opens the single day, empty or not: it
+     is also the entry point for the day-swipe browser in sheet.js, which
+     needs to be able to land on a day with nothing on it. */
+  return `<div class="dsq ${st}" role="button" tabindex="0" data-act="day" data-d="${d}"><span class="num">${Number(d.slice(8))}</span>${glanceIcon(d)}</div>`;
 }
 function glanceMonth(y, mo) {
   const key = ymOf(y, mo), n = daysIn(y, mo), now = key === frame.today.slice(0, 7);

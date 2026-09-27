@@ -14,7 +14,7 @@ import { escapeHtml as esc, safeUrl } from "./util.js";
 import { addDays, dayOfWeek } from "./dates.js";
 import { isoWeek } from "./views.js";
 import { holidayOn } from "./holidays.js";
-import { tappable, iconsOf, hasOpenTodos, guestsExcludingViewer, statusGuestsLine } from "./cal-model.js";
+import { tappable, iconsOf, hasOpenTodos, guestsExcludingViewer, statusGuestsLine, gesture } from "./cal-model.js";
 import { rows, frameNow, detailGrey, place } from "./calendar.js";
 import { ICON } from "./chrome-icons.js";
 import { STATUS_LABEL } from "./model.js";
@@ -289,11 +289,48 @@ export function initSheet() {
   root.addEventListener("pointerdown", (e) => { y0 = e.target.closest("[data-swipe]") ? e.clientY : null; });
   root.addEventListener("pointerup", (e) => {
     if (y0 != null && e.clientY - y0 > 60) {
-      const eat = (ev) => { ev.stopPropagation(); ev.preventDefault(); };
-      document.addEventListener("click", eat, { capture: true, once: true });
-      setTimeout(() => document.removeEventListener("click", eat, { capture: true }), 400);
+      swallowSheetClick();
       closeAll();
     }
     y0 = null;
   });
+
+  /* The single day level: swipe anywhere in the body sideways to step to
+     the previous or next day, one at a time -- replaceTop, not openLevel,
+     so repeated swipes never pile up history entries (final review I6's
+     one gesture rule, reused rather than re-derived). Previous is left
+     (swipe right, dx > 0), next is right (swipe left, dx < 0), matching
+     calendar.js's own view-swipe direction. */
+  let d0 = null;
+  const dayStart = (x, y) => {
+    const l = stack[stack.length - 1];
+    d0 = l && l.kind === "day" ? { x, y, d: l.d } : null;
+  };
+  const dayEnd = (x, y) => {
+    if (!d0) return;
+    const act = gesture({ dx: x - d0.x, dy: y - d0.y, top: false, searching: false, loadedOlder: false });
+    const from = d0.d;
+    d0 = null;
+    if (act === "next" || act === "prev") {
+      swallowSheetClick();
+      replaceTop({ kind: "day", d: addDays(from, act === "next" ? 1 : -1) });
+    }
+  };
+  root.addEventListener("pointerdown", (e) => {
+    if (e.pointerType !== "touch" && e.target.closest(".sbody")) dayStart(e.clientX, e.clientY);
+  });
+  document.addEventListener("pointerup", (e) => { if (e.pointerType !== "touch") dayEnd(e.clientX, e.clientY); });
+  root.addEventListener("touchstart", (e) => {
+    if (e.touches.length === 1 && e.target.closest(".sbody")) dayStart(e.touches[0].clientX, e.touches[0].clientY);
+  }, { passive: true });
+  root.addEventListener("touchend", (e) => { const t = e.changedTouches[0]; if (t) dayEnd(t.clientX, t.clientY); }, { passive: true });
+}
+
+/* A swipe ends in a click on whatever was under the finger (a day row, an
+   event strip): eat that one click, the same trick calendar.js uses for
+   its own view swipe. */
+function swallowSheetClick() {
+  const eat = (e) => { e.stopPropagation(); e.preventDefault(); };
+  document.addEventListener("click", eat, { capture: true, once: true });
+  setTimeout(() => document.removeEventListener("click", eat, { capture: true }), 400);
 }

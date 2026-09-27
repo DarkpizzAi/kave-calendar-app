@@ -431,26 +431,31 @@ a.ticket{color:inherit;text-decoration:none}
 .daycard.clear > .cd{color:var(--good-bg)}
 .daycard.open{background:var(--good-bg);color:var(--good-tx)}
 .daycard.open > .cd{color:var(--good-tx)}
-/* glance: a real Monday-first month grid, blank pad cells outside the month */
-.glanceCard{background:var(--panel);border-radius:var(--r-card);padding:var(--sp-3);margin-bottom:var(--sp-2);border:2px solid transparent}
-.glanceCard.now{border-color:var(--accent)}
+/* glance: a real Monday-first month grid, blank pad cells outside the month.
+   No card: just the squares, month to month, with no boxed container or
+   border around the group. */
+.glanceCard{margin-bottom:var(--sp-3)}
 .wdhead{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));margin-bottom:2px}
 .wdhead span{text-align:center;font-size:var(--fs-micro);font-weight:var(--fw-medium);color:var(--text-dim)}
 .monthgrid{display:flex;flex-direction:column;gap:4px}
 .grid7{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));gap:4px}
-.dsq{aspect-ratio:1;border-radius:8px;background:var(--surface-2);display:flex;align-items:center;justify-content:center;cursor:pointer;border:2px solid transparent}
-.dsq.pad{background:transparent;border-color:transparent;cursor:default}
-.dsq .num{font-size:var(--fs-micro);font-weight:var(--fw-medium);color:var(--text-dim)}
-/* busy in Glance is a border, not a fill -- the card stays grey underneath.
-   Solid = I have something that day, dotted = only the other person does;
-   if we both do, mine wins (never both borders at once). */
-.dsq.mine{border-color:var(--accent)}
-.dsq.other{border-style:dotted;border-color:var(--accent)}
-.dsq.today{background:var(--accent);border-color:transparent}
+.dsq{aspect-ratio:1;border-radius:8px;background:#000;position:relative;cursor:pointer}
+.dsq.pad{background:transparent;cursor:default}
+.dsq .num{position:absolute;top:4px;left:5px;font-size:var(--fs-micro);font-weight:var(--fw-medium);color:var(--text-dim)}
+/* the day's single emoji, dead centre -- no border ever says whose day it
+   is; a day that's only the other person's uses the app's existing "grey"
+   convention (same filter as .c-i.grey in the event rows) instead. */
+.dsq .emo{position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);font-size:15px;line-height:1}
+.dsq .emo.grey{filter:grayscale(1);opacity:.45}
+/* more than one event that day -- a small accent dot, bottom-right, next to
+   the single emoji the priority rule already chose */
+.dsq .more{position:absolute;bottom:4px;right:5px;width:5px;height:5px;border-radius:var(--r-round);background:var(--accent)}
+.dsq.today{background:var(--accent)}
 .dsq.today .num{color:var(--accent-text)}
-.dsq.clear{background:var(--good-tx);border-color:transparent}
+.dsq.today .more{background:var(--accent-text)}
+.dsq.clear{background:var(--good-tx)}
 .dsq.clear .num{color:var(--good-bg)}
-.dsq.open{background:var(--good-bg);border-color:transparent}
+.dsq.open{background:var(--good-bg)}
 .dsq.open .num{color:var(--good-tx)}
 /* search */
 .hint{margin:0;color:var(--text-dim);font-size:var(--fs-meta)}
