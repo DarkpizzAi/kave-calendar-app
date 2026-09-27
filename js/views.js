@@ -1,7 +1,6 @@
-/* Compass: the shape of the three views, as data (spec: prototype P3 is the
-   reference). Weekly draws days, Monthly draws weeks, Yearly draws months;
-   Monthly is the hub. Everything here is pure and tested; drawing lives in
-   the view modules. */
+/* Compass: the shape of the two views, as data (spec: prototype P3 is the
+   reference). Agenda draws weeks, Grid draws months; Agenda is the hub.
+   Everything here is pure and tested; drawing lives in the view modules. */
 "use strict";
 
 import { addDays, mondayOf, dayOfWeek } from "./dates.js";
@@ -31,7 +30,7 @@ export function loadRange(today, lastEventDay, floorYear) {
   return { min: from + "-01-01", max: lastEventDay && lastEventDay > max ? lastEventDay : max };
 }
 
-/* ---- free weekends (Monthly): any future one, not the one underway ---- */
+/* ---- free weekends (Agenda): any future one, not the one underway ---- */
 export function freeWeekendSaturday(monday, eventsOn, today, blocks) {
   const sat = addDays(monday, 5);
   if (sat <= today) return null;
@@ -47,13 +46,12 @@ export function dayFreeState(day, eventsOn, blocks) {
   return evs.some(blocks) ? "" : "open";
 }
 
-/* One week's worth of free-window note, for Grid: a plain free weekend
-   (Saturday, any week still ahead, same as Agenda's own note) if there
-   is one, else a long weekend or opportunity whose block *starts* inside
-   this Monday-to-Sunday week (Yearly/Glance's own longWeekends, scoped to
-   this one week's dates instead of a whole month). Long weekend takes
-   priority when both would otherwise apply, since it is the rarer, more
-   worth-surfacing case. */
+/* One week's worth of free-window note, for Agenda: a plain free weekend
+   (Saturday, any week still ahead) if there is one, else a long weekend or
+   opportunity whose block *starts* inside this Monday-to-Sunday week
+   (Grid's own longWeekends, scoped to this one week's dates instead of a
+   whole month). Long weekend takes priority when both would otherwise
+   apply, since it is the rarer, more worth-surfacing case. */
 export function weekFreeNote(monday, holidays, eventsOn, today, blocks) {
   const sunday = addDays(monday, 6);
   /* weekendBlocks (inside longWeekends) filters candidate holiday anchors by
@@ -89,7 +87,7 @@ export function weekFreeDays(monday, holidays, eventsOn, today, blocks) {
   return sat ? [sat, addDays(sat, 1)] : [];
 }
 
-/* ---- long weekends (Yearly), from the bank holidays ---- */
+/* ---- long weekends (Grid), from the bank holidays ---- */
 const offDay = (holidays) => (d) => dayOfWeek(d) >= 5 || !!holidays[d];
 
 /* Every weekday holiday grows through the weekends and holidays around it
@@ -140,7 +138,7 @@ export function longWeekends(holidays, from, to, eventsOn, blocks) {
   return out;
 }
 
-/* ---- the Yearly stats card: trips, cities, plans first; never costs ---- */
+/* ---- the yearly stats card: trips, cities, plans first; never costs ---- */
 export function yearStats(events, today) {
   const year = today.slice(0, 4);
   const past = events.filter((e) => e.start.startsWith(year) && e.start <= today && !e.deleted);

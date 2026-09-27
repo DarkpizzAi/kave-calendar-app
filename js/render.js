@@ -156,8 +156,8 @@ registerLevel("set-defaults", {
       + field("Default detail level", choices("pref-detail", DETAIL_NAMES, p.defaultDetail), "Full: both of you. Partial: the other person greyed. Minimal: yours and shared only.")
       + field("Card style", choices("pref-style", STYLE_NAMES, p.cardStyle), "How events look in Weekly's day cards.")
       + field("Weekday letters",
-          `<button class="tick${p.showWeekdayHeader ? " on" : ""}" role="checkbox" aria-checked="${p.showWeekdayHeader}" aria-label="Show weekday letters in Glance" data-tick-weekday>${p.showWeekdayHeader ? ICON.check : ""}</button>`,
-          "The M T W T F S S row above each month in Glance.")
+          `<button class="tick${p.showWeekdayHeader ? " on" : ""}" role="checkbox" aria-checked="${p.showWeekdayHeader}" aria-label="Show weekday letters in Grid" data-tick-weekday>${p.showWeekdayHeader ? ICON.check : ""}</button>`,
+          "The M T W T F S S row above each month in Grid.")
       + "</div>";
   },
   onAction(b) {

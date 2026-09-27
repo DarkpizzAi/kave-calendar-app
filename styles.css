@@ -386,38 +386,17 @@ a.ticket{color:inherit;text-decoration:none}
 .flag{display:inline-block;border-radius:var(--r-pill);padding:1px var(--sp-2);font-size:var(--fs-meta);font-weight:var(--fw-medium);max-width:100%;overflow:hidden;text-overflow:ellipsis;vertical-align:middle}
 .flag.acc{background:var(--accent);color:var(--accent-text)}
 .flag.soft{background:var(--accent-soft);color:var(--text)}
-/* Grid, Agenda and Glance all share one card model: a "period card" -- one
-   calendar week (Grid/Agenda) or month (Glance) -- in var(--panel), black in
-   dark mode; every day inside it is its own smaller "day card" in
-   var(--surface-2), grey, always (busy or not). No card ever takes a
-   border for this. Today is the one day card whose fill turns solid
-   var(--accent), and that always wins over every other state. */
+/* Agenda's card model: a "period card" -- one calendar week -- in
+   var(--panel), black in dark mode; every day inside it is its own smaller
+   "day card" in var(--surface-2), grey, always (busy or not). No card ever
+   takes a border for this. Today is the one day card whose fill turns
+   solid var(--accent), and that always wins over every other state. Grid
+   (below, .gridCard/.dsq) draws its own month-grid card model instead. */
 .month{margin:var(--sp-3) 0 0;font-size:var(--fs-title-lg);font-weight:var(--fw-strong);letter-spacing:var(--tracking-heading);line-height:var(--lh-title)}
-.gridCard{background:var(--panel);border-radius:var(--r-card);padding:var(--sp-2);margin-bottom:var(--sp-2)}
+.weekCard{background:var(--panel);border-radius:var(--r-card);padding:var(--sp-2);margin-bottom:var(--sp-2)}
 .mh{margin:0 0 var(--sp-2);display:flex;justify-content:space-between;align-items:center}
 .away{margin:0;display:grid;grid-template-columns:20px minmax(0,1fr);column-gap:var(--sp-2);font-size:var(--fs-meta);background:var(--surface-2);border-radius:var(--r-control);padding:var(--sp-1) var(--sp-2)}
 .away.grey{color:var(--text-dim)}
-/* grid: weekend-spotlight. The gap between the 5 weekday cards and the gap
-   above the weekend cards are the same value (--sp-2), so the rhythm reads
-   as one consistent grid, not two different spacings. */
-.wk-row2{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:var(--sp-2);margin-bottom:var(--sp-2)}
-.bsq2{background:var(--surface-2);border-radius:var(--r-card);min-height:64px;padding:6px 4px;display:flex;flex-direction:column;align-items:center;justify-content:flex-start;gap:4px;cursor:pointer}
-.bsq2 .lbl{font-size:var(--fs-micro);font-weight:500;color:var(--text-dim)}
-/* up to 4 emoji, 2x2, centred -- never a single left-aligned row */
-.bsq2 .emogrid{display:grid;grid-template-columns:repeat(2,1fr);justify-items:center;align-content:center;gap:2px;flex:1;width:100%}
-.bsq2.today{background:var(--accent)}
-.bsq2.today .lbl{color:var(--accent-text)}
-.bsq2.clear{background:var(--free-tx);color:var(--free-bg)}
-.bsq2.clear .lbl{color:var(--free-bg)}
-.bsq2.open{border:2px solid var(--free-tx)}
-.werect{background:var(--surface-2);border-radius:var(--r-card);min-height:64px;padding:6px var(--sp-2);display:flex;flex-direction:column;gap:3px;cursor:pointer;margin-bottom:var(--sp-2)}
-.werect:last-child{margin-bottom:0}
-.werect .lbl{font-size:var(--fs-micro);font-weight:500;color:var(--text-dim)}
-.werect.today{background:var(--accent)}
-.werect.today .lbl{color:var(--accent-text)}
-.werect.clear{background:var(--free-tx);color:var(--free-bg)}
-.werect.clear .lbl{color:var(--free-bg)}
-.werect.open{border:2px solid var(--free-tx)}
 /* agenda: one grey rectangle per day, every day, always -- an empty day is
    just a day card with nothing in it, never skipped, never a placeholder line */
 .daycard{background:var(--surface-2);border-radius:var(--r-card);padding:6px var(--sp-2);margin-bottom:var(--sp-2);cursor:pointer}
@@ -428,10 +407,10 @@ a.ticket{color:inherit;text-decoration:none}
 .daycard.clear{background:var(--free-tx);color:var(--free-bg)}
 .daycard.clear > .cd{color:var(--free-bg)}
 .daycard.open{border:2px solid var(--free-tx)}
-/* glance: a real Monday-first month grid, blank pad cells outside the month.
+/* grid: a real Monday-first month grid, blank pad cells outside the month.
    No card: just the squares, month to month, with no boxed container or
    border around the group. */
-.glanceCard{margin-bottom:var(--sp-3)}
+.gridCard{margin-bottom:var(--sp-3)}
 .wdhead{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));margin-bottom:2px}
 .wdhead span{text-align:center;font-size:var(--fs-micro);font-weight:var(--fw-medium);color:var(--text-dim)}
 .monthgrid{display:flex;flex-direction:column;gap:4px}
