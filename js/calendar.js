@@ -9,11 +9,11 @@
 
 import { escapeHtml as esc } from "./util.js";
 import { addDays, dayOfWeek, mondayOf, todayKey } from "./dates.js";
-import { isoWeek, monthOfWeek, loadRange, freeWeekendSaturday, longWeekends } from "./views.js";
+import { isoWeek, monthOfWeek, loadRange, freeWeekendSaturday, longWeekends, dayFreeState, weekFreeNote } from "./views.js";
 import { HOLIDAYS } from "./holidays.js";
 import { applyDetail } from "./filter.js";
 import { store } from "./store.js";
-import { indexByDay, weekRows, tappable, zoomWeekTarget, zoomMonthTarget, isAway, awayText,
+import { indexByDay, tappable, zoomWeekTarget, zoomMonthTarget, isAway, awayText,
   shouldLoadMore, nextCount, iconsOf, searchEvents, shortDate, pastMonths, gesture, lastEventDay,
   fullPastWeeks, fullPastMonths, backToTodayState, todaysCount as cmTodaysCount, eventsInMonth, hideCancelled,
   hasLoadedOlder, hasOpenTodos, heatFill } from "./cal-model.js";
@@ -24,7 +24,6 @@ import { readPrefs, byCategories, eventBlocksFreeTime } from "./prefs.js";
 const MONTHS = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
 const DOW = ["MON", "TUE", "WED", "THU", "FRI", "SAT", "SUN"];
 export const VIEWS = ["glance", "grid", "agenda"];
-const WIDE = "(min-width: 900px)";
 
 /* Transient UI state: not persisted, reset when the app opens. The defaults
    come from Settings. */
@@ -138,24 +137,40 @@ const monthHead = (d) => {
 };
 const weekLabel = (m) => `WEEK ${isoWeek(m)}`;
 
-function dayCard(d) {
-  const evs = frame.on(d);
-  const body = frame.style === "icons" ? `<div class="icons">${evs.map(iconSpans).join("")}</div>` : rows(evs, false, false);
-  const tap = tappable(evs) ? ` role="button" tabindex="0" data-act="day" data-d="${d}"` : "";
-  const isToday = d === frame.today;
-  const label = `${DOW[dayOfWeek(d)]} ${Number(d.slice(8))}`;
-  return `<div class="day${isToday ? " today" : ""}${evs.length ? "" : " empty"}"${tap}>`
-    + `<span class="lbl-pill${isToday ? " on" : ""}">${label}</span>${body}</div>`;
+/* Grid: Mon-Fri as small emoji-only squares (never title text, for anyone,
+   at any setting -- a layout rule, not a display choice); Sat-Sun as two
+   full-width event-line rectangles. Free time (S.freeOn) colours Clear
+   (nothing at all) or Open (something, but nothing blocking) inside a
+   qualifying week; today is solid accent and wins over Clear/Open. */
+function gridBlocks(e) { return eventBlocksFreeTime(readPrefs(store.state.settings), e); }
+function gridState(d) {
+  if (d === frame.today) return "today";
+  if (!S.freeOn) return "";
+  return dayFreeState(d, frame.onAll, gridBlocks);
 }
-/* F8: Weekly keeps its "WEEK 39" heading, but it is no longer a tap target
-   (F11 removed the jump it gave); it must match Monthly's card label
-   exactly, so it shares the same .lbl-pill construction (F9), minus the
-   pill itself (F27: this one line never gets the pill treatment). */
+function gridLabel(d) {
+  const dow = DOW[dayOfWeek(d)];
+  return `${dow[0]}${dow.slice(1).toLowerCase()} ${Number(d.slice(8))}`;
+}
+function gridWeekday(d) {
+  const evs = frame.on(d);
+  const tap = tappable(evs) ? ` role="button" tabindex="0" data-act="day" data-d="${d}"` : "";
+  return `<div class="bsq2 ${gridState(d)}"${tap}><span class="lbl">${gridLabel(d)}</span>`
+    + `<span class="emorow">${evs.map(iconSpans).join("")}</span></div>`;
+}
+function gridWeekend(d, note) {
+  const evs = frame.on(d);
+  const tap = tappable(evs) ? ` role="button" tabindex="0" data-act="day" data-d="${d}"` : "";
+  const noteLine = (note && note.on === d) ? `<li style="--n:1"><span class="c-i">🔍</span><span class="c-t">${esc(note.text)}</span></li>` : "";
+  return `<div class="werect ${gridState(d)}"${tap}><span class="lbl">${gridLabel(d)}</span>`
+    + `<ul class="rows">${evs.map((e) => row(e, false, false)).join("")}${noteLine}</ul></div>`;
+}
 function weekRow(m) {
   const days = [0, 1, 2, 3, 4, 5, 6].map((k) => addDays(m, k));
-  const grid = weekRows(days, matchMedia(WIDE).matches).map((r) => r.map(dayCard).join("")).join("");
-  return `<section class="week" data-week="${m}"><span class="lbl-plain wk">${weekLabel(m)}</span>`
-    + `<div class="g3">${grid}</div></section>`;
+  const note = S.freeOn ? weekFreeNote(m, HOLIDAYS, frame.onAll, frame.today, gridBlocks) : null;
+  const weekdays = days.slice(0, 5).map(gridWeekday).join("");
+  const weekend = days.slice(5, 7).map((d) => gridWeekend(d, note)).join("");
+  return `<section class="week" data-week="${m}"><div class="wk-row2">${weekdays}</div>${weekend}</section>`;
 }
 function weekEvents(m) {
   const out = [];
@@ -512,8 +527,6 @@ export function initCalendar(c) {
   mn.addEventListener("scroll", () => { onScroll(); if (ctx.isCalendar()) loadMore(mn); }, { passive: true });
   window.addEventListener("scroll", onScroll, { passive: true });
   document.addEventListener("click", onClick);
-  /* rows of 3-3-1 or one of seven are decided at draw time: redraw on crossing */
-  matchMedia(WIDE).addEventListener("change", () => { if (ctx.isCalendar()) ctx.render(); });
 
   /* Gestures: swipe the list sideways to change view; pull down at the top
      (or wheel up) to reveal See previous. */

@@ -389,9 +389,26 @@ a.ticket{color:inherit;text-decoration:none}
 /* weekly */
 .month{margin:var(--sp-3) 0 0;font-size:var(--fs-title-lg);font-weight:var(--fw-strong);letter-spacing:var(--tracking-heading);line-height:var(--lh-title)}
 .week{display:flex;flex-direction:column;gap:var(--sp-2);margin-bottom:var(--sp-2)}
-.g3{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:var(--sp-2);align-items:stretch}
-.day{background:var(--panel);border-radius:var(--r-card);min-height:84px;padding:var(--sp-2);display:flex;flex-direction:column;gap:var(--sp-2);min-width:0;border:2px solid transparent;cursor:pointer}
-.day.today{border-color:var(--accent)}
+/* grid: weekend-spotlight */
+.wk-row2{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:var(--sp-2);margin-bottom:var(--sp-2)}
+.bsq2{background:var(--panel);border-radius:var(--r-card);min-height:64px;padding:6px 4px;display:flex;flex-direction:column;align-items:center;justify-content:flex-start;gap:4px;cursor:pointer}
+.bsq2 .lbl{font-size:var(--fs-micro);font-weight:500;color:var(--text-dim)}
+.bsq2 .emorow{display:flex;flex-direction:row;justify-content:flex-start;gap:2px;width:100%;overflow:hidden}
+.bsq2.today{background:var(--accent)}
+.bsq2.today .lbl{color:var(--accent-text)}
+.bsq2.clear{background:var(--good-tx);color:var(--good-bg)}
+.bsq2.clear .lbl{color:var(--good-bg)}
+.bsq2.open{background:var(--good-bg);color:var(--good-tx)}
+.bsq2.open .lbl{color:var(--good-tx)}
+.werect{background:var(--panel);border-radius:var(--r-card);min-height:64px;padding:6px var(--sp-2);display:flex;flex-direction:column;gap:3px;cursor:pointer;margin-bottom:var(--sp-2)}
+.werect:last-child{margin-bottom:0}
+.werect .lbl{font-size:var(--fs-micro);font-weight:500;color:var(--text-dim)}
+.werect.today{background:var(--accent)}
+.werect.today .lbl{color:var(--accent-text)}
+.werect.clear{background:var(--good-tx);color:var(--good-bg)}
+.werect.clear .lbl{color:var(--good-bg)}
+.werect.open{background:var(--good-bg);color:var(--good-tx)}
+.werect.open .lbl{color:var(--good-tx)}
 .icons{display:flex;flex-wrap:wrap;gap:4px;font-size:18px;line-height:1.15}
 /* monthly and yearly cards. F11: the month card itself is no longer a tap
    target (only its "N plans" line is), so it takes no pointer cursor. */
@@ -451,8 +468,6 @@ a.ticket{color:inherit;text-decoration:none}
   .ctl{flex-wrap:wrap;justify-content:flex-start;width:auto;max-width:518px}
   .ctl .segment{flex:none;width:380px}
   .ctl.searching .ctl2{width:380px}
-  .g3{grid-template-columns:repeat(7,minmax(0,1fr))}
-  .day{min-height:110px}
   .fab.add{right:var(--sp-6)}
   .fab.up,.fab.down{right:var(--sp-6)}
 }
