@@ -174,7 +174,7 @@ registerLevel("set-freetime", {
       return `<div class="grid-r single"><span class="gl"><span class="gi">${escapeHtml(iconFor({ type: c.type }, { owner: s.me }, s.me))}</span>${escapeHtml(c.label)}</span>`
         + `<button class="tick${on ? " on" : ""}" role="checkbox" aria-checked="${on}" aria-label="${escapeHtml(c.label)} blocks free time" data-tick-block="${escapeHtml(c.type)}">${on ? ICON.check : ""}</button></div>`;
     }).join("");
-    return `<p class="fhint">Which categories count as "not free" when a weekend or long weekend could otherwise show as free. Shared by both of you.</p><div class="grid">${rowsHtml}</div>`;
+    return `<p class="fhint">Which of these would block you from planning a trip?</p><div class="grid">${rowsHtml}</div>`;
   },
   onAction(b) {
     const t = b.dataset.tickBlock;
