@@ -264,7 +264,10 @@ function glanceSquare(d, freeDays) {
      tapped), every Glance square opens the single day, empty or not: it
      is also the entry point for the day-swipe browser in sheet.js, which
      needs to be able to land on a day with nothing on it. */
-  return `<div class="dsq ${st}" role="button" tabindex="0" data-act="day" data-d="${d}"><span class="num">${Number(d.slice(8))}</span>${glanceIcon(d)}</div>`;
+  /* F16's own glyph, reused rather than re-derived: at least one event
+     that day still has an unchecked to-do. */
+  const todo = frame.on(d).some(hasOpenTodos) ? `<span class="dtodo" aria-label="Open to-dos">${ICON.checkbox}</span>` : "";
+  return `<div class="dsq ${st}" role="button" tabindex="0" data-act="day" data-d="${d}"><span class="num">${Number(d.slice(8))}</span>${todo}${glanceIcon(d)}</div>`;
 }
 function glanceMonth(y, mo) {
   const key = ymOf(y, mo), n = daysIn(y, mo), now = key === frame.today.slice(0, 7);

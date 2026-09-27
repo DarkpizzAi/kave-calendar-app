@@ -439,17 +439,25 @@ a.ticket{color:inherit;text-decoration:none}
 .wdhead span{text-align:center;font-size:var(--fs-micro);font-weight:var(--fw-medium);color:var(--text-dim)}
 .monthgrid{display:flex;flex-direction:column;gap:4px}
 .grid7{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));gap:4px}
-.dsq{aspect-ratio:1;border-radius:8px;background:#000;position:relative;cursor:pointer}
+.dsq{aspect-ratio:5/6;border-radius:8px;background:#000;position:relative;cursor:pointer}
 .dsq.pad{background:transparent;cursor:default}
 .dsq .num{position:absolute;top:4px;left:5px;font-size:var(--fs-micro);font-weight:var(--fw-medium);color:var(--text-dim)}
-/* the day's single emoji, dead centre -- no border ever says whose day it
-   is; a day that's only the other person's uses the app's existing "grey"
-   convention (same filter as .c-i.grey in the event rows) instead. */
-.dsq .emo{position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);font-size:15px;line-height:1}
+/* F16's checkbox glyph, top-right -- at least one event that day still has
+   an unchecked to-do. A line icon, never an emoji, same as the sheet's own
+   .todo-ic. */
+.dsq .dtodo{position:absolute;top:4px;right:5px;display:flex;color:var(--text-dim)}
+.dsq .dtodo svg{width:12px;height:12px;stroke-width:2.5}
+.dsq.today .dtodo{color:var(--accent-text)}
+/* the day's single emoji, centred in the bottom two thirds -- no border
+   ever says whose day it is; a day that's only the other person's uses
+   the app's existing "grey" convention (same filter as .c-i.grey in the
+   event rows) instead. */
+.dsq .emo{position:absolute;top:67%;left:50%;transform:translate(-50%,-50%);font-size:21px;line-height:1}
 .dsq .emo.grey{filter:grayscale(1);opacity:.45}
-/* more than one event that day -- a small accent dot, bottom-right, next to
-   the single emoji the priority rule already chose */
-.dsq .more{position:absolute;bottom:4px;right:5px;width:5px;height:5px;border-radius:var(--r-round);background:var(--accent)}
+/* more than one event that day -- a small accent dot, right on the
+   emoji's own top-right corner, next to the single one the priority
+   rule already chose */
+.dsq .more{position:absolute;top:calc(67% - 11px);left:calc(50% + 8px);width:6px;height:6px;border-radius:var(--r-round);background:var(--accent)}
 .dsq.today{background:var(--accent)}
 .dsq.today .num{color:var(--accent-text)}
 .dsq.today .more{background:var(--accent-text)}
