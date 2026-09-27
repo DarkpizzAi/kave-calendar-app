@@ -1,6 +1,6 @@
 import { test, eq, ok } from "./run.js";
 import { indexByDay, tappable, zoomWeekTarget, zoomMonthTarget, isAway, isBig, awayText,
-  shouldLoadMore, nextCount, iconsOf, searchEvents, todaysCount, fullPastWeeks, fullPastMonths,
+  shouldLoadMore, nextCount, iconsOf, searchEvents, todaysCount, fullPastMonths,
   backToTodayState, eventsInMonth, tripCityFor, defaultCity, hideCancelled,
   hasOpenTodos, guestsExcludingViewer, statusGuestsLine, heatFill } from "../js/cal-model.js";
 import { readPrefs, byCategories, toggleCategory } from "../js/prefs.js";
@@ -135,11 +135,9 @@ test("cal: todaysCount is minimal-only-mine, both people at partial and full", (
   eq(todaysCount([], "isa", "full"), 0);
 });
 
-/* ---- F7: "load older" jumps straight to 1 January of the floor year, and
-   "Back to today" discards whatever it loaded ---- */
-test("cal: fullPastWeeks and fullPastMonths reach exactly 1 January of the floor year", () => {
-  eq(fullPastWeeks("2026-09-21", "2026"), 38, "38 Mondays from the first week of 2026 to late September");
-  eq(fullPastWeeks("2026-01-05", "2026"), 1);
+/* ---- F7: "load older" (Grid only) jumps straight to 1 January of the
+   floor year, and "Back to today" discards whatever it loaded ---- */
+test("cal: fullPastMonths reaches exactly 1 January of the floor year", () => {
   eq(fullPastMonths("2026-09-24", "2025"), 20, "January 2025 to August 2026");
 });
 test("cal: Back to today discards the loaded past, the floor resets to this year", () => {

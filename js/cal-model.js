@@ -138,13 +138,9 @@ export function pastMonths(today, floorYear, count) {
   return out;
 }
 
-/* F7: "See previous" / the floating "load older" button jump straight to 1
-   January of the current floor year in one go, instead of revealing a few
-   weeks or months at a time. */
-export function fullPastWeeks(thisMonday, floorYear) {
-  const floorMonday = mondayOf(floorYear + "-01-01");
-  return Math.max(0, Math.round((Date.parse(thisMonday) - Date.parse(floorMonday)) / 6048e5));
-}
+/* F7: "See previous" / the floating "load older" button (Grid only -- Agenda
+   has no past to load) jumps straight to 1 January of the current floor
+   year in one go, instead of revealing a few months at a time. */
 export function fullPastMonths(today, floorYear) {
   return pastMonths(today, floorYear, 9999).length;
 }
