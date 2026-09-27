@@ -30,8 +30,8 @@ const defaultHidden = () => [];
    usually booked and paid for in advance (a trip, a concert, a work
    commitment); casual, easy-to-move plans don't block. */
 export const BLOCKING_DEFAULT = [
-  "transport", "accommodation", "business-trip", "work",
-  "live-music", "clubbing", "cinema", "activity",
+  "live-music", "birthday", "cinema", "activity", "business-trip",
+  "work", "visitor", "transport", "accommodation",
 ];
 
 /* Old view names, still possibly sitting in someone's saved settings from
@@ -63,9 +63,14 @@ export function readPrefs(settings) {
     defaultView: oneOf(VIEW_NAMES, migrateViewKey(s.defaultView), "glance"),
     defaultDetail: oneOf(DETAIL_NAMES, s.defaultDetail, "full"),
     cardStyle: oneOf(STYLE_NAMES, s.cardStyle, "lines"),
+    showWeekdayHeader: s.showWeekdayHeader !== false,
     hiddenCategories,
     blockingCategories,
   };
+}
+
+export function toggleWeekdayHeader(prefs) {
+  return { ...prefs, showWeekdayHeader: !prefs.showWeekdayHeader };
 }
 
 /* Reset restores nothing-hidden, the same set defaultHidden() already

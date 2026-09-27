@@ -276,9 +276,11 @@ function glanceMonth(y, mo) {
     const freeDays = S.freeOn ? new Set(weekFreeDays(r.monday, HOLIDAYS, frame.onAll, frame.today, glanceBlocks)) : new Set();
     return `<div class="grid7">${r.days.map((d) => glanceSquare(d, freeDays)).join("")}</div>`;
   }).join("");
+  const wdhead = readPrefs(store.state.settings).showWeekdayHeader
+    ? `<div class="wdhead">${DOW.map((w) => `<span>${w[0]}</span>`).join("")}</div>` : "";
   return `<div class="glanceCard${now ? " now" : ""}" data-month="${key}">`
     + `<p class="mh"><span class="lbl-pill${now ? " on" : ""}">${label}</span></p>`
-    + `<div class="wdhead">${DOW.map((w) => `<span>${w[0]}</span>`).join("")}</div>`
+    + wdhead
     + `<div class="monthgrid">${rows}</div></div>`;
 }
 function glance() {
