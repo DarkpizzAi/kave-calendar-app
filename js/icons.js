@@ -11,27 +11,31 @@ export const PERSON_ICONS = {
   dancing: P("💃", "🕺"),
 };
 
+/* Groups are display-only (settings grid, event-form picker) -- they don't
+   touch `type`, so nothing stored on an event or in prefs changes. */
+export const GROUPS = ["Nightlife & Social", "Entertainment & Leisure", "Outdoors", "Travel & Work", "Other"];
+
 export const CATEGORIES = [
   /* F33: the CD icon (💿) is gone; the music notes (🎶) were already the
      first/default icon and stay it. */
-  { type: "live-music", label: "Live music", icons: [{ icon: "🎶" }, { icon: "🎸", note: "rock" }, { icon: "🎻", note: "classical" }] },
-  { type: "clubbing", label: "Clubbing", icons: [{ icon: "🪩" }, { icon: "dancing" }] },
-  { type: "drinks", label: "Drinks", icons: [{ icon: "🍺" }, { icon: "🍷" }, { icon: "🥂" }, { icon: "🍹" }, { icon: "🍻", note: "pre-drinks" }] },
-  { type: "eating", label: "Eating out", icons: [{ icon: "🍔" }, { icon: "🥩" }, { icon: "🍕" }, { icon: "🍝" }, { icon: "🍜" }, { icon: "🍙" }, { icon: "🍣" }, { icon: "🌮" }, { icon: "🥞", note: "brunch" }, { icon: "☕", note: "coffee" }] },
-  { type: "birthday", label: "Birthday party", icons: [{ icon: "🎂" }] },
-  { type: "cinema", label: "Cinema", icons: [{ icon: "🎬" }] },
-  { type: "activity", label: "Activity", icons: [{ icon: "🎟" }, { icon: "🏛", note: "museum" }, { icon: "🖼", note: "exhibition" }, { icon: "🏺", note: "pottery" }, { icon: "🎨", note: "workshop" }, { icon: "🎤", note: "karaoke" }, { icon: "🎭", note: "theatre" }, { icon: "🩰", note: "ballet" }, { icon: "🎳", note: "bowling" }, { icon: "🎢", note: "amusement park" }, { icon: "🧗", note: "climbing" }] },
-  { type: "games", label: "Games", icons: [{ icon: "🎮", note: "videogames" }, { icon: "🎲", note: "board games" }] },
-  { type: "park", label: "Park or hang out", icons: [{ icon: "🌳" }, { icon: "🧺" }, { icon: "☀️" }] },
-  { type: "beach", label: "Beach", icons: [{ icon: "🏖" }] },
-  { type: "sport", label: "Sport or exercise", icons: [{ icon: "weights" }, { icon: "running" }, { icon: "🏅", note: "a race" }, { icon: "🎾", note: "tennis" }, { icon: "🏓", note: "padel" }] },
-  { type: "hike", label: "Hike", icons: [{ icon: "🥾" }] },
-  { type: "business-trip", label: "Business trip", icons: [{ icon: "💼" }] },
-  { type: "work", label: "Work event", icons: [{ icon: "🏢" }] },
-  { type: "visitor", label: "Visitor", icons: [{ icon: "🧳" }, { icon: "🏠", note: "staying with us" }] },
-  { type: "transport", label: "Transport", icons: [{ icon: "🛫", note: "outbound" }, { icon: "🛬", note: "return" }, { icon: "🚄", note: "train" }, { icon: "🚌", note: "bus" }, { icon: "🚗", note: "car" }, { icon: "🚢", note: "boat" }] },
-  { type: "accommodation", label: "Accommodation", icons: [{ icon: "🏨" }, { icon: "🏡" }, { icon: "⛺" }] },
-  { type: "none", label: "Other", icons: [{ icon: "📌" }] },
+  { type: "live-music", label: "Live music", group: "Nightlife & Social", icons: [{ icon: "🎶" }, { icon: "🎸", note: "rock" }, { icon: "🎻", note: "classical" }] },
+  { type: "clubbing", label: "Clubbing", group: "Nightlife & Social", icons: [{ icon: "🪩" }, { icon: "dancing" }] },
+  { type: "drinks", label: "Drinks", group: "Nightlife & Social", icons: [{ icon: "🍺" }, { icon: "🍷" }, { icon: "🥂" }, { icon: "🍹" }, { icon: "🍻", note: "pre-drinks" }] },
+  { type: "eating", label: "Eating out", group: "Nightlife & Social", icons: [{ icon: "🍔" }, { icon: "🥩" }, { icon: "🍕" }, { icon: "🍝" }, { icon: "🍜" }, { icon: "🍙" }, { icon: "🍣" }, { icon: "🌮" }, { icon: "🥞", note: "brunch" }, { icon: "☕", note: "coffee" }] },
+  { type: "birthday", label: "Birthday party", group: "Nightlife & Social", icons: [{ icon: "🎂" }] },
+  { type: "cinema", label: "Cinema", group: "Entertainment & Leisure", icons: [{ icon: "🎬" }] },
+  { type: "activity", label: "Activity", group: "Entertainment & Leisure", icons: [{ icon: "🎟" }, { icon: "🏛", note: "museum" }, { icon: "🖼", note: "exhibition" }, { icon: "🏺", note: "pottery" }, { icon: "🎨", note: "workshop" }, { icon: "🎤", note: "karaoke" }, { icon: "🎭", note: "theatre" }, { icon: "🩰", note: "ballet" }, { icon: "🎳", note: "bowling" }, { icon: "🎢", note: "amusement park" }, { icon: "🧗", note: "climbing" }] },
+  { type: "games", label: "Games", group: "Entertainment & Leisure", icons: [{ icon: "🎮", note: "videogames" }, { icon: "🎲", note: "board games" }] },
+  { type: "park", label: "Park or hang out", group: "Outdoors", icons: [{ icon: "🌳" }, { icon: "🧺" }, { icon: "☀️" }] },
+  { type: "beach", label: "Beach", group: "Outdoors", icons: [{ icon: "🏖" }] },
+  { type: "sport", label: "Sport or exercise", group: "Outdoors", icons: [{ icon: "weights" }, { icon: "running" }, { icon: "🏅", note: "a race" }, { icon: "🎾", note: "tennis" }, { icon: "🏓", note: "padel" }] },
+  { type: "hike", label: "Hike", group: "Outdoors", icons: [{ icon: "🥾" }] },
+  { type: "business-trip", label: "Business trip", group: "Travel & Work", icons: [{ icon: "💼" }] },
+  { type: "work", label: "Work event", group: "Travel & Work", icons: [{ icon: "🏢" }] },
+  { type: "visitor", label: "Visitor", group: "Travel & Work", icons: [{ icon: "🧳" }, { icon: "🏠", note: "staying with us" }] },
+  { type: "transport", label: "Transport", group: "Travel & Work", icons: [{ icon: "🛫", note: "outbound" }, { icon: "🛬", note: "return" }, { icon: "🚄", note: "train" }, { icon: "🚌", note: "bus" }, { icon: "🚗", note: "car" }, { icon: "🚢", note: "boat" }] },
+  { type: "accommodation", label: "Accommodation", group: "Travel & Work", icons: [{ icon: "🏨" }, { icon: "🏡" }, { icon: "⛺" }] },
+  { type: "none", label: "Other", group: "Other", icons: [{ icon: "📌" }] },
 ];
 
 const BY_TYPE = new Map(CATEGORIES.map((c) => [c.type, c]));

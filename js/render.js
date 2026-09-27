@@ -16,7 +16,7 @@ import { status as syncStatus, checkToken } from "./sync.js";
 import { ICON } from "./chrome-icons.js";
 import { calendarHtml, afterCalendar, onScroll, backToToday, todaysCount } from "./calendar.js";
 import { refreshSheet, openLevel, registerLevel } from "./sheet.js";
-import { readPrefs, isShown, toggleCategory, resetCategories, defaultsSummary, categoriesSummary, VIEW_NAMES, DETAIL_NAMES, STYLE_NAMES, blocksFreeTime, toggleBlocking, freeTimeSummary } from "./prefs.js";
+import { readPrefs, defaultsSummary, VIEW_NAMES, DETAIL_NAMES, STYLE_NAMES, blocksFreeTime, toggleBlocking, freeTimeSummary } from "./prefs.js";
 import { CATEGORIES, iconFor } from "./icons.js";
 import { resetCalendarDefaults } from "./calendar.js";
 import { checkForUpdate, ensureVersionAsked, updateStatusLines, updateBusy, updateButtonText, updateReady } from "./updates.js";
@@ -123,7 +123,6 @@ function renderSettings() {
   return `<div class="fields">
     ${field("Theme", theme, "Light and dark follow the phone.")}
     ${opener("Calendar defaults", "set-defaults", defaultsSummary(prefs))}
-    ${me ? opener("Categories", "set-cats", categoriesSummary(prefs, me)) : ""}
     ${opener("Free time", "set-freetime", freeTimeSummary(prefs))}
     ${field("Sync", `<div class="sync-status"><p class="sync-line ${dot}"><i></i>${escapeHtml(syncLine)}</p>${when ? `<p class="sync-line muted">${escapeHtml(when)}</p>` : ""}</div>`
       + `<button id="syncNow"${s.token ? "" : " disabled"}>Sync now</button>`)}
@@ -148,7 +147,6 @@ function renderSettings() {
 const APP_URL = "https://darkpizzai.github.io/kave-calendar-app/";
 
 /* The two Settings sheets, as levels of the one sheet. */
-const VIEW_LABEL = { glance: "Glance", grid: "Grid", agenda: "Agenda" };
 const PREF_KEYS = ["defaultView", "defaultDetail", "cardStyle"];
 registerLevel("set-defaults", {
   title: () => "Calendar defaults",
@@ -167,30 +165,6 @@ registerLevel("set-defaults", {
     resetCalendarDefaults();
   },
 });
-registerLevel("set-cats", {
-  title: () => "Categories",
-  body() {
-    const s = store.state.settings, p = readPrefs(s), me = s.me;
-    const head = `<div class="grid-h"><span></span>${VIEW_NAMES.map(([, l]) => `<span>${l[0]}<span class="full">${l.slice(1)}</span></span>`).join("")}</div>`;
-    const rowsHtml = CATEGORIES.map((c) => `<div class="grid-r"><span class="gl"><span class="gi">${escapeHtml(iconFor({ type: c.type }, { owner: me }, me))}</span>${escapeHtml(c.label)}</span>`
-      + VIEW_NAMES.map(([v]) => {
-        const on = isShown(p, me, v, c.type);
-        return `<button class="tick${on ? " on" : ""}" role="checkbox" aria-checked="${on}" aria-label="${escapeHtml(c.label)} in ${VIEW_LABEL[v]}" data-tick-view="${v}" data-tick-type="${escapeHtml(c.type)}">${on ? ICON.check : ""}</button>`;
-      }).join("") + "</div>").join("");
-    return `<p class="fhint">What ${me === "hugo" ? "Hugo" : "Isa"} sees in each view. Each of you picks your own; hiding a category deletes nothing.</p><div class="grid">${head}${rowsHtml}</div>`;
-  },
-  bar: () => `<button class="act-btn" data-act="reset">Reset</button>`,
-  onAction(b) {
-    const s = store.state.settings;
-    if (b.dataset.act === "reset") {
-      store.setSetting("hiddenCategories", resetCategories(readPrefs(s)).hiddenCategories);
-      return;
-    }
-    const v = b.dataset.tickView, t = b.dataset.tickType;
-    if (!v || !t || !s.me) return;
-    store.setSetting("hiddenCategories", toggleCategory(readPrefs(s), s.me, v, t).hiddenCategories);
-  },
-});
 registerLevel("set-freetime", {
   title: () => "Free time",
   body() {
@@ -200,7 +174,7 @@ registerLevel("set-freetime", {
       return `<div class="grid-r single"><span class="gl"><span class="gi">${escapeHtml(iconFor({ type: c.type }, { owner: s.me }, s.me))}</span>${escapeHtml(c.label)}</span>`
         + `<button class="tick${on ? " on" : ""}" role="checkbox" aria-checked="${on}" aria-label="${escapeHtml(c.label)} blocks free time" data-tick-block="${escapeHtml(c.type)}">${on ? ICON.check : ""}</button></div>`;
     }).join("");
-    return `<p class="fhint">Which categories count as "not free" when a weekend or long weekend could otherwise show as free. Shared by both of you.</p><div class="grid">${rowsHtml}</div>`;
+    return `<p class="fhint">Which of these would block you from planning a trip?</p><div class="grid">${rowsHtml}</div>`;
   },
   onAction(b) {
     const t = b.dataset.tickBlock;
