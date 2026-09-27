@@ -423,6 +423,10 @@ a.ticket{color:inherit;text-decoration:none}
 .dsq .dtodo{position:absolute;top:4px;right:5px;display:flex;color:var(--text-dim)}
 .dsq .dtodo svg{width:12px;height:12px;stroke-width:2.5}
 .dsq.today .dtodo{color:var(--accent-text)}
+/* the opening day of a real long weekend/opportunity (never a plain free
+   weekend -- that's colour only), bottom-left so it never fights the
+   centred emoji or the top corners' num/dtodo */
+.dsq .note{position:absolute;bottom:4px;left:5px;font-size:11px;line-height:1}
 /* the day's single emoji, centred in the bottom two thirds -- no border
    ever says whose day it is; a day that's only the other person's uses
    the app's existing "grey" convention (same filter as .c-i.grey in the

@@ -93,8 +93,8 @@ test("weekFreeNote: a plain free weekend note attaches to the Saturday", () => {
      freeWeekendSaturday's own behaviour, not about which real 2026 holidays
      happen to fall near this week */
   const blocksAll = () => true;
-  eq(weekFreeNote("2026-09-21", {}, on([]), "2026-09-24", blocksAll), { on: "2026-09-26", text: "Free weekend" });
-  eq(weekFreeNote("2026-11-16", {}, on([]), "2026-09-24", blocksAll), { on: "2026-11-21", text: "Free weekend" },
+  eq(weekFreeNote("2026-09-21", {}, on([]), "2026-09-24", blocksAll), { on: "2026-09-26", text: "Free weekend", kind: "plain" });
+  eq(weekFreeNote("2026-11-16", {}, on([]), "2026-09-24", blocksAll), { on: "2026-11-21", text: "Free weekend", kind: "plain" },
      "a free weekend months out still gets its note");
 });
 test("weekFreeNote: a long weekend or opportunity starting inside this week takes priority", () => {
@@ -103,6 +103,7 @@ test("weekFreeNote: a long weekend or opportunity starting inside this week take
   const note = weekFreeNote("2026-10-05", HOLIDAYS, on([]), "2026-09-24", blocksAll);
   eq(note.on, "2026-10-10");
   eq(note.text, "Free long weekend");
+  eq(note.kind, "long", "only 'long' is worth a 🔍 badge -- a plain free weekend is colour only");
 });
 test("weekFreeNote: nothing qualifying this week is null", () => {
   const blocksAll = () => true;
