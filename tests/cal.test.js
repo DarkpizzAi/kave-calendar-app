@@ -3,7 +3,7 @@ import { weekRows, indexByDay, tappable, zoomWeekTarget, zoomMonthTarget, isAway
   shouldLoadMore, nextCount, iconsOf, searchEvents, todaysCount, fullPastWeeks, fullPastMonths,
   backToTodayState, eventsInMonth, tripCityFor, defaultCity, hideCancelled,
   hasOpenTodos, guestsExcludingViewer, statusGuestsLine, heatFill } from "../js/cal-model.js";
-import { readPrefs, byCategories } from "../js/prefs.js";
+import { readPrefs, byCategories, toggleCategory } from "../js/prefs.js";
 
 const ev = (id, start, extra = {}) => ({ id, title: id, start, end: null, owner: "shared", status: "planned", activities: [], ...extra });
 const act = (type, icon) => ({ type, icon });
@@ -168,7 +168,7 @@ test("cal: F20/F61 -- the plans count and the heat-strip fill both ignore catego
   const drinks = ev("drinks", "2026-10-05", { activities: [act("drinks")] });
   const trip = ev("trip", "2026-10-10", { activities: [act("transport")] });
   const all = [drinks, trip];
-  const prefs = readPrefs({}); // Yearly's default already hides "drinks" (F17): no toggle needed
+  const prefs = toggleCategory(readPrefs({}), "isa", "glance", "drinks");
   const filtered = byCategories(all, prefs, "isa", "glance");
   const onAll = (d) => (indexByDay(all).get(d) || []);
   const onFiltered = (d) => (indexByDay(filtered).get(d) || []);

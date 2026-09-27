@@ -3,30 +3,15 @@ import { readPrefs, isShown, toggleCategory, byCategories, defaultsSummary, cate
 
 const ev = (id, types) => ({ id, activities: types.map((type) => ({ type })) });
 
-test("prefs: every category shows in Weekly and Monthly by default", () => {
+test("prefs: every category shows in every view by default", () => {
   const p = readPrefs({});
   ok(isShown(p, "isa", "grid", "cinema"));
   ok(isShown(p, "hugo", "agenda", "none"));
+  ok(isShown(p, "isa", "glance", "drinks"), "the Glance emoji redesign shows everything, not just big things");
+  ok(isShown(p, "hugo", "glance", "none"));
   eq([p.defaultView, p.defaultDetail, p.cardStyle], ["glance", "full", "lines"]);
 });
-
-/* F17: the drift Isa found -- the Categories grid said "everything on" while
-   Yearly only ever drew trips away, visitors and business trips. The grid's
-   stored default now matches that real filter, in both directions: the four
-   "big" categories on, everything else (including "none"/Other) off. */
-test("prefs: Yearly starts on its real filter, not 'everything on' (F17)", () => {
-  const p = readPrefs({});
-  ok(isShown(p, "isa", "glance", "transport"));
-  ok(isShown(p, "isa", "glance", "accommodation"));
-  ok(isShown(p, "isa", "glance", "business-trip"));
-  ok(isShown(p, "hugo", "glance", "visitor"));
-  ok(!isShown(p, "isa", "glance", "drinks"), "Isa's exact complaint: drinks read as on but never showed");
-  ok(!isShown(p, "hugo", "glance", "birthday"));
-  ok(!isShown(p, "hugo", "glance", "none"));
-});
 test("prefs: a toggle is per person and per view", () => {
-  /* "transport" is one of Yearly's real defaults (F17: shown, not cinema)
-     so toggling it actually hides something rather than un-hiding it. */
   const p = toggleCategory(readPrefs({}), "isa", "glance", "transport");
   eq(isShown(p, "isa", "glance", "transport"), false);
   ok(isShown(p, "isa", "grid", "transport"), "other view untouched");
@@ -92,25 +77,21 @@ test("prefs: an event with no activity counts as Other", () => {
 test("prefs: summaries for the two Settings buttons", () => {
   let p = readPrefs({ defaultView: "grid", defaultDetail: "partial", cardStyle: "icons" });
   eq(defaultsSummary(p), "Grid, Partial, Icons only");
-  /* F17: the spec's own example (section 3, Settings) -- "Weekly all,
-     Monthly all, Yearly 4" -- is the default now, not "Yearly all". */
-  eq(categoriesSummary(p, "isa"), "Glance 4, Grid all, Agenda all");
+  eq(categoriesSummary(p, "isa"), "Glance all, Grid all, Agenda all");
   p = toggleCategory(toggleCategory(p, "isa", "glance", "transport"), "isa", "glance", "visitor");
-  eq(categoriesSummary(p, "isa"), "Glance 2, Grid all, Agenda all", "two of the four hidden");
-  eq(categoriesSummary(p, "hugo"), "Glance 4, Grid all, Agenda all");
+  eq(categoriesSummary(p, "isa"), "Glance 17, Grid all, Agenda all", "two of the nineteen hidden");
+  eq(categoriesSummary(p, "hugo"), "Glance all, Grid all, Agenda all");
 });
 
-test("prefs: resetCategories restores the corrected Yearly defaults, not the old bug (F18)", () => {
+test("prefs: resetCategories restores nothing hidden, in every view", () => {
   let p = readPrefs({});
-  p = toggleCategory(p, "isa", "glance", "drinks"); // Isa un-hides drinks for Yearly
-  p = toggleCategory(p, "isa", "glance", "transport"); // and hides transport
-  p = toggleCategory(p, "hugo", "grid", "cinema"); // Hugo hides cinema in Weekly
+  p = toggleCategory(p, "isa", "glance", "drinks");
+  p = toggleCategory(p, "hugo", "grid", "cinema");
   const r = resetCategories(p);
-  ok(isShown(r, "isa", "glance", "transport"), "back to shown");
-  ok(!isShown(r, "isa", "glance", "drinks"), "back to hidden -- the real default, not 'everything on'");
+  ok(isShown(r, "isa", "glance", "drinks"), "back to shown");
   ok(isShown(r, "hugo", "grid", "cinema"), "every person and view resets, not just the one touched");
-  eq(categoriesSummary(r, "isa"), "Glance 4, Grid all, Agenda all");
-  eq(categoriesSummary(r, "hugo"), "Glance 4, Grid all, Agenda all");
+  eq(categoriesSummary(r, "isa"), "Glance all, Grid all, Agenda all");
+  eq(categoriesSummary(r, "hugo"), "Glance all, Grid all, Agenda all");
   eq([r.defaultView, r.defaultDetail, r.cardStyle], [p.defaultView, p.defaultDetail, p.cardStyle], "reset touches categories only");
 });
 test("prefs: stored junk falls back to defaults", () => {

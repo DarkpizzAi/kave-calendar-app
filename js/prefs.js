@@ -7,7 +7,6 @@
 
 import { CATEGORIES } from "./icons.js";
 import { PEOPLE } from "./model.js";
-import { AWAY } from "./cal-model.js";
 
 export const VIEW_NAMES = [["glance", "Glance"], ["grid", "Grid"], ["agenda", "Agenda"]];
 export const DETAIL_NAMES = [["full", "Full"], ["partial", "Partial"], ["minimal", "Minimal"]];
@@ -16,16 +15,14 @@ const TYPES = CATEGORIES.map((c) => c.type);
 const oneOf = (list, v, fallback) => (list.some(([k]) => k === v) ? v : fallback);
 const labelOf = (list, v) => list.find(([k]) => k === v)[1];
 
-/* F17: Yearly's real filter is "big things" (trips away, visitors, business
-   trips; never birthdays, spec section 3) -- the same set Yearly's own
-   rendering (cal-model.js's AWAY, plus "visitor") already used, hard-coded,
-   with no path through here. That is the drift Isa found: this module's
-   stored defaults said "everything shows", while Yearly actually only ever
-   drew four categories. One list now, imported rather than re-declared, so
-   the Categories grid and the Calendar cannot disagree again. This becomes
-   the new default (Isa, 2026-09-25), not a return to "show everything". */
-export const YEARLY_DEFAULT_SHOWN = [...AWAY, "visitor"];
-const defaultHidden = (view) => (view === "glance" ? TYPES.filter((t) => !YEARLY_DEFAULT_SHOWN.includes(t)) : []);
+/* F17 (2026-09-25) restricted Glance to "big things" (away trips, business
+   trips, visitors) because the grid drew only those four regardless of what
+   this module's stored defaults said -- a drift between what Settings
+   claimed and what actually showed. The Glance redesign (one emoji per day,
+   picked by priority) removed that drift a different way: every category
+   can render, so there is no longer a mismatch to guard against. Every view
+   now starts with nothing hidden. */
+const defaultHidden = () => [];
 
 /* Free-time blocking: which categories count against a free weekend/long
    weekend/opportunity. One list, shared by both people -- symmetric, not
@@ -56,7 +53,7 @@ export function readPrefs(settings) {
     for (const [oldOrNewKey, list] of Object.entries(rawPerson)) migratedPerson[migrateViewKey(oldOrNewKey)] = list;
     for (const [v] of VIEW_NAMES) {
       const list = migratedPerson[v];
-      hiddenCategories[p][v] = Array.isArray(list) ? list.filter((t) => TYPES.includes(t)) : defaultHidden(v);
+      hiddenCategories[p][v] = Array.isArray(list) ? list.filter((t) => TYPES.includes(t)) : defaultHidden();
     }
   }
   const blockingCategories = Array.isArray(s.blockingCategories)
@@ -71,13 +68,13 @@ export function readPrefs(settings) {
   };
 }
 
-/* F18: Reset restores these corrected defaults, not the old "everything on"
-   bug -- same set defaultHidden() already falls back to for stored junk. */
+/* Reset restores nothing-hidden, the same set defaultHidden() already
+   falls back to for stored junk. */
 export function resetCategories(prefs) {
   const hiddenCategories = {};
   for (const p of PEOPLE) {
     hiddenCategories[p] = {};
-    for (const [v] of VIEW_NAMES) hiddenCategories[p][v] = defaultHidden(v);
+    for (const [v] of VIEW_NAMES) hiddenCategories[p][v] = defaultHidden();
   }
   return { ...prefs, hiddenCategories };
 }
