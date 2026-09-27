@@ -218,7 +218,7 @@ button:disabled { opacity: .5; cursor: default; }
 .gate-title{margin:0;font-size:var(--fs-title-lg);font-weight:600;letter-spacing:var(--tracking-heading)}
 .gate .lede{margin:0}
 /* the sheet: one sheet, levels inside */
-.sheet{position:absolute;left:0;right:0;top:56px;bottom:0;margin:0 auto;max-width:720px;background:var(--surface);border-radius:var(--r-sheet) var(--r-sheet) 0 0;box-shadow:var(--shadow-raised);display:flex;flex-direction:column;overflow:hidden;z-index:8}
+.sheet{position:absolute;left:0;right:0;top:var(--header-h,56px);bottom:0;margin:0 auto;max-width:720px;background:var(--surface);border-radius:var(--r-sheet) var(--r-sheet) 0 0;box-shadow:var(--shadow-raised);display:flex;flex-direction:column;overflow:hidden;z-index:8}
 .sheet.in{animation:sheet-up var(--motion-slow) var(--ease-sheet)}
 .sheet.out{animation:sheet-down var(--motion-base) var(--ease-standard) forwards}
 .shade.out{animation:fade-out var(--motion-base) var(--ease-standard) forwards}
@@ -471,9 +471,10 @@ a.ticket{color:inherit;text-decoration:none}
 /* the sheet: header taps and swipes close; each level looks different */
 /* F32: the backdrop must not darken the page's own header above it -- it
    used to be inset:0 of .shell (position:relative), covering .app-header
-   too; now it starts where .sheet itself does (top:56px, matching), so the
-   page header stays undarkened. */
-.shade{position:absolute;left:0;right:0;bottom:0;top:56px;background:var(--bg);opacity:.6;z-index:7}
+   too; now it starts where .sheet itself does (top:var(--header-h), the
+   header's real measured height from wire.js, not a guessed constant), so
+   the page header stays undarkened. */
+.shade{position:absolute;left:0;right:0;bottom:0;top:var(--header-h,56px);background:var(--bg);opacity:.6;z-index:7}
 .sbar{flex:none;background:var(--accent-soft);border-radius:var(--r-sheet);padding:var(--sp-4);position:relative;touch-action:none;cursor:pointer}
 .grab{position:absolute;top:7px;left:50%;transform:translateX(-50%);width:34px;height:4px;border-radius:var(--r-pill);background:var(--text-dim);opacity:.5}
 .stitle{margin:0;font-size:var(--fs-title-lg);font-weight:var(--fw-strong);letter-spacing:var(--tracking-heading);line-height:1.2}
