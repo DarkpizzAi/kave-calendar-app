@@ -157,7 +157,11 @@ function agendaDay(d, freeDays) {
 }
 function agendaWeek(m) {
   const freeDays = S.freeOn ? new Set(weekFreeDays(m, HOLIDAYS, frame.onAll, frame.today, freeBlocks)) : new Set();
-  const days = [0, 1, 2, 3, 4, 5, 6].map((k) => addDays(m, k));
+  /* Only the week underway trims to today -- Isa: Agenda opens on today at
+     the top, but "load older" must still reveal real past weeks in full,
+     not empty cards (m !== frame.thisMonday is always entirely in the past
+     or entirely in the future here, never split by today). */
+  const days = [0, 1, 2, 3, 4, 5, 6].map((k) => addDays(m, k)).filter((d) => m !== frame.thisMonday || d >= frame.today);
   return `<div class="weekCard" data-week="${m}">${days.map((d) => agendaDay(d, freeDays)).join("")}</div>`;
 }
 function weekBlocks(from, count) {
