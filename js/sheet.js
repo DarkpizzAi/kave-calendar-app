@@ -159,7 +159,8 @@ function draw(anim) {
   let sh = root.querySelector(".sheet:not(.out)");
   if (!sh) {
     root.innerHTML = '<div class="shade" data-sact="close"></div><section class="sheet in" role="dialog" aria-modal="true" aria-labelledby="stitle">'
-      + '<header class="sbar" data-sact="close" data-swipe="sheet"><span class="grab" aria-hidden="true"></span><h2 class="stitle" id="stitle"></h2><div class="bar-acts"></div></header>'
+      + '<header class="sbar" data-sact="close" data-swipe="sheet"><span class="grab" aria-hidden="true"></span>'
+      + '<div class="stitle-wrap"><h2 class="stitle" id="stitle"></h2><div class="stags"></div></div><div class="bar-acts"></div></header>'
       + '<div class="sstage"></div></section>';
     sh = root.querySelector(".sheet");
     anim = "";
@@ -167,6 +168,7 @@ function draw(anim) {
   sh.className = `sheet lv-${l.kind}${anim === "" && sh.classList.contains("in") ? " in" : ""}`;
   sh.querySelector(".stitle").textContent = title(l);
   const def = custom[l.kind];
+  sh.querySelector(".stags").innerHTML = def && def.tags ? def.tags(l) : "";
   sh.querySelector(".bar-acts").innerHTML = l.kind === "day"
     ? `<button class="sbtn" data-sact="newday" aria-label="Add an event">${ICON.plus}</button>`
     : def && def.bar ? def.bar(l) : "";
