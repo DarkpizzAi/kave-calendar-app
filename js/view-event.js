@@ -88,7 +88,6 @@ function eventPage(e) {
      accent-text, r-pill, fs-meta -- Compass's existing .flag.acc is the
      same construction already) -- not the softer .flag.soft treatment F40
      gave it. */
-  const statusPill = `<p class="flag acc status-pill">${esc(STATUS_LABEL[e.status] || "")}</p>`;
   const when = `<p class="big">${esc(whenLine(e, thisYear()))}</p>`;
   const place = [e.venue, e.city && e.city[0].toUpperCase() + e.city.slice(1)].filter(Boolean).join(", ");
   const maps = mapsUrl(e.venue, e.city);
@@ -103,7 +102,7 @@ function eventPage(e) {
   const addT = `<div class="newtodo"><span class="box empty" aria-hidden="true"></span>${input("task", pageTask.text, "Add a task", "text", "bare")}`
     + (pageTask.text.trim() ? `${choices("task-for", [["isa", "Isa"], ["hugo", "Hugo"], ["shared", "Both"]], pageTask.for)}<button class="primary" data-act="addtask">Add</button>` : "") + "</div>";
   const costs = visibleCosts(e.costs, me()).map((k) => costLine(k, false)).join("") + costEntry(pageCost || costDefaults(e, me()));
-  return statusPill + group("clock", when, "When") + (acts ? group("tag", `<p>${esc(acts)}</p>`, "Type") : "")
+  return group("clock", when, "When") + (acts ? group("tag", `<p>${esc(acts)}</p>`, "Type") : "")
     + (where ? group("pin", where, "Where") : "") + group("people", who, "Who")
     + (links ? group("link", links, "Tickets and links") : "")
     + section("To do", todos + addT) + section("Costs", costs)
@@ -314,6 +313,10 @@ export function initEvent(ctx) {
   refresh = ctx.refresh;
   registerLevel("event", {
     title: (l) => { const e = find(l.id); return e ? e.title : "Event"; },
+    /* F68 continued: the status pill moved into the sheet's own header,
+       Spoon's recipe popup's own .detail-tags row under the name, instead
+       of living as the page's first line. */
+    tags: (l) => { const e = find(l.id); return e ? `<span class="flag acc status-pill">${esc(STATUS_LABEL[e.status] || "")}</span>` : ""; },
     body: (l) => {
       /* the entry lines belong to one event: a different event starts them empty */
       if (l.id !== lastPage) { lastPage = l.id; pageCost = null; pageTask.text = ""; pageTask.for = "shared"; }
