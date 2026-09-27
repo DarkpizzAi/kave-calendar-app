@@ -83,9 +83,20 @@ document.addEventListener("keydown", (e) => {
    old worker is already serving a stale copy of this file. */
 const IS_LOCAL_DEV = ["localhost", "127.0.0.1"].includes(location.hostname);
 
+/* Ported from Spoon (js/boot.js): register at module eval time, not on
+   window "load". The load-wrapper Compass had here left a window where
+   Settings > Advanced > Check for updates could run getRegistration()
+   before the registration promise had settled, which reads as "no service
+   worker found" even though one is about to exist -- and looks identical
+   to a genuine registration failure, so reopening the app doesn't fix it
+   when the same race just happens again. updateViaCache: "none" matches
+   Spoon too: without it, Check for updates can be served the *old*
+   service-worker.js straight out of the HTTP cache and never see a new
+   version to install. */
 if ("serviceWorker" in navigator && !IS_LOCAL_DEV) {
-  window.addEventListener("load", () => {
-    navigator.serviceWorker.register("service-worker.js").then((reg) => {
+  navigator.serviceWorker
+    .register("service-worker.js", { updateViaCache: "none" })
+    .then((reg) => {
       /* A new worker took over: the shell on screen is the old one. Say so
          rather than leaving the user on a stale app that looks current. */
       reg.addEventListener("updatefound", () => {
@@ -98,5 +109,4 @@ if ("serviceWorker" in navigator && !IS_LOCAL_DEV) {
         });
       });
     }).catch(() => { /* registration is an enhancement, never a hard failure */ });
-  });
 }
