@@ -9,7 +9,7 @@ import { escapeHtml as esc, safeUrl } from "./util.js";
 import { todayKey } from "./dates.js";
 import { newEvent, STATUSES, STATUS_LABEL } from "./model.js";
 import { CATEGORIES as MONEY, formatCents, visibleCosts } from "./money.js";
-import { CATEGORIES, iconFor, categoryOf } from "./icons.js";
+import { CATEGORIES, GROUPS, iconFor, categoryOf } from "./icons.js";
 import { readForm, costDefaults, canChangeCost, addTask, addCost, whenLine, mapsUrl, toDraft, costPayerText } from "./event-form.js";
 import { defaultCity } from "./cal-model.js";
 import { registerLevel, openLevel, replaceTop, back, closeAll, topLevel } from "./sheet.js";
@@ -124,8 +124,12 @@ function activityForm(d) {
   const chips = d.activities.map((a, i) => `<span class="act">${esc(iconFor(a, d, me()))} ${esc(categoryOf(a.type).label)}`
     + `<button class="iconbtn" data-act="rmact" data-i="${i}" aria-label="Remove">${ICON.x}</button></span>`).join('<span class="then">then</span>');
   let pick = "";
-  if (picker === "cat") pick = `<p class="sub">Pick a category</p><div class="catgrid">${CATEGORIES.map((c) =>
-    `<button data-act="pickcat" data-c="${c.type}"><span class="ci">${esc(iconFor({ type: c.type }, d, me()))}</span>${esc(c.label)}</button>`).join("")}</div>`;
+  if (picker === "cat") pick = `<p class="sub">Pick a category</p>${GROUPS.map((g) => {
+    const cats = CATEGORIES.filter((c) => c.group === g);
+    if (!cats.length) return "";
+    return `<p class="catgroup">${esc(g)}</p><div class="catgrid">${cats.map((c) =>
+      `<button data-act="pickcat" data-c="${c.type}"><span class="ci">${esc(iconFor({ type: c.type }, d, me()))}</span>${esc(c.label)}</button>`).join("")}</div>`;
+  }).join("")}`;
   else if (picker) pick = `<p class="sub">${esc(categoryOf(picker).label)}: pick its icon</p><div class="choices">${categoryOf(picker).icons.map((ic, i) =>
     `<button class="big" data-act="pickicon" data-i="${i}">${esc(iconFor({ type: picker, icon: ic.icon }, d, me()))}</button>`).join("")}</div>`;
   return (chips ? `<div class="acts">${chips}</div>` : "")

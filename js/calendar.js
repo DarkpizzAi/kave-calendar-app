@@ -52,8 +52,12 @@ function buildFrame() {
   const { me, style } = prefs();
   const today = todayKey();
   const thisYear = today.slice(0, 4);
-  /* the detail level first, then the viewer's categories for this view */
-  const detailed = applyDetail(byCategories(ctx.data.events(), readPrefs(store.state.settings), me, S.view), me, S.detail);
+  /* the detail level first, then the viewer's categories for this view --
+     unless the Categories toggle is off, in which case every category shows
+     regardless of what's stored. */
+  const catsOn = store.state.settings.categoriesOn !== false;
+  const byCat = catsOn ? byCategories(ctx.data.events(), readPrefs(store.state.settings), me, S.view) : ctx.data.events();
+  const detailed = applyDetail(byCat, me, S.detail);
   const grey = new Set(detailed.filter((x) => x.grey).map((x) => x.event.id));
   /* F35: Weekly hides a cancelled event outright; Monthly and Yearly keep it
      (struck through, cls() below). */
@@ -108,6 +112,8 @@ function controls() {
   const views = `<div class="segment" role="tablist"><span class="seg-thumb" style="--i:${idx};--from:${from}"></span>`
     + VIEWS.map((v) => `<button role="tab" aria-selected="${S.view === v}" data-act="view" data-v="${v}">${v[0].toUpperCase() + v.slice(1)}</button>`).join("") + "</div>";
   const detail = `<button class="ib" data-act="menu" aria-label="Detail level" aria-expanded="${S.menu}">${ICON.eye}</button>`;
+  const catsOn = store.state.settings.categoriesOn !== false;
+  const cats = `<button class="ib${catsOn ? " on" : ""}" data-act="cats" aria-label="Categories" aria-pressed="${catsOn}">${ICON.tag}</button>`;
   const free = `<button class="ib${S.freeOn ? " on" : ""}" data-act="free" aria-label="Highlight free time" aria-pressed="${S.freeOn}">${ICON.star}</button>`;
   /* F29: "load older" is now one of three inline control buttons, sitting
      between detail and search, not a floating round button (F6's mechanism
@@ -119,7 +125,7 @@ function controls() {
   const menu = S.menu ? `<div class="menu"><p class="mt">Detail level</p>${[["full", "Full"], ["partial", "Partial"], ["minimal", "Minimal"]]
     .map(([k, l]) => `<button class="opt${S.detail === k ? " on" : ""}" data-act="detail" data-v="${k}">${l}</button>`).join("")}`
     + '<p class="mh">Full: both of you. Partial: the other person greyed. Minimal: yours and shared only.</p></div>' : "";
-  return `<div class="ctl${S.searchOpen ? " searching" : ""}">${S.searchOpen ? "" : views}<div class="ctl2">${S.searchOpen ? "" : free + detail + older}${search}</div>${menu}</div>`;
+  return `<div class="ctl${S.searchOpen ? " searching" : ""}">${S.searchOpen ? "" : views}<div class="ctl2">${S.searchOpen ? "" : free + detail + cats + older}${search}</div>${menu}</div>`;
 }
 
 /* ---- Weekly and Monthly: runs of weeks ---- */
@@ -479,6 +485,7 @@ function onClick(e) {
   if (a === "view") setView(b.dataset.v);
   else if (a === "menu") { S.menu = !S.menu; ctx.render(); }
   else if (a === "free") { S.freeOn = !S.freeOn; ctx.render(); }
+  else if (a === "cats") { store.setSetting("categoriesOn", store.state.settings.categoriesOn === false); ctx.render(); }
   else if (a === "detail") { S.detail = b.dataset.v; S.menu = false; ctx.render(); }
   else if (a === "search") { S.searchOpen = true; S.menu = false; ctx.render(); loadAllOlder(); }
   else if (a === "closesearch") { S.searchOpen = false; S.query = ""; ctx.render(); }
