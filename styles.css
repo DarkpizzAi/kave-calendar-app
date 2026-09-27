@@ -593,8 +593,11 @@ a.ticket{color:inherit;text-decoration:none}
    that control. Match the icon's box to whichever control actually opens
    the group. */
 .grp:has(> .gbody > input:first-child) > .gic,
-.grp:has(> .gbody > button.add:first-child) > .gic{height:var(--touch-min)}
+.grp:has(> .gbody > button.add:first-child) > .gic,
+.grp:has(> .gbody > .choices:first-child) > .gic{height:var(--touch-min)}
 .grp:has(> .gbody > .acts:first-child) > .gic{height:calc(var(--fs-ui) * var(--lh-base) + var(--sp-2))}
+/* the title field's larger font makes its box taller than --touch-min */
+.grp:has(> .gbody > input.titlein:first-child) > .gic{height:calc(var(--fs-title-lg) * var(--lh-base) + 20px)}
 .gbody{display:flex;flex-direction:column;align-items:flex-start;gap:var(--sp-2);min-width:0}
 .gbody p{margin:0;font-size:var(--fs-body)}
 .gbody .big{font-size:var(--fs-lede);font-weight:500}
