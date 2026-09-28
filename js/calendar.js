@@ -182,6 +182,25 @@ function agendaWeek(m) {
   const days = [0, 1, 2, 3, 4, 5, 6].map((k) => addDays(m, k)).filter((d) => m !== frame.thisMonday || d >= frame.today);
   return days.map((d) => agendaDay(d, m, freeDays, note)).join("");
 }
+/* Agenda: within one week, weekdays match the tallest weekday and the
+   weekend matches the tallest weekend day -- two independent groups, not
+   one across all seven (a quiet Sat/Sun shouldn't grow just because
+   Friday had a busy day, and vice versa). Cards render at their own
+   natural height first (no CSS floor any more, see styles.css); this
+   runs after, over whatever daycards are actually in the DOM (the main
+   view or the Archive popup), and stretches each to its group's max. */
+function equalizeAgendaHeights(root) {
+  const groups = new Map();
+  root.querySelectorAll(".daycard[data-week]").forEach((el) => {
+    el.style.height = "";
+    const key = `${el.dataset.week}:${el.classList.contains("weekend") ? "we" : "wd"}`;
+    (groups.get(key) || groups.set(key, []).get(key)).push(el);
+  });
+  for (const els of groups.values()) {
+    const max = Math.max(...els.map((el) => el.offsetHeight));
+    els.forEach((el) => { el.style.height = `${max}px`; });
+  }
+}
 function weekBlocks(from, count) {
   let out = "", cur = "";
   for (let m = from, i = 0; i < count && m <= frame.range.max; i++, m = addDays(m, 7)) {
@@ -324,6 +343,7 @@ export function calendarHtml() {
 
 /* After the tab's HTML is in place: scroll, focus, clear one-shot state. */
 export function afterCalendar(mn, before) {
+  if (S.view === "agenda") equalizeAgendaHeights(mn);
   if (S.keepAnchor) mn.scrollTop = before.top + (mn.scrollHeight - before.height);
   else if (S.scrollTo) { const t = mn.querySelector(S.scrollTo); if (t) t.scrollIntoView({ block: "start" }); }
   else if (before.first) { const t = mn.querySelector("#today"); if (t) t.scrollIntoView({ block: "start" }); }
@@ -443,6 +463,7 @@ function renderArchive() {
   const before = old ? { top: old.scrollTop, height: old.scrollHeight } : null;
   root.innerHTML = archiveHtml();
   const fresh = root.querySelector(".archive-body");
+  if (fresh && AR.view === "agenda") equalizeAgendaHeights(fresh);
   if (fresh) fresh.scrollTop = AR.keepAnchor && before ? before.top + (fresh.scrollHeight - before.height) : fresh.scrollHeight;
   AR.keepAnchor = false;
 }

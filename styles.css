@@ -410,10 +410,6 @@ a.ticket{color:inherit;text-decoration:none}
    between two different weeks, kept at the size Agenda always used. */
 .daycard.week-end{margin-bottom:var(--sp-2)}
 .daycard > .cd{display:block;font-size:var(--fs-micro);font-weight:500;color:var(--text-dim);margin-bottom:2px}
-/* every card reserves at least one line's height, even an empty one (never
-   an away pill's own day -- that already has visible content); 2+ events
-   grow taller than this floor same as before */
-.daycard:not(:has(.away)) .rows:empty::after{content:"";display:block;height:1.2em}
 .daycard.weekend{background:var(--surface-2)}
 .daycard.today{background:var(--accent)}
 .daycard.today > .cd{color:var(--accent-text)}
