@@ -257,10 +257,21 @@ body.gated .mn{background:transparent;border-radius:0;padding:var(--sp-4)}
 @keyframes lv-in-up{from{transform:translateY(40%);opacity:0}}
 @keyframes lv-out-down{to{transform:translateY(40%);opacity:0}}
 @keyframes lv-in-down{from{transform:translateY(-30%);opacity:0}}
+/* the single day level's own swipe (js/sheet.js dayEnd): sideways, not
+   depth -- the old day leaves the way the finger swiped and the new one
+   arrives from the far side, an actual page-turn rather than a snap. */
+.sbody.out-left{animation:lv-out-left var(--motion-base) var(--ease-standard) forwards}
+.sbody.in-left{animation:lv-in-left var(--motion-base) var(--ease-standard)}
+.sbody.out-right{animation:lv-out-right var(--motion-base) var(--ease-standard) forwards}
+.sbody.in-right{animation:lv-in-right var(--motion-base) var(--ease-standard)}
+@keyframes lv-out-left{to{transform:translateX(-30%);opacity:0}}
+@keyframes lv-in-left{from{transform:translateX(40%);opacity:0}}
+@keyframes lv-out-right{to{transform:translateX(40%);opacity:0}}
+@keyframes lv-in-right{from{transform:translateX(-30%);opacity:0}}
 .todo-l.done{color:var(--text-dim);text-decoration:line-through}
 a.ticket{color:inherit;text-decoration:none}
 @media (prefers-reduced-motion: reduce){
-  .sfield,.sheet.in,.sheet.out,.shade.out,.slide-left,.slide-right,.segment .seg-thumb,.sbody.out-up,.sbody.in-up,.sbody.out-down,.sbody.in-down{animation:none}
+  .sfield,.sheet.in,.sheet.out,.shade.out,.slide-left,.slide-right,.segment .seg-thumb,.sbody.out-up,.sbody.in-up,.sbody.out-down,.sbody.in-down,.sbody.out-left,.sbody.in-left,.sbody.out-right,.sbody.in-right{animation:none}
   .fab.up,.fab.down,.fab.up svg,.fab.down svg,.nav-icon{transition:none}
 }
 /* three round buttons, all one size: add, and above it up (scroll to top)

@@ -139,6 +139,9 @@ function body(l) {
 }
 
 /* ---- drawing ---- */
+/* [old's exit class, new's entrance class] per anim value draw() gets. */
+const ANIM_DIR = { deeper: ["out-up", "in-up"], shallower: ["out-down", "in-down"],
+  next: ["out-left", "in-left"], prev: ["out-right", "in-right"] };
 function draw(anim) {
   if (!stack.length) {
     if (!root.firstChild) return;
@@ -179,11 +182,16 @@ function draw(anim) {
     fresh.scrollTop = keep;
     return;
   }
-  /* both layers stay until the animation ends, so the old one visibly leaves */
-  old.classList.add("leaving", anim === "deeper" ? "out-up" : "out-down");
-  fresh.classList.add(anim === "deeper" ? "in-up" : "in-down");
+  /* both layers stay until the animation ends, so the old one visibly
+     leaves -- vertically for stack depth (deeper/shallower), horizontally
+     for a day swipe (next/prev, ANIM_DIR below): the old day slides out
+     the way the finger swiped, the new one arrives from the far side, the
+     same two-layer trick either way. */
+  const [outCls, inCls] = ANIM_DIR[anim] || ANIM_DIR.shallower;
+  old.classList.add("leaving", outCls);
+  fresh.classList.add(inCls);
   stage.append(fresh);
-  afterAnim(fresh, () => { old.remove(); fresh.classList.remove("in-up", "in-down"); });
+  afterAnim(fresh, () => { old.remove(); fresh.classList.remove(inCls); });
 }
 
 /* A background redraw (new data from a sync) must never rebuild an open
@@ -195,11 +203,14 @@ export const refreshable = (l) => !!l && !FORMS.includes(l.kind);
 /* Called after the page redraws (new data): refresh the open level in place. */
 export function refreshSheet() { if (refreshable(stack[stack.length - 1])) draw(""); }
 
-/* Swap the level on top for another (a new event, once saved, becomes its page). */
-export function replaceTop(l) {
+/* Swap the level on top for another (a new event, once saved, becomes its
+   page; a day swipe steps to the next/previous day, anim "next"/"prev").
+   Defaults to no animation -- an in-place redraw (a form's own re-render,
+   an edit becoming its event page) must never suddenly slide. */
+export function replaceTop(l, anim = "") {
   if (!stack.length) return openLevel(l);
   stack[stack.length - 1] = l;
-  draw("");
+  draw(anim);
 }
 
 export function openLevel(l) {
@@ -309,7 +320,7 @@ export function initSheet() {
     d0 = null;
     if (act === "next" || act === "prev") {
       swallowSheetClick();
-      replaceTop({ kind: "day", d: addDays(from, act === "next" ? 1 : -1) });
+      replaceTop({ kind: "day", d: addDays(from, act === "next" ? 1 : -1) }, act);
     }
   };
   root.addEventListener("pointerdown", (e) => {
