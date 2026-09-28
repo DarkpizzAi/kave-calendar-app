@@ -13,7 +13,7 @@ import { loadRange, dayFreeState, weekFreeNote, weekFreeDays } from "./views.js"
 import { HOLIDAYS } from "./holidays.js";
 import { applyDetail } from "./filter.js";
 import { store } from "./store.js";
-import { indexByDay, tappable, zoomWeekTarget, zoomMonthTarget, isAway, awayText, AWAY,
+import { indexByDay, zoomWeekTarget, zoomMonthTarget, isAway, awayText, AWAY,
   shouldLoadMore, nextCount, iconsOf, searchEvents, shortDate, pastMonths, gesture, lastEventDay,
   fullPastWeeks, fullPastMonths, backToTodayState, todaysCount as cmTodaysCount, hideCancelled,
   hasLoadedOlder, hasOpenTodos } from "./cal-model.js";
@@ -170,7 +170,9 @@ function agendaDay(d, m, freeDays, note) {
   const weekStart = dayOfWeek(d) === 0 ? " week-start" : "";
   const dow = DOW[dayOfWeek(d)][0] + DOW[dayOfWeek(d)].slice(1).toLowerCase();
   const cd = `<div class="cd"><span class="cd-dow">${dow}</span><span class="cd-date">${dayMonth(d)}</span></div>`;
-  const tap = tappable(evs) ? ` role="button" tabindex="0" data-act="day" data-d="${d}"` : "";
+  /* Every day card opens the day, empty or not -- matches Grid's own
+     squares (gridSquare below), which have always worked this way. */
+  const tap = ` role="button" tabindex="0" data-act="day" data-d="${d}"`;
   /* A plain free weekend is colour only (Clear/Open, above); only a real
      long weekend or opportunity earns the 🔍 and its explanatory text, on
      the day its window opens. */
@@ -296,10 +298,10 @@ function gridIcon(d) {
 function gridSquare(d, freeDays, note) {
   if (!d) return `<div class="dsq pad"></div>`;
   const st = periodState(d, freeDays);
-  /* Unlike Agenda (tappable() -- a day with nothing cannot be tapped),
-     every Grid square opens the single day, empty or not: it is also the
-     entry point for the day-swipe browser in sheet.js, which needs to be
-     able to land on a day with nothing on it. */
+  /* Every Grid square opens the single day, empty or not (Agenda's day
+     cards work the same way, agendaDay above): it is also the entry point
+     for the day-swipe browser in sheet.js, which needs to be able to land
+     on a day with nothing on it. */
   /* F16's own glyph, reused rather than re-derived: at least one event
      that day still has an unchecked to-do. */
   const todo = frame.on(d).some(hasOpenTodos) ? `<span class="dtodo" aria-label="Open to-dos">${ICON.checkbox}</span>` : "";
