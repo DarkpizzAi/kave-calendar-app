@@ -32,7 +32,7 @@ export const CATEGORIES = [
   { type: "business-trip", label: "Business trip", group: "Travel & Work", icons: [{ icon: "💼" }] },
   { type: "work", label: "Work event", group: "Travel & Work", icons: [{ icon: "🏢" }] },
   { type: "visitor", label: "Visitor", group: "Travel & Work", icons: [{ icon: "🧳" }, { icon: "🏠", note: "staying with us" }] },
-  { type: "transport", label: "Transport", group: "Travel & Work", icons: [{ icon: "🛫", note: "outbound" }, { icon: "🛬", note: "return" }, { icon: "🚄", note: "train" }, { icon: "🚌", note: "bus" }, { icon: "🚗", note: "car" }, { icon: "🚢", note: "boat" }] },
+  { type: "transport", label: "Transport", group: "Travel & Work", icons: [{ icon: "✈️", note: "flight" }, { icon: "🛫", note: "outbound" }, { icon: "🛬", note: "return" }, { icon: "🚄", note: "train" }, { icon: "🚌", note: "bus" }, { icon: "🚗", note: "car" }, { icon: "🚢", note: "boat" }] },
   { type: "accommodation", label: "Accommodation", group: "Travel & Work", icons: [{ icon: "🏨" }, { icon: "🏡" }, { icon: "⛺" }] },
   { type: "none", label: "Other", group: "Other", icons: [{ icon: "📌" }] },
 ];
