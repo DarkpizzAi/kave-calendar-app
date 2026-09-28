@@ -16,8 +16,7 @@ export const PERSON_ICONS = {
 export const GROUPS = ["Nightlife & Social", "Entertainment & Leisure", "Outdoors", "Travel & Work", "Other"];
 
 export const CATEGORIES = [
-  /* F33: the CD icon (💿) is gone; the music notes (🎶) were already the
-     first/default icon and stay it. */
+  /* 🎶 is the default; the old CD icon is retired */
   { type: "live-music", label: "Live music", group: "Nightlife & Social", icons: [{ icon: "🎶" }, { icon: "🎸", note: "rock" }, { icon: "🎻", note: "classical" }] },
   { type: "clubbing", label: "Clubbing", group: "Nightlife & Social", icons: [{ icon: "🪩" }, { icon: "dancing" }] },
   { type: "drinks", label: "Drinks", group: "Nightlife & Social", icons: [{ icon: "🍺" }, { icon: "🍷" }, { icon: "🥂" }, { icon: "🍹" }, { icon: "🍻", note: "pre-drinks" }] },
@@ -41,11 +40,15 @@ export const CATEGORIES = [
 const BY_TYPE = new Map(CATEGORIES.map((c) => [c.type, c]));
 export const categoryOf = (type) => BY_TYPE.get(type) || BY_TYPE.get("none");
 
-/* The emoji to draw for one activity of one event, for one viewer. */
+/* The emoji to draw for one activity of one event, for one viewer. Only
+   ever a catalogue icon: a stored icon the catalogue does not list (a
+   retired one, or anything that is not an icon at all) falls back to the
+   category's first, so synced data never decides what reaches the page. */
 export function iconFor(activity, event, viewer) {
   const cat = BY_TYPE.get(activity && activity.type);
   if (!cat) return "📌";
-  const key = (activity.icon || cat.icons[0].icon);
+  const listed = activity.icon && cat.icons.some((i) => i.icon === activity.icon);
+  const key = listed ? activity.icon : cat.icons[0].icon;
   const person = PERSON_ICONS[key];
   if (person) return person[event.owner === "shared" ? viewer : event.owner] || person.isa;
   return key;

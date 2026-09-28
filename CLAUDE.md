@@ -93,17 +93,23 @@ sweep proposes, a person decides.
 
 ## Check the no-token state
 
-The app with no token saved is a real screen, seen after every reinstall. It
-is invisible to a diff and to a dev run with a token present, and in the
-sister app that blind spot hid three defects in one release. Test it
-deliberately.
+With no token saved the app shows only the gate (`js/gate.js`), seen after
+every reinstall. It is invisible to a diff and to a dev run with a token
+present, and in the sister app that blind spot hid three defects in one
+release. Test it deliberately: gate, wrong token, good token, who, theme.
 
-## Work in progress
+## Before any Compass work
 
-Sub-project A (the Calendar, the event screen, Settings) was merged to
-`main` and deployed on 2026-09-25 (v0.12). Rounds of real use on both phones
-follow (plan Task 14). The design decisions, the plan and the handoff for a
-new chat live in the private kave-hub repo: read
-`docs/superpowers/specs/2026-09-24-compass-a-core-design.md` first, then the
-"Handoff for a new chat" section of
-`docs/superpowers/plans/2026-09-24-compass-a-core.md`.
+Sub-project A (the Calendar, the event screen, Settings, the first-run
+gate) is live on `main`, which deploys: work on a branch and merge only on
+Isa's say. The design lives in the private kave-hub repo: read "Current
+design at a glance" at the top of
+`docs/superpowers/specs/2026-09-24-compass-a-core-design.md`, then
+`calendar/data/roadmap.md` for what is next.
+
+## One origin, one token
+
+Compass, Spoon and the hub site are all served from
+`darkpizzai.github.io` and share one `localStorage`, so they share the
+token. Never publish another GitHub Pages site from the DarkpizzAi
+account: anything served there can read it.

@@ -32,10 +32,6 @@ export function touch(e, me, now) {
   return { ...e, updated: { at: now.toISOString(), by: me } };
 }
 
-export function mainType(e) {
-  return (e.activities && e.activities[0] && e.activities[0].type) || "none";
-}
-
 export function addLink(e, { label, url, ...rest }) {
   const safe = safeUrl(url);
   if (!safe || (e.links || []).some((l) => l.url === safe)) return e;

@@ -91,16 +91,10 @@ export function mapsUrl(venue, city) {
   return q ? safeUrl("https://www.google.com/maps/search/?api=1&query=" + encodeURIComponent(q)) : null;
 }
 
-/* F44's root cause: toDraft used to be a bare JSON clone in view-event.js,
-   so an event missing links/checklist/costs/activities (any older or
-   imported event that predates a field -- blank() always sets them, but an
-   existing event on disk may not) left those undefined. formPage's
-   d.links.map(...) then threw, aborting the sheet's draw() partway through:
-   the title and Save/Cancel/Delete bar had already been swapped to "Edit
-   event", but the body swap never ran, so the old read-only page stayed in
-   the DOM underneath -- reading as "the cost fields (and everything else)
-   vanished". Every list field is defaulted here so the form can never
-   crash on a missing one. */
+/* An event on disk may predate a list field (links, checklist, costs,
+   activities). formPage maps over every one of them, and a throw there
+   aborts the sheet's draw halfway (new title and bar, old body), so every
+   list field is defaulted here. */
 export function toDraft(e) {
   return { ...JSON.parse(JSON.stringify(e)), refs: (e.bookingRefs || []).join(", "),
     city: e.city ? e.city[0].toUpperCase() + e.city.slice(1) : "",

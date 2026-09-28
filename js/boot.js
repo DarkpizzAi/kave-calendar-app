@@ -10,7 +10,6 @@
 import { initTheme } from "./theme.js";
 import { render, isCalendar, dataSync, actions } from "./render.js";
 import { wire, showBanner } from "./wire.js";
-import { initPullToSync } from "./pull-to-sync.js";
 import { appData } from "./data.js";
 import { store } from "./store.js";
 import { initCalendar, backToToday, closeMenus, scrollToTop } from "./calendar.js";
@@ -19,7 +18,6 @@ import { initEvent, newEventForm } from "./view-event.js";
 
 initTheme();
 wire();
-initPullToSync();
 
 const data = await appData();
 data.subscribe(render);

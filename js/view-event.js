@@ -5,7 +5,7 @@
    escapeHtml and every url through safeUrl. */
 "use strict";
 
-import { escapeHtml as esc, safeUrl } from "./util.js";
+import { escapeHtml as esc, safeUrl, copyText } from "./util.js";
 import { todayKey } from "./dates.js";
 import { newEvent, STATUSES, STATUS_LABEL } from "./model.js";
 import { CATEGORIES as MONEY, formatCents, visibleCosts } from "./money.js";
@@ -78,11 +78,8 @@ function costEntry(c) {
 /* ---- the page, in Google Calendar's order ---- */
 function eventPage(e) {
   const acts = (e.activities || []).map((a) => categoryOf(a.type).label).join(", then ");
-  /* F40: the status is its own pill, under the title, not text on the date
-     line; F43: the date line keeps only the day, end day and times (the
-     "until Sun" span the day sheet shows belongs there, not repeated here).
-     F42: the event's type (its activities) gets its own line and icon,
-     after the date, instead of living in that removed second line. */
+  /* The date line holds the day, end day and times only. The status is a
+     pill in the sheet's header; the event's type gets its own line. */
   /* F68: an accent-filled pill, like Spoon's real recipe-page status pill
      (kave-food-app/styles.css's .detail-tag: accent background,
      accent-text, r-pill, fs-meta -- Compass's existing .flag.acc is the
@@ -206,14 +203,10 @@ function onInput(t, l) {
   const v = t.value;
   if (needing === f) { needing = null; t.classList.remove("need"); }
   const onPage = l.kind === "event";
-  /* F44 (second cause): refresh() is refreshSheet, deliberately a no-op
-     while a form ("edit"/"new") is open (review I2 -- a background sync
-     must never redraw an open form and close the keyboard). But typing the
-     first character of a name is a user-initiated reveal, same as tapping
-     a choice button already does (sheet.js's own click handler always
-     redraws after onAction, form or not) -- so it needs the same
-     unconditional redraw, not the guarded one. replaceTop redraws the
-     current level in place, with no history entry, whichever level it is. */
+  /* refresh() (refreshSheet) never redraws an open form, so a background
+     sync cannot close the keyboard mid-word. Typing the first character of
+     a name is a reveal the person asked for, so it redraws unconditionally,
+     in place and with no history entry (replaceTop). */
   const redraw = (sel) => { const l = topLevel(); if (l) replaceTop(l); const i = document.querySelector(`#sheetRoot [data-f="${sel}"]`); if (i) { i.focus(); i.setSelectionRange(i.value.length, i.value.length); } };
   if (f === "task") {
     const had = !!pageTask.text.trim(); pageTask.text = v;
@@ -263,7 +256,7 @@ function onAction(b, l) {
   }
   if (a === "copy") {
     const done = () => { const s = b.querySelector(".cl"); s.textContent = "Copied"; setTimeout(() => { s.textContent = "Copy"; }, 1500); };
-    if (navigator.clipboard) navigator.clipboard.writeText(b.dataset.v).then(done, done); else done();
+    copyText(b.dataset.v).then(done);
     return;
   }
   if (e) {

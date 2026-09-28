@@ -115,17 +115,31 @@ function set(state, message) {
   status = { state, message, at: Date.now() };
 }
 
-/* Prove the token can actually reach the repo. A HEAD-shaped read of the
-   repo's own metadata is enough: it needs the same Contents permission real
-   sync will need, and it writes nothing. */
+/* Can this token read Compass's data? One read of this year's events
+   file: it needs the same Contents permission sync needs, and writes
+   nothing. It has to be a JSON file, because getFile parses what it reads
+   (a markdown file here once made every good token read as a failure). */
+export async function probeToken(token, gh = github, year = new Date().getFullYear()) {
+  gh.setToken(token);
+  try {
+    try { await gh.getFile(pathFor(year)); }
+    catch (e) {
+      /* early January, before this year's file exists: last year's will do */
+      if (!(e && e.gh === "notFound")) throw e;
+      await gh.getFile(pathFor(year - 1));
+    }
+    return { ok: true };
+  } catch (e) { return { ok: false, error: e }; }
+}
+
 export async function checkToken() {
   const token = store.state.settings.token;
   if (!token) { set("none", "No token set"); return status; }
 
   set("checking", "Checking token...");
   try {
-    github.setToken(token);
-    await github.getFile("calendar/data/roadmap.md");
+    const r = await probeToken(token);
+    if (!r.ok) throw r.error;
     set("ok", "Token works. Reached kave-hub.");
     store.state.sync.syncedAt = Date.now();
     store.persist("compass.sync", store.state.sync);

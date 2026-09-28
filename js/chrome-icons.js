@@ -9,8 +9,7 @@ export const ICON = {
   x: svg('<path d="M18 6 6 18M6 6l12 12"/>'),
   chev: svg('<path d="m9 6 6 6-6 6"/>', "chev"),
   up: svg('<path d="m6 15 6-6 6 6"/>'),
-  /* F29: "load older" is one of the inline control buttons; an archive box
-     ("a box of evidence", Isa), replacing the old double-chevron. */
+  /* "older": an archive box ("a box of evidence", Isa). */
   older: svg('<rect x="3" y="4" width="18" height="5" rx="1"/><path d="M5 9v9a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V9M10 13h4"/>'),
   check: svg('<path d="m5 12 5 5L20 7"/>'),
   /* F16: a tiny checkbox glyph marks an event with open to-dos in list rows,
@@ -33,6 +32,7 @@ export const ICON = {
   confirmed: svg('<rect x="3" y="5.5" width="18" height="13" rx="2"/><path d="m3.5 7 8.5 6 8.5-6"/>'),
   locked: svg('<rect x="5" y="11" width="14" height="9" rx="2"/><path d="M8 11V8a4 4 0 0 1 8 0v3"/>'),
   plus: svg('<path d="M12 5v14M5 12h14"/>'),
+  arrow: svg('<path d="M5 12h14M13 6l6 6-6 6"/>'),
   calendar: svg('<rect x="3" y="4" width="18" height="18" rx="3"/><path d="M16 2v4M8 2v4M3 10h18"/>'),
   insights: svg('<path d="M9 18h6M10 22h4M12 2a7 7 0 0 0-4 12.7V17h8v-2.3A7 7 0 0 0 12 2Z"/>'),
   trips: svg('<path d="M17.8 19.2 16 11l3.5-3.5C21 6 21.5 4 21 3c-1-.5-3 0-4.5 1.5L13 8 4.8 6.2c-.5-.1-.9.1-1.1.5l-.3.5c-.2.5-.1 1 .3 1.3L9 12l-2 3H4l-1 1 3 2 2 3 1-1v-3l3-2 3.5 5.3c.3.4.8.5 1.3.3l.5-.2c.4-.3.6-.7.5-1.2z"/>'),

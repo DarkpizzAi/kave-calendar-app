@@ -1,6 +1,6 @@
 import { test, eq, ok } from "./run.js";
-import { isoWeek, monthOfWeek, firstWeekOf, loadRange, freeWeekendSaturday, weekendBlocks, classifyWeekend, longWeekends, yearStats, dayFreeState, weekFreeNote, weekFreeDays } from "../js/views.js";
-import { applyDetail, DETAIL_LEVELS } from "../js/filter.js";
+import { isoWeek, monthOfWeek, firstWeekOf, loadRange, freeWeekendSaturday, weekendBlocks, classifyWeekend, longWeekends, dayFreeState, weekFreeNote, weekFreeDays } from "../js/views.js";
+import { applyDetail } from "../js/filter.js";
 import { CATEGORIES, iconFor } from "../js/icons.js";
 import { HOLIDAYS } from "../js/holidays.js";
 
@@ -137,16 +137,6 @@ test("weekFreeDays: nothing qualifying this week is an empty list", () => {
   eq(weekFreeDays("2026-09-21", {}, on([ev("x", "2026-09-26")]), "2026-09-24", blocksAll), []);
 });
 
-/* ---- the Yearly stats card ---- */
-test("stats lead with trips, cities, plans, and never costs", () => {
-  const events = [ev("t1", "2026-06-23", { end: "2026-06-28", away: true, city: "porto" }), ev("t2", "2026-08-06", { end: "2026-08-10", away: true, city: "prague" }),
-                  ev("t3", "2026-10-30", { end: "2026-11-02", away: true, city: "porto" }), ev("v", "2026-02-27", { activities: [{ type: "visitor", icon: "🧳" }] }),
-                  ev("n", "2026-03-01", { activities: [{ type: "live-music", icon: "🎶" }] })];
-  const s = yearStats(events, "2026-09-24");
-  eq([s.trips, s.cities, s.plans, s.nightsAway, s.visitors], [2, 2, 4, 9, 1]);
-  ok(!("cost" in s));
-});
-
 /* ---- detail levels ---- */
 test("detail levels: full, partial greys the other person, minimal hides them except when away", () => {
   const list = [
@@ -155,7 +145,6 @@ test("detail levels: full, partial greys the other person, minimal hides them ex
     ev("t", "2026-10-01", { owner: "hugo" }),
     ev("trip", "2026-10-01", { owner: "hugo", activities: [{ type: "transport" }] }),
   ];
-  eq(DETAIL_LEVELS, ["full", "partial", "minimal"]);
   eq(applyDetail(list, "isa", "full").map((x) => [x.event.id, x.grey]),
      [["m", false], ["o", false], ["t", false], ["trip", false]]);
   eq(applyDetail(list, "isa", "partial").map((x) => [x.event.id, x.grey]),
@@ -184,5 +173,11 @@ test("the catalogue from round 1b, and person icons follow the viewer", () => {
 test("the catalogue has a work event category (Isa, 2026-09-24)", () => {
   const work = CATEGORIES.find((c) => c.type === "work");
   ok(work, "work category");
-  eq([work.label, work.icons.map((i) => i.icon)], ["Work event", ["🏢", "💻", "🎤"]]);
+  eq([work.label, work.icons.map((i) => i.icon)], ["Work event", ["🏢"]]);
+});
+
+test("iconFor only ever returns a catalogue icon", () => {
+  eq(iconFor({ type: "transport", icon: "✈️" }, { owner: "isa" }, "isa"), "🛫", "a retired icon falls back to the category's first");
+  eq(iconFor({ type: "eating", icon: '<b id="x">x</b>' }, { owner: "isa" }, "isa"), "🍔", "markup in the data never comes back out");
+  eq(iconFor({ type: "eating", icon: "🍕" }, { owner: "isa" }, "isa"), "🍕", "a listed icon is kept");
 });

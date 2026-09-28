@@ -141,23 +141,3 @@ export function longWeekends(holidays, from, to, eventsOn, blocks) {
   return out;
 }
 
-/* ---- the yearly stats card: trips, cities, plans first; never costs ---- */
-export function yearStats(events, today) {
-  const year = today.slice(0, 4);
-  const past = events.filter((e) => e.start.startsWith(year) && e.start <= today && !e.deleted);
-  const trips = past.filter((e) => e.away);
-  const nights = trips.reduce((n, e) => n + Math.max(0, Math.round((Date.parse(e.end || e.start) - Date.parse(e.start)) / 864e5)), 0);
-  const byType = {};
-  for (const e of past) {
-    const t = (e.activities && e.activities[0] && e.activities[0].type) || "none";
-    if (!e.away && t !== "none") byType[t] = (byType[t] || 0) + 1;
-  }
-  return {
-    trips: trips.length,
-    cities: new Set(trips.map((e) => e.city).filter(Boolean)).size,
-    plans: past.length,
-    nightsAway: nights,
-    visitors: past.filter((e) => e.activities && e.activities.some((a) => a.type === "visitor")).length,
-    byType,
-  };
-}

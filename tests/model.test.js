@@ -1,5 +1,5 @@
 import { test, eq, ok, throws } from "./run.js";
-import { newEvent, validateEvent, touch, yearOf, markDeleted, restore, writesFor, mainType, addLink } from "../js/model.js";
+import { newEvent, validateEvent, touch, yearOf, markDeleted, restore, writesFor, addLink } from "../js/model.js";
 
 const NOW = new Date("2026-09-24T10:00:00Z");
 const LATER = new Date("2026-09-24T11:00:00Z");
@@ -24,7 +24,6 @@ test("activities keep their order; the first is the main one", () => {
   const e = newEvent({ title: "Night out", start: "2026-09-26",
     activities: [{ type: "eating", icon: "🍝" }, { type: "drinks", icon: "🍸" }, { type: "clubbing", icon: "🪩" }] }, { me: "isa", now: NOW });
   eq(e.activities.map((a) => a.type), ["eating", "drinks", "clubbing"]);
-  eq([mainType(e), mainType({ activities: [] })], ["eating", "none"]);
 });
 test("an activity needs a known shape", () => {
   eq(validateEvent({ title: "x", start: "2026-10-02", activities: [{ type: "", icon: "🍸" }] }), ["every activity needs a category"]);

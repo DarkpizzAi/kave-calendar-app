@@ -1,7 +1,7 @@
-/* Compass: the Calendar tab (spec section 3; ported from prototype P4).
+/* Compass: the Calendar tab (spec section 3).
 
-   From the top: the Today card, the control row, then the view. Monthly is
-   the hub. One rule: a heading with a chevron changes view; a card opens the
+   From the top: the control row, then the view, Grid (a month grid per
+   month) or Agenda (a card per day). A tap on a day or an event opens the
    sheet. Decisions live in cal-model.js (tested); this file draws them and
    handles the taps. Every synced string goes through escapeHtml, every url
    through safeUrl. */
@@ -20,7 +20,7 @@ import { indexByDay, tappable, zoomWeekTarget, zoomMonthTarget, isAway, awayText
 import { openLevel, sheetOpen } from "./sheet.js";
 import { ICON } from "./chrome-icons.js";
 import { CATEGORIES, iconFor } from "./icons.js";
-import { readPrefs, byCategories, eventBlocksFreeTime } from "./prefs.js";
+import { readPrefs, eventBlocksFreeTime } from "./prefs.js";
 
 const MONTHS = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
 const DOW = ["MON", "TUE", "WED", "THU", "FRI", "SAT", "SUN"];
@@ -54,15 +54,14 @@ function prefs() {
   const s = store.state.settings;
   if (!S.view) S.view = VIEWS.includes(s.defaultView) ? s.defaultView : "grid";
   if (!S.detail) S.detail = ["full", "partial", "minimal"].includes(s.defaultDetail) ? s.defaultDetail : "full";
-  return { me: s.me, style: s.cardStyle === "icons" ? "icons" : "lines" };
+  return { me: s.me };
 }
 
 function buildFrame() {
-  const { me, style } = prefs();
+  const { me } = prefs();
   const today = todayKey();
   const thisYear = today.slice(0, 4);
-  /* the detail level first, then the viewer's categories for this view */
-  const detailed = applyDetail(byCategories(ctx.data.events(), readPrefs(store.state.settings), me, S.view), me, S.detail);
+  const detailed = applyDetail(ctx.data.events(), me, S.detail);
   const grey = new Set(detailed.filter((x) => x.grey).map((x) => x.event.id));
   /* F35: Grid hides a cancelled event outright; Agenda keeps it (struck
      through, cls() below). */
@@ -71,13 +70,10 @@ function buildFrame() {
   const last = lastEventDay(events);
   if (!S.floor) S.floor = thisYear;
   const range = loadRange(today, last, S.floor);
-  /* F20: "N plans" must not respect the category filters (the heat-strip
-     fill still does, F17/F12 unaffected) -- an index built with detail
-     applied but no category filtering, so the count matches what Monthly
-     will actually show once you jump there. */
-  const allEvents = applyDetail(ctx.data.events(), me, S.detail).map((x) => x.event);
-  const allIdx = indexByDay(allEvents);
-  return { me, style, today, thisYear, events, idx, grey, range,
+  /* onAll: every event at this detail level, before Grid drops cancelled
+     ones; the free-time colouring reads this. */
+  const allIdx = indexByDay(detailed.map((x) => x.event));
+  return { me, today, thisYear, events, idx, grey, range,
     on: (d) => idx.get(d) || [], onAll: (d) => allIdx.get(d) || [],
     thisMonday: mondayOf(today), firstMonday: mondayOf(range.min) };
 }
@@ -98,9 +94,8 @@ function row(e, withDate, click) {
 const list = (items, dated) => (items ? `<ul class="rows${dated ? " dated" : ""}">${items}</ul>` : "");
 export const rows = (evs, dated, click) => list(evs.map((e) => row(e, dated, click)).join(""), dated);
 
-/* ---- Today (F4: the Today card is gone; a bare anchor keeps the scroll
-   machinery -- Back to today, onScroll's visibility check -- working at the
-   same spot in the list, between the past and the future). ---- */
+/* ---- Today: a bare anchor between the past and the future, which Back to
+   today and onScroll's visibility check scroll to. ---- */
 const place = (e) => [e.venue, e.city && e.city[0].toUpperCase() + e.city.slice(1)].filter(Boolean).join(", ");
 function todayAnchor() {
   return `<span id="today" aria-hidden="true"></span>`;
@@ -118,9 +113,8 @@ function controls() {
     + VIEWS.map((v) => `<button role="tab" aria-selected="${S.view === v}" data-act="view" data-v="${v}">${v[0].toUpperCase() + v.slice(1)}</button>`).join("") + "</div>";
   const detail = `<button class="ib" data-act="menu" aria-label="Detail level" aria-expanded="${S.menu}">${ICON.eye}</button>`;
   const free = `<button class="ib${S.freeOn ? " on" : ""}" data-act="free" aria-label="Highlight free time" aria-pressed="${S.freeOn}">${ICON.leaf}</button>`;
-  /* F29: "load older" is now one of three inline control buttons, sitting
-     between detail and search, not a floating round button; it opens the
-     Archive popup instead of growing the main view in place. */
+  /* "older" is an inline control button, between detail and search; it
+     opens the Archive popup. */
   const older = showLoadOlder() ? `<button class="ib" data-act="older" aria-label="Open archive">${ICON.older}</button>` : "";
   const search = S.searchOpen
     ? `<div class="sfield"><span class="si">${ICON.search}</span><input id="q" type="search" placeholder="Search every event" value="${esc(S.query)}" autocomplete="off"><button class="clr" data-act="closesearch" aria-label="Close search">${ICON.x}</button></div>`
@@ -132,9 +126,7 @@ function controls() {
 }
 
 /* ---- Agenda: a run of weeks ---- */
-/* F54: this heading used to also be F26's sticky-title section boundary
-   (data-sec); F26 is fully reverted, so it is back to being just the plain,
-   non-sticky "September" heading, drawn once per month. */
+/* the plain, non-sticky month heading, drawn once per month */
 const monthLabel = (d) => `${MONTHS[Number(d.slice(5, 7)) - 1]}${d.slice(0, 4) !== frame.thisYear ? " " + d.slice(0, 4) : ""}`;
 const monthHead = (d) => `<h3 class="month">${esc(monthLabel(d))}</h3>`;
 /* Agenda's card model: a "period card" (one calendar week, var(--panel),
@@ -193,17 +185,14 @@ function agendaWeek(m) {
 function weekBlocks(from, count) {
   let out = "", cur = "";
   for (let m = from, i = 0; i < count && m <= frame.range.max; i++, m = addDays(m, 7)) {
-    /* Monthly files a week under the month of its Thursday, so no week
-       shows twice. */
+    /* a week is filed under the month of its Thursday, so no week shows
+       twice */
     const monthOf = monthOfWeek(m) + "-01";
     if (monthOf.slice(0, 7) !== cur) { cur = monthOf.slice(0, 7); out += monthHead(monthOf); }
     out += agendaWeek(m);
   }
   return out;
 }
-/* F6: "See previous" is no longer inline text in the list; it is the
-   floating "load older" button that sits with the floating controls
-   (drawn in calendarHtml/controls). */
 function weeks() {
   const from = addDays(frame.thisMonday, -7 * S.past.agenda);
   return { past: weekBlocks(from, S.past.agenda),
@@ -251,7 +240,7 @@ function gridIcon(d) {
   if (!best) return "";
   const grey = best.e.owner !== frame.me && best.e.owner !== "shared";
   const more = evs.length > 1 ? `<span class="more"></span>` : "";
-  return `<span class="emo${grey ? " grey" : ""}">${iconFor(best.a, best.e, frame.me)}</span>${more}`;
+  return `<span class="emo${grey ? " grey" : ""}">${esc(iconFor(best.a, best.e, frame.me))}</span>${more}`;
 }
 function gridSquare(d, freeDays, note) {
   if (!d) return `<div class="dsq pad"></div>`;
@@ -318,11 +307,9 @@ function ensureYears() {
   }
 }
 
-/* ---- the tab ----
-   F28: the control row scrolls with the page again (F5 reversed). F54: F26's
-   sticky month/year title is gone entirely -- the big per-section heading
-   (monthHead/yearHead) is the only heading now, drawn once, non-sticky,
-   where it always was. F4: no more Today card, just its anchor. */
+/* ---- the tab: the control row (it scrolls with the page), then the view
+   between its past and future halves, with the Today anchor between them.
+   The swipe animation moves only .content, never the controls. ---- */
 /* F34: the swipe animation now applies only to .content (the list), not
    the whole .page -- the controls stay put; only the view toggle's own
    .seg-thumb (its own transform/animation, untouched) visibly slides to its
@@ -347,12 +334,10 @@ export function afterCalendar(mn, before) {
   onScroll();
 }
 
-/* ---- F55: one fixed slot above "+", never two heights, never both
-   showing at once. Up (scrolled forward into the future, today is above
-   the visible area) and down (scrolled back into the past/loaded-older
-   data, today is below it) are mutually exclusive by scroll direction, not
-   two independently-toggled booleans any more. Measured on screen: an
-   animation's transform throws offsetTop off. ---- */
+/* ---- the up and down buttons share one slot above "+" and never show
+   together: up once today has scrolled out above the view, down while today
+   is still below it. Measured on screen, because an animation's transform
+   throws offsetTop off. ---- */
 export function onScroll() {
   const mn = document.getElementById("view"), t = document.getElementById("today");
   const up = document.querySelector(".fab.up"), down = document.querySelector(".fab.down");
@@ -415,23 +400,19 @@ async function loadAllOlder() {
   for (let i = 0; i < 15 && !S.exhausted; i++) if (!(await loadOlder())) break;
   if (S.searchOpen) ctx.render();
 }
-/* ---- Archive: the popup the "older" control button opens. It replaces the
-   old in-place "load older" growth of the main view (F6/F7): the main view
-   never grows into the past any more, it always opens on today. Archive
-   shows only the past -- oldest at the top, most recent at the bottom, only
-   scrollable upward -- starting at 1 January of this year and stepping back
-   a further January on each "Load more" tap. It has its own floor/exhausted,
-   independent of S.floor/S.exhausted above (those still track how far back
-   Search has fetched). All events, no detail or category filtering.
+/* ---- Archive: the popup the "older" button opens. The main view always
+   opens on today and never grows into the past; Archive shows only the past,
+   oldest at the top, from 1 January of this year, one more January per
+   "Load more". It keeps its own floor/exhausted (S.floor/S.exhausted track
+   how far back Search has fetched). All events, no detail filtering.
 
-   Archive draws with the exact same gridMonth/agendaWeek/weekBlocks
-   functions the main view uses, against a swapped-in frame, so grid and
-   agenda look identical whether you're looking at today or the archive. */
+   It draws with the same gridMonth/agendaWeek/weekBlocks the main view
+   uses, against a swapped-in frame, so both look identical. */
 function archiveFrame() {
   const today = todayKey(), thisYear = today.slice(0, 4);
   const events = hideCancelled(ctx.data.events(), AR.view);
   const idx = indexByDay(events);
-  return { me: store.state.settings.me, style: prefs().style, today, thisYear,
+  return { me: store.state.settings.me, today, thisYear,
     events, idx, grey: new Set(), on: (d) => idx.get(d) || [], onAll: (d) => idx.get(d) || [],
     thisMonday: mondayOf(today), range: { max: today } };
 }
