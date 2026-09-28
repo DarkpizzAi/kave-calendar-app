@@ -153,30 +153,30 @@ function periodState(d, freeDays) {
    today still win over it, same priority as before. data-week carries the
    week's Monday on every one of its days (not a separate wrapper), so a
    jump target still has something to scroll to. */
-/* Top-left the weekday, top-right the day and month (a dashed leader
-   fills the gap between, "Mon ---------- 28 Sep"); the month only shows
-   here, not just once per section, because a week now routinely breaks
-   across two of them (below) and a bare "28" right after a "30" reads as
-   a typo, not the 1st of a new month. The year only joins in when the
-   day isn't in frame.thisYear (Archive, mostly). */
+/* Top-left the weekday, top-right the day and month, plain empty space
+   between the two (no rule, no dots); the month only shows here, not just
+   once per section, because a week now routinely breaks across two of
+   them (below) and a bare "28" right after a "30" reads as a typo, not
+   the 1st of a new month. The year only joins in when the day isn't in
+   frame.thisYear (Archive, mostly). */
 const dayMonth = (d) => `${Number(d.slice(8))} ${MONTHS[Number(d.slice(5, 7)) - 1].slice(0, 3)}${d.slice(0, 4) !== frame.thisYear ? " " + d.slice(0, 4) : ""}`;
 function agendaDay(d, m, freeDays, note) {
   const evs = frame.on(d);
   const away = evs.filter(isAway), rest = evs.filter((e) => !isAway(e));
   const weekend = dayOfWeek(d) >= 5 ? " weekend" : "";
-  /* Sunday is the last day of a Monday-first week: its own margin is the
-     gap the reader should see between two different weeks, distinct from
-     the tighter gap between two days of the same week (below). */
-  const weekEnd = dayOfWeek(d) === 6 ? " week-end" : "";
+  /* Monday is the first day of the week: it's the one day that keeps the
+     wider between-weeks gap (.content's own flex gap); every other day
+     pulls in tighter, to the same-week spacing below. */
+  const weekStart = dayOfWeek(d) === 0 ? " week-start" : "";
   const dow = DOW[dayOfWeek(d)][0] + DOW[dayOfWeek(d)].slice(1).toLowerCase();
-  const cd = `<div class="cd"><span class="cd-dow">${dow}</span><span class="cd-fill" aria-hidden="true"></span><span class="cd-date">${dayMonth(d)}</span></div>`;
+  const cd = `<div class="cd"><span class="cd-dow">${dow}</span><span class="cd-date">${dayMonth(d)}</span></div>`;
   const tap = tappable(evs) ? ` role="button" tabindex="0" data-act="day" data-d="${d}"` : "";
   /* A plain free weekend is colour only (Clear/Open, above); only a real
      long weekend or opportunity earns the 🔍 and its explanatory text, on
      the day its window opens. */
   const noteLine = (note && note.kind === "long" && note.on === d)
     ? `<li style="--n:1"><span class="c-i">🔍</span><span class="c-t">${esc(note.text)}</span></li>` : "";
-  return `<div class="daycard ${periodState(d, freeDays)}${weekend}${weekEnd}" data-week="${m}"${tap}>${cd}`
+  return `<div class="daycard ${periodState(d, freeDays)}${weekend}${weekStart}" data-week="${m}"${tap}>${cd}`
     + away.map((e) => `<span class="away${frame.grey.has(e.id) ? " grey" : ""}">${esc(icons(e)[0])} ${esc(awayText(e, frame.thisYear))}</span>`).join("")
     + `<ul class="rows">${rest.map((e) => row(e, false, false)).join("")}${noteLine}</ul></div>`;
 }

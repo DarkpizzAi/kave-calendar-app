@@ -403,19 +403,20 @@ a.ticket{color:inherit;text-decoration:none}
 .month{margin:var(--sp-3) 0 0;font-size:var(--fs-title-lg);font-weight:var(--fw-strong);letter-spacing:var(--tracking-heading);line-height:var(--lh-title)}
 .away{margin:0;display:grid;grid-template-columns:20px minmax(0,1fr);column-gap:var(--sp-2);font-size:var(--fs-meta);background:var(--surface-2);border-radius:var(--r-control);padding:var(--sp-1) var(--sp-2)}
 .away.grey{color:var(--text-dim)}
-/* Between two days of the same week: Grid's own intra-month row gap
-   (.monthgrid, 4px), not the wider gap the week boundary below keeps. */
-.daycard{background:var(--panel);border-radius:var(--r-card);padding:6px var(--sp-2);margin-bottom:4px;cursor:pointer}
-/* Sunday is the last day of a Monday-first week: its margin is the gap
-   between two different weeks, kept at the size Agenda always used. */
-.daycard.week-end{margin-bottom:var(--sp-2)}
-/* Weekday top-left, day+month top-right, a dashed leader between them
-   filling whatever space is left -- "Mon -------- 28 Sep". The leader is
-   currentColor so it follows .cd's own color overrides below (today,
-   clear) without a rule of its own for each. */
-.daycard > .cd{display:flex;align-items:baseline;gap:6px;font-size:var(--fs-micro);font-weight:500;color:var(--text-dim);margin-bottom:2px}
-.daycard > .cd .cd-dow,.daycard > .cd .cd-date{flex:none}
-.daycard > .cd .cd-fill{flex:1;min-width:12px;border-bottom:1px dashed currentColor;opacity:.35;margin-bottom:3px}
+.daycard{background:var(--panel);border-radius:var(--r-card);padding:6px var(--sp-2);cursor:pointer}
+/* .content is a flex column with its own gap (sp-3) between every child,
+   so it's never the whole story: a bare margin-bottom just adds to that
+   gap, and a small difference between two already-large numbers barely
+   reads. Both rules below fight the gap directly instead. A week's first
+   day (Monday) restores the original between-weeks distance (gap + sp-2,
+   what every daycard used before any of this); every other day in the
+   week pulls in well past it, with a negative margin-top, down to Grid's
+   own intra-month row gap (.monthgrid, 4px) total. */
+.daycard.week-start{margin-top:var(--sp-2)}
+.daycard:not(.week-start){margin-top:calc(4px - var(--sp-3))}
+/* Weekday top-left, day+month top-right, plain empty space between them
+   (no rule, no dots) -- flex justify-content does the work. */
+.daycard > .cd{display:flex;justify-content:space-between;align-items:baseline;gap:6px;font-size:var(--fs-micro);font-weight:500;color:var(--text-dim);margin-bottom:2px}
 .daycard.weekend{background:var(--surface-2)}
 .daycard.today{background:var(--accent)}
 .daycard.today > .cd{color:var(--accent-text)}
