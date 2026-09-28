@@ -9,7 +9,7 @@
 
 import { escapeHtml as esc } from "./util.js";
 import { addDays, dayOfWeek, mondayOf, todayKey } from "./dates.js";
-import { monthOfWeek, loadRange, dayFreeState, weekFreeNote, weekFreeDays } from "./views.js";
+import { loadRange, dayFreeState, weekFreeNote, weekFreeDays } from "./views.js";
 import { HOLIDAYS } from "./holidays.js";
 import { applyDetail } from "./filter.js";
 import { store } from "./store.js";
@@ -42,7 +42,7 @@ const S = {
    main view (always pinned to today), Archive shows only the past -- newest
    at the bottom, oldest at the top -- with no future, no scroll-triggered
    loading and no category/detail filtering (Isa: "all events, no filters").
-   It draws with the exact same gridMonth/agendaWeek machinery as the main
+   It draws with the exact same gridMonth/weekBlocks machinery as the main
    view (frame is swapped for the duration of the draw, see archiveFrame),
    so grid and agenda look identical in and out of Archive. */
 const AR = { open: false, view: null, floor: null, exhausted: false, loading: false, keepAnchor: false };
@@ -153,43 +153,94 @@ function periodState(d, freeDays) {
    today still win over it, same priority as before. data-week carries the
    week's Monday on every one of its days (not a separate wrapper), so a
    jump target still has something to scroll to. */
+/* Top-left the weekday, top-right the day and month, plain empty space
+   between the two (no rule, no dots); the month only shows here, not just
+   once per section, because a week now routinely breaks across two of
+   them (below) and a bare "28" right after a "30" reads as a typo, not
+   the 1st of a new month. The year only joins in when the day isn't in
+   frame.thisYear (Archive, mostly). */
+const dayMonth = (d) => `${Number(d.slice(8))} ${MONTHS[Number(d.slice(5, 7)) - 1].slice(0, 3)}${d.slice(0, 4) !== frame.thisYear ? " " + d.slice(0, 4) : ""}`;
 function agendaDay(d, m, freeDays, note) {
   const evs = frame.on(d);
   const away = evs.filter(isAway), rest = evs.filter((e) => !isAway(e));
   const weekend = dayOfWeek(d) >= 5 ? " weekend" : "";
-  /* Sunday is the last day of a Monday-first week: its own margin is the
-     gap the reader should see between two different weeks, distinct from
-     the tighter gap between two days of the same week (below). */
-  const weekEnd = dayOfWeek(d) === 6 ? " week-end" : "";
-  const label = `${DOW[dayOfWeek(d)][0]}${DOW[dayOfWeek(d)].slice(1).toLowerCase()} ${Number(d.slice(8))}`;
+  /* Monday is the first day of the week: it's the one day that keeps the
+     wider between-weeks gap (.content's own flex gap); every other day
+     pulls in tighter, to the same-week spacing below. */
+  const weekStart = dayOfWeek(d) === 0 ? " week-start" : "";
+  const dow = DOW[dayOfWeek(d)][0] + DOW[dayOfWeek(d)].slice(1).toLowerCase();
+  const cd = `<div class="cd"><span class="cd-dow">${dow}</span><span class="cd-date">${dayMonth(d)}</span></div>`;
   const tap = tappable(evs) ? ` role="button" tabindex="0" data-act="day" data-d="${d}"` : "";
   /* A plain free weekend is colour only (Clear/Open, above); only a real
      long weekend or opportunity earns the 🔍 and its explanatory text, on
      the day its window opens. */
   const noteLine = (note && note.kind === "long" && note.on === d)
     ? `<li style="--n:1"><span class="c-i">🔍</span><span class="c-t">${esc(note.text)}</span></li>` : "";
-  return `<div class="daycard ${periodState(d, freeDays)}${weekend}${weekEnd}" data-week="${m}"${tap}><span class="cd">${label}</span>`
+  return `<div class="daycard ${periodState(d, freeDays)}${weekend}${weekStart}" data-week="${m}"${tap}>${cd}`
     + away.map((e) => `<span class="away${frame.grey.has(e.id) ? " grey" : ""}">${esc(icons(e)[0])} ${esc(awayText(e, frame.thisYear))}</span>`).join("")
     + `<ul class="rows">${rest.map((e) => row(e, false, false)).join("")}${noteLine}</ul></div>`;
 }
-function agendaWeek(m) {
-  const freeDays = S.freeOn ? new Set(weekFreeDays(m, HOLIDAYS, frame.onAll, frame.today, freeBlocks)) : new Set();
-  const note = S.freeOn ? weekFreeNote(m, HOLIDAYS, frame.onAll, frame.today, freeBlocks) : null;
-  /* Only the week underway trims to today -- Isa: Agenda opens on today at
-     the top, but "load older" must still reveal real past weeks in full,
-     not empty cards (m !== frame.thisMonday is always entirely in the past
-     or entirely in the future here, never split by today). */
-  const days = [0, 1, 2, 3, 4, 5, 6].map((k) => addDays(m, k)).filter((d) => m !== frame.thisMonday || d >= frame.today);
-  return days.map((d) => agendaDay(d, m, freeDays, note)).join("");
+/* Agenda's per-card height rule -- two independent groups per week
+   (weekdays, weekend), not one across all seven:
+     - a card with content is at least one line tall, and taller still if
+       it has more than one line -- its own height, never matched up to a
+       busier sibling.
+     - a card with nothing on it is also one line tall, PROVIDED its group
+       (Mon-Fri, or Sat+Sun) has something somewhere that week -- otherwise
+       the whole group is thin, not even one line (an ordinary quiet week
+       stays quiet-looking).
+   "One line" isn't a card's own content, so it can't come from measuring
+   that card -- oneLineHeight renders a one-off, one-row reference card
+   (detached, same width as the real ones) once per draw and reuses the
+   number for every card that needs the floor. */
+function oneLineHeight(root) {
+  const probe = document.createElement("div");
+  probe.className = "daycard";
+  probe.style.cssText = "position:absolute;visibility:hidden;pointer-events:none";
+  probe.innerHTML = '<div class="cd"><span class="cd-dow">Mon</span><span class="cd-date">1 Jan</span></div>'
+    + '<ul class="rows"><li data-act="event" style="--n:1"><span class="c-i">•</span><span class="c-t">x</span></li></ul>';
+  root.appendChild(probe);
+  const h = probe.getBoundingClientRect().height;
+  probe.remove();
+  return h;
 }
+function equalizeAgendaHeights(root) {
+  const cards = root.querySelectorAll(".daycard[data-week]");
+  cards.forEach((el) => { el.style.minHeight = ""; });
+  if (!cards.length) return;
+  const groups = new Map();
+  cards.forEach((el) => {
+    const key = `${el.dataset.week}:${el.classList.contains("weekend") ? "we" : "wd"}`;
+    (groups.get(key) || groups.set(key, []).get(key)).push(el);
+  });
+  const oneLine = oneLineHeight(root);
+  for (const els of groups.values()) {
+    if (els.some((el) => el.querySelector(".rows li, .away"))) els.forEach((el) => { el.style.minHeight = `${oneLine}px`; });
+  }
+}
+/* A calendar week almost never fits neatly inside one month: this breaks
+   it at the boundary instead of filing the whole week under whichever
+   month its Thursday happened to land in. cur tracks the last month
+   heading actually drawn, across every week in this run, so a month
+   heading appears exactly once, right before its first day, even when
+   that's day 3 of a week already under way. The week itself -- freeDays,
+   the long-weekend note, data-week for spacing/grouping -- stays whole;
+   only which heading a day falls under is per-day. */
 function weekBlocks(from, count) {
   let out = "", cur = "";
   for (let m = from, i = 0; i < count && m <= frame.range.max; i++, m = addDays(m, 7)) {
-    /* a week is filed under the month of its Thursday, so no week shows
-       twice */
-    const monthOf = monthOfWeek(m) + "-01";
-    if (monthOf.slice(0, 7) !== cur) { cur = monthOf.slice(0, 7); out += monthHead(monthOf); }
-    out += agendaWeek(m);
+    const freeDays = S.freeOn ? new Set(weekFreeDays(m, HOLIDAYS, frame.onAll, frame.today, freeBlocks)) : new Set();
+    const note = S.freeOn ? weekFreeNote(m, HOLIDAYS, frame.onAll, frame.today, freeBlocks) : null;
+    /* Only the week underway trims to today -- Isa: Agenda opens on today
+       at the top, but "load older" must still reveal real past weeks in
+       full, not empty cards (m !== frame.thisMonday is always entirely in
+       the past or entirely in the future here, never split by today). */
+    const days = [0, 1, 2, 3, 4, 5, 6].map((k) => addDays(m, k)).filter((d) => m !== frame.thisMonday || d >= frame.today);
+    for (const d of days) {
+      const ym = d.slice(0, 7);
+      if (ym !== cur) { cur = ym; out += monthHead(`${ym}-01`); }
+      out += agendaDay(d, m, freeDays, note);
+    }
   }
   return out;
 }
@@ -324,6 +375,7 @@ export function calendarHtml() {
 
 /* After the tab's HTML is in place: scroll, focus, clear one-shot state. */
 export function afterCalendar(mn, before) {
+  if (S.view === "agenda") equalizeAgendaHeights(mn);
   if (S.keepAnchor) mn.scrollTop = before.top + (mn.scrollHeight - before.height);
   else if (S.scrollTo) { const t = mn.querySelector(S.scrollTo); if (t) t.scrollIntoView({ block: "start" }); }
   else if (before.first) { const t = mn.querySelector("#today"); if (t) t.scrollIntoView({ block: "start" }); }
@@ -406,8 +458,8 @@ async function loadAllOlder() {
    "Load more". It keeps its own floor/exhausted (S.floor/S.exhausted track
    how far back Search has fetched). All events, no detail filtering.
 
-   It draws with the same gridMonth/agendaWeek/weekBlocks the main view
-   uses, against a swapped-in frame, so both look identical. */
+   It draws with the same gridMonth/weekBlocks the main view uses, against
+   a swapped-in frame, so both look identical. */
 function archiveFrame() {
   const today = todayKey(), thisYear = today.slice(0, 4);
   const events = hideCancelled(ctx.data.events(), AR.view);
@@ -443,6 +495,7 @@ function renderArchive() {
   const before = old ? { top: old.scrollTop, height: old.scrollHeight } : null;
   root.innerHTML = archiveHtml();
   const fresh = root.querySelector(".archive-body");
+  if (fresh && AR.view === "agenda") equalizeAgendaHeights(fresh);
   if (fresh) fresh.scrollTop = AR.keepAnchor && before ? before.top + (fresh.scrollHeight - before.height) : fresh.scrollHeight;
   AR.keepAnchor = false;
 }
