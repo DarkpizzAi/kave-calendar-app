@@ -22,7 +22,6 @@ export const CATEGORIES = [
   { slug: "transport/fuel", label: "Fuel" },
   { slug: "bureaucracy/immigration", label: "Visas & immigration" },
 ];
-export const RUNGS = ["estimate", "recorded", "confirmed", "locked"];
 export const EDITABLE_STATES = ["estimate", "recorded"];
 
 export function toCents(text) {

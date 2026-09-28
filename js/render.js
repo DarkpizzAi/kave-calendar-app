@@ -16,10 +16,11 @@ import { status as syncStatus, checkToken } from "./sync.js";
 import { ICON } from "./chrome-icons.js";
 import { calendarHtml, afterCalendar, onScroll, backToToday, todaysCount } from "./calendar.js";
 import { refreshSheet, openLevel, registerLevel } from "./sheet.js";
-import { readPrefs, defaultsSummary, VIEW_NAMES, DETAIL_NAMES, STYLE_NAMES, blocksFreeTime, toggleBlocking, freeTimeSummary, toggleWeekdayHeader } from "./prefs.js";
+import { readPrefs, defaultsSummary, VIEW_NAMES, DETAIL_NAMES, blocksFreeTime, toggleBlocking, freeTimeSummary, toggleWeekdayHeader } from "./prefs.js";
 import { CATEGORIES, iconFor } from "./icons.js";
 import { resetCalendarDefaults } from "./calendar.js";
 import { checkForUpdate, ensureVersionAsked, updateStatusLines, updateBusy, updateButtonText, updateReady } from "./updates.js";
+import { gateStep, gateHtml, bindGate } from "./gate.js";
 
 /* Sync of the events themselves, shown in Settings only (spec: the Calendar
    never shows sync state). Set by boot.js. */
@@ -27,8 +28,7 @@ export const dataSync = { state: "idle", message: "", at: 0 };
 /* Set by boot.js: what "Sync now" runs. */
 export const actions = { sync: null };
 
-/* The five tabs from the brainstorm's tab map (kave-hub
-   the Compass A spec in kave-hub). Calendar is home and
+/* The five tabs (the Compass A spec in kave-hub). Calendar is home and
    back from anywhere returns to it; there is no separate home screen. Trips
    is for what is real, Radar for what is not. Settings last, as everywhere
    in this household. */
@@ -49,15 +49,9 @@ export function setView(name) {
   if (!VIEWS[name]) return;
   if (name === current && name === "calendar") { backToToday(); return; }
   current = name;
-  /* F64: every tab switch lands scrolled to the top, filters visible.
-     Setting scrollTop here used to be undone right after: `firstDraw` was
-     reset to true on every switch, so afterCalendar's "before.first"
-     branch (render.js -> calendar.js) fired again and scrolled to #today
-     instead, which sits below the filter bar and section heading -- so
-     returning to Calendar always hid the controls, not just on first load.
-     firstDraw now stays whatever it already is (true only for the app's
-     genuine first render), so afterCalendar falls through to its literal
-     "mn.scrollTop = before.top" branch, which is the 0 set right here. */
+  /* Every tab switch lands at the top, filters visible. firstDraw is true
+     only for the app's first render, so afterCalendar keeps this 0 rather
+     than jumping to #today, which sits below the controls. */
   document.getElementById("view").scrollTop = 0;
   render();
 }
@@ -147,14 +141,13 @@ function renderSettings() {
 const APP_URL = "https://darkpizzai.github.io/kave-calendar-app/";
 
 /* The two Settings sheets, as levels of the one sheet. */
-const PREF_KEYS = ["defaultView", "defaultDetail", "cardStyle"];
+const PREF_KEYS = ["defaultView", "defaultDetail"];
 registerLevel("set-defaults", {
   title: () => "Calendar defaults",
   body() {
     const p = readPrefs(store.state.settings);
     return `<div class="fields">${field("Default view", choices("pref-view", VIEW_NAMES, p.defaultView), "Where the Calendar opens.")}`
       + field("Default detail level", choices("pref-detail", DETAIL_NAMES, p.defaultDetail), "Full: both of you. Partial: the other person greyed. Minimal: yours and shared only.")
-      + field("Card style", choices("pref-style", STYLE_NAMES, p.cardStyle), "How events look in Weekly's day cards.")
       + field("Weekday letters",
           `<button class="tick${p.showWeekdayHeader ? " on" : ""}" role="checkbox" aria-checked="${p.showWeekdayHeader}" aria-label="Show weekday letters in Grid" data-tick-weekday>${p.showWeekdayHeader ? ICON.check : ""}</button>`,
           "The M T W T F S S row above each month in Grid.")
@@ -163,8 +156,7 @@ registerLevel("set-defaults", {
   onAction(b) {
     const d = b.dataset;
     if (d.tickWeekday != null) { store.setSetting("showWeekdayHeader", toggleWeekdayHeader(readPrefs(store.state.settings)).showWeekdayHeader); return; }
-    const pick = d.prefView != null ? ["defaultView", d.prefView] : d.prefDetail != null ? ["defaultDetail", d.prefDetail]
-      : d.prefStyle != null ? ["cardStyle", d.prefStyle] : null;
+    const pick = d.prefView != null ? ["defaultView", d.prefView] : d.prefDetail != null ? ["defaultDetail", d.prefDetail] : null;
     if (!pick || !PREF_KEYS.includes(pick[0])) return;
     store.setSetting(pick[0], pick[1]);
     resetCalendarDefaults();
@@ -200,39 +192,40 @@ function renderNav() {
     </button>`).join("");
 }
 
-/* The Calendar's gates, before anything else: no token, then who am I. */
-function gate() {
-  const s = store.state.settings;
-  if (!s.token) return `<div class="gate"><p class="gate-title">Connect Compass first</p>
-    <p class="lede">Compass keeps your events in kave-hub. Add the GitHub token in Settings, then come back here.</p>
-    <button data-view="settings">Open Settings</button></div>`;
-  if (!s.me) return `<div class="gate"><p class="gate-title">Who are you?</p>
-    <p class="lede">Every edit is stamped with who made it. You can change this later in Settings.</p>
-    <div class="row"><button data-me="isa">Isa</button><button data-me="hugo">Hugo</button></div></div>`;
-  return "";
-}
-
 let firstDraw = true;
-export const isCalendar = () => current === "calendar" && !gate();
+export const isCalendar = () => current === "calendar" && !gateStep();
 
 export function render() {
   const main = document.getElementById("view");
+  /* The gate first: no token (or no "who am I") and nothing else draws. */
+  const step = gateStep();
+  const wasGated = document.body.classList.contains("gated");
+  document.body.classList.toggle("gated", !!step);
+  /* the header was hidden while gated, so --header-h measured 0: wire.js
+     measures it again on resize */
+  if (wasGated && !step) window.dispatchEvent(new Event("resize"));
+  if (step) {
+    main.classList.remove("is-cal");
+    main.innerHTML = gateHtml(step);
+    document.getElementById("nav").innerHTML = "";
+    document.getElementById("fabs").innerHTML = "";
+    bindGate(main, { onToken: () => { if (actions.sync) actions.sync(); } });
+    return;
+  }
   const before = { top: main.scrollTop, height: main.scrollHeight, first: firstDraw };
   document.getElementById("tabName").textContent = VIEWS[current];
-  const blocked = current === "calendar" && gate();
   main.innerHTML = current === "settings" ? renderSettings()
-    : current === "calendar" ? (blocked || calendarHtml()) : renderStub(current);
-  main.classList.toggle("is-cal", current === "calendar" && !blocked);
+    : current === "calendar" ? calendarHtml() : renderStub(current);
+  main.classList.toggle("is-cal", current === "calendar");
   document.getElementById("nav").innerHTML = renderNav();
-  /* F28: two round buttons replace the single "Back to today" -- up (scroll
-     to top, revealing the now non-floating controls) and down (jump to
-     today, collapsing loaded-older data), the same icon mirrored via CSS.
-     F29 moved "load older" inline into the control row (calendar.js). */
-  document.getElementById("fabs").innerHTML = current === "calendar" && !blocked
+  /* The round buttons: up (scroll to the top, revealing the controls), down
+     (jump to today, collapsing loaded-older data; the same icon mirrored in
+     CSS) and add. */
+  document.getElementById("fabs").innerHTML = current === "calendar"
     ? `<button class="fab up" data-fab="up" aria-label="Scroll to top">${ICON.up}</button>`
       + `<button class="fab down" data-fab="down" aria-label="Back to today">${ICON.up}</button>`
       + `<button class="fab add" data-fab="add" aria-label="Add an event">${ICON.plus}</button>` : "";
-  if (current === "calendar" && !blocked) { afterCalendar(main, before); firstDraw = false; }
+  if (current === "calendar") { afterCalendar(main, before); firstDraw = false; }
   else onScroll();
   refreshSheet();
   bindView();
@@ -263,7 +256,9 @@ function bindView() {
   const input = document.getElementById("tokenInput");
   if (input) input.addEventListener("change", () => {
     const v = input.value.trim();
-    if (!v) return;
+    /* the same value twice is one paste: a redraw can blur the field and
+       fire change again while this render is still running */
+    if (!v || v === store.state.settings.token) return;
     store.setSetting("token", v);
     checkToken().then(render);
     if (actions.sync) actions.sync();

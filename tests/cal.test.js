@@ -1,9 +1,8 @@
 import { test, eq, ok } from "./run.js";
-import { indexByDay, tappable, zoomWeekTarget, zoomMonthTarget, isAway, isBig, awayText,
+import { indexByDay, tappable, zoomWeekTarget, zoomMonthTarget, isAway, awayText,
   shouldLoadMore, nextCount, iconsOf, searchEvents, todaysCount, fullPastWeeks, fullPastMonths,
-  backToTodayState, eventsInMonth, tripCityFor, defaultCity, hideCancelled,
-  hasOpenTodos, guestsExcludingViewer, statusGuestsLine, heatFill } from "../js/cal-model.js";
-import { readPrefs, byCategories, toggleCategory } from "../js/prefs.js";
+  backToTodayState, tripCityFor, defaultCity, hideCancelled,
+  hasOpenTodos, guestsExcludingViewer, statusGuestsLine } from "../js/cal-model.js";
 
 const ev = (id, start, extra = {}) => ({ id, title: id, start, end: null, owner: "shared", status: "planned", activities: [], ...extra });
 const act = (type, icon) => ({ type, icon });
@@ -26,13 +25,11 @@ test("cal: jump targets land on a Monday", () => {
   eq(zoomMonthTarget("2026-10"), "2026-09-28");
   eq(zoomMonthTarget("2026-11"), "2026-11-02");
 });
-test("cal: away and big", () => {
+test("cal: away", () => {
   const flight = ev("f", "2026-10-01", { activities: [act("transport")] });
   const visit = ev("v", "2026-10-01", { activities: [act("visitor")] });
-  const bday = ev("b", "2026-10-01", { activities: [act("birthday"), act("transport")] });
   const dinner = ev("d", "2026-10-01", { activities: [act("eating")] });
   eq([isAway(flight), isAway(visit), isAway(dinner)], [true, false, false]);
-  eq([isBig(flight), isBig(visit), isBig(bday), isBig(dinner)], [true, true, false, false]);
 });
 test("cal: away text names the person unless shared", () => {
   eq(awayText(ev("Anglet", "2026-10-16", { owner: "hugo", end: "2026-10-18" }), "2026"), "Hugo in Anglet, Fri 16 to Sun 18");
@@ -66,17 +63,12 @@ test("cal: search ignores accents and case, across title, venue, city, guests", 
 });
 
 /* ---- older years on demand (Isa, 2026-09-24: 2024 and 2025 reachable) ---- */
-import { seePrevious, pastMonths } from "../js/cal-model.js";
+import { pastMonths } from "../js/cal-model.js";
 import { loadRange } from "../js/views.js";
 
 test("cal: the range starts at the oldest year loaded", () => {
   eq(loadRange("2026-09-24", "", "2024").min, "2024-01-01");
   eq(loadRange("2026-09-24", "").min, "2026-01-01");
-});
-test("cal: See previous reveals more, then loads the year before, then stops", () => {
-  eq(seePrevious({ from: "2026-03-02", firstMonday: "2025-12-29", exhausted: false }), "more");
-  eq(seePrevious({ from: "2025-12-29", firstMonday: "2025-12-29", exhausted: false }), "older");
-  eq(seePrevious({ from: "2025-12-29", firstMonday: "2025-12-29", exhausted: true }), "none");
 });
 test("cal: Grid's past months run across years, oldest first", () => {
   eq(pastMonths("2026-03-10", "2025", 4), ["2025-11", "2025-12", "2026-01", "2026-02"]);
@@ -146,33 +138,6 @@ test("cal: Back to today discards the loaded past, the floor resets to this year
   eq(backToTodayState("2026"), { past: { grid: 0, agenda: 0 }, floor: "2026", exhausted: false });
 });
 
-/* ---- F20: "N plans" must not respect the category filters; the heat-strip
-   fill still does (unaffected). eventsInMonth is the pure piece
-   calendar.js's monthCard runs once against a filtered index (heat-strip)
-   and once against an unfiltered one (the count), so the two can now
-   disagree on purpose. ---- */
-test("cal: eventsInMonth collects each unique event once across the month", () => {
-  const drinks = ev("drinks", "2026-10-05", { activities: [act("drinks")] });
-  const trip = ev("trip", "2026-10-10", { activities: [act("transport")], end: "2026-10-12" });
-  const idx = indexByDay([drinks, trip]);
-  const on = (d) => idx.get(d) || [];
-  eq(eventsInMonth(on, "2026-10", 31).map((e) => e.id), ["drinks", "trip"]);
-});
-test("cal: F20/F61 -- the plans count and the heat-strip fill both ignore category filters; only the itemised lines below stay filtered", () => {
-  const drinks = ev("drinks", "2026-10-05", { activities: [act("drinks")] });
-  const trip = ev("trip", "2026-10-10", { activities: [act("transport")] });
-  const all = [drinks, trip];
-  const prefs = toggleCategory(readPrefs({}), "isa", "grid", "drinks");
-  const filtered = byCategories(all, prefs, "isa", "grid");
-  const onAll = (d) => (indexByDay(all).get(d) || []);
-  const onFiltered = (d) => (indexByDay(filtered).get(d) || []);
-  const count = eventsInMonth(onAll, "2026-10", 31).length;
-  const itemisedLines = eventsInMonth(onFiltered, "2026-10", 31).length;
-  eq(count, 2, "the count includes the hidden-category event");
-  eq(itemisedLines, 1, "the itemised lines below the squares stay filtered (F61 leaves this alone)");
-  ok(count !== itemisedLines, "the count/heat-strip source and the itemised-lines source now disagree when a category is hidden -- that's F61's whole point");
-});
-
 /* ---- F22: default city, trip-aware -- reuses isAway (Agenda's "away"
    test), never a second definition of "trip". ---- */
 test("cal: tripCityFor finds the trip covering a date, city and all", () => {
@@ -214,27 +179,6 @@ test("cal: statusGuestsLine never repeats the status -- guests alone, or empty",
   eq(statusGuestsLine(""), "", "no guests -- nothing to show, the pill already carries the status");
   eq(statusGuestsLine("Apu, Jordi"), "Apu, Jordi", "guests alone, no 'Planned ·' prefix");
   eq(statusGuestsLine(null), "");
-});
-
-/* ---- F61 (corrects F58/F12): the heat-strip fill reads from whatever
-   accessor is passed in -- calendar.js passes frame.onAll (unfiltered, the
-   same source "N plans" already uses), never frame.on (category-filtered),
-   so a hidden category's day still lights up. ---- */
-test("cal: heatFill colours a day from the given accessor, unfiltered by category when that accessor is unfiltered", () => {
-  const mine = ev("m", "2026-11-05", { owner: "isa" });
-  const other = ev("o", "2026-11-06", { owner: "hugo" });
-  const onAll = (d) => (d === "2026-11-05" ? [mine] : d === "2026-11-06" ? [other] : []);
-  eq(heatFill(onAll, "2026-11-05", true, "isa"), "mine", "current month, viewer's own event");
-  eq(heatFill(onAll, "2026-11-06", true, "isa"), "other", "current month, another person only");
-  eq(heatFill(onAll, "2026-11-07", true, "isa"), "", "current month, empty day");
-  eq(heatFill(onAll, "2026-11-05", false, "isa"), "future", "future month, viewer's own event -- accent fade");
-  eq(heatFill(onAll, "2026-11-06", false, "isa"), "", "future month, another person only -- unfilled, not a separate grey");
-  eq(heatFill(onAll, "2026-11-07", false, "isa"), "", "future month, empty day");
-  /* the point of F61: pass an accessor that ignores the category filter
-     (frame.onAll), and a hidden-category event still fills -- the caller
-     (calendar.js) is responsible for choosing onAll over on for this. */
-  const onFiltered = () => []; // simulates a category-hidden day under frame.on
-  eq(heatFill(onFiltered, "2026-11-05", true, "isa"), "", "if the caller passed the filtered accessor, the day would wrongly read empty -- onAll must be what's wired up in calendar.js");
 });
 
 /* ---- F38: does this event have at least one open to-do ---- */

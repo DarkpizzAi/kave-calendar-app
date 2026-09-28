@@ -1,5 +1,5 @@
 import { test, eq } from "./run.js";
-import { precision, isValidDate, sortKey, compareDates, formatDate, addDays,
+import { precision, isValidDate, sortKey, compareDates, addDays,
   dayOfWeek, mondayOf, todayKey, daysOf, MAX_SPAN_DAYS } from "../js/dates.js";
 
 test("precision from length", () => {
@@ -14,9 +14,6 @@ test("month and year sort before days of that month and year", () => {
   const list = ["2025-08-14", "2025-08", "2025", "2025-08-01"].sort(compareDates);
   eq(list, ["2025", "2025-08", "2025-08-01", "2025-08-14"]);
   eq(sortKey("2025-08"), "2025-08-00");
-});
-test("formatDate by precision", () => {
-  eq([formatDate("2025"), formatDate("2025-08"), formatDate("2025-08-14")], ["2025", "Aug 2025", "14 Aug 2025"]);
 });
 test("addDays crosses months, years and DST", () => {
   eq([addDays("2026-01-31", 1), addDays("2025-12-31", 1), addDays("2026-03-29", 1), addDays("2026-03-01", -1)],

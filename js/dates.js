@@ -6,7 +6,6 @@
 "use strict";
 
 export const MAX_SPAN_DAYS = 62;
-const MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
 const pad = (n) => String(n).padStart(2, "0");
 
 export function precision(d) {
@@ -32,13 +31,6 @@ export function sortKey(d) {
 export function compareDates(a, b) {
   const x = sortKey(a), y = sortKey(b);
   return x < y ? -1 : x > y ? 1 : 0;
-}
-
-export function formatDate(d) {
-  const [y, m, day] = d.split("-");
-  if (!m) return y;
-  if (!day) return `${MONTHS[Number(m) - 1]} ${y}`;
-  return `${Number(day)} ${MONTHS[Number(m) - 1]} ${y}`;
 }
 
 function toUtc(day) { const [y, m, d] = day.split("-").map(Number); return new Date(Date.UTC(y, m - 1, d)); }

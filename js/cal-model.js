@@ -10,14 +10,9 @@ import { applyDetail } from "./filter.js";
 
 const DOW = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
 
-/* F62: "Mon 21" in rows -- weekday and day-of-month only, for every year,
-   not just the current one. Grid's future-year cards used to append the
-   month (and year) here, "Fri 24 Sep 2027" instead of "Fri 24" -- but each
-   card already names its own month and year (monthCard's heading,
-   yearHead), so repeating it on every line was redundant, and the current
-   year's lines never did it. `thisYear` is unused now but kept in the
-   signature: every call site already threads frame.thisYear through, and
-   dropping the parameter buys nothing. */
+/* "Mon 21": weekday and day of the month only. Every card already names its
+   own month and year, so the line does not repeat them. `thisYear` stays in
+   the signature because every caller passes it. */
 export function shortDate(day, thisYear) {
   return `${DOW[dayOfWeek(day)]} ${Number(day.slice(8))}`;
 }
@@ -41,19 +36,11 @@ export const zoomWeekTarget = (day) => mondayOf(day);
 export const zoomMonthTarget = (ym) => firstWeekOf(ym);
 
 const has = (e, types) => (e.activities || []).some((a) => types.includes(a.type));
-/* Also prefs.js's single source for Grid's default-shown categories
-   (F17): the "who is away" set plus "visitor" is what Grid always meant
-   by "big things", so it is exported rather than re-declared. */
+/* The "who is away" categories. Exported: Grid ranks a day's emoji by it. */
 export const AWAY = ["transport", "accommodation", "business-trip"];
 
 /* Agenda's "who is away" line. */
 export const isAway = (e) => has(e, AWAY);
-
-/* Grid's big things: trips away, visitors, business trips; never birthdays. */
-export function isBig(e) {
-  if (has(e, ["birthday"])) return false;
-  return isAway(e) || has(e, ["visitor"]);
-}
 
 /* F35: a cancelled event is hidden outright in Grid ("if I really don't
    want to see them I'll delete them" is Isa's own escape hatch there);
@@ -118,13 +105,6 @@ export function gesture({ dx, dy, top, searching, loadedOlder }) {
    down button's own "is there anything to collapse" both read one answer. */
 export const hasLoadedOlder = (past) => Object.values(past).some(Boolean);
 
-/* See previous: reveal more of what is loaded, load the year before, or
-   nothing, once kave-hub has no older year. */
-export function seePrevious({ from, firstMonday, exhausted }) {
-  if (from > firstMonday) return "more";
-  return exhausted ? "none" : "older";
-}
-
 /* Grid's past months, oldest first: the last `count` months before this
    one, never before January of the floor year. */
 export function pastMonths(today, floorYear, count) {
@@ -138,9 +118,8 @@ export function pastMonths(today, floorYear, count) {
   return out;
 }
 
-/* F7: "See previous" / the floating "load older" button jump straight to 1
-   January of the current floor year in one go, instead of revealing a few
-   weeks or months at a time. */
+/* How many weeks or months reach back to 1 January of the floor year, in
+   one go (the Archive draws them all at once). */
 export function fullPastWeeks(thisMonday, floorYear) {
   const floorMonday = mondayOf(floorYear + "-01-01");
   return Math.max(0, Math.round((Date.parse(thisMonday) - Date.parse(floorMonday)) / 6048e5));
@@ -163,23 +142,6 @@ export function backToTodayState(thisYear) {
    one entry per day). */
 export function todaysCount(eventsToday, me, detail) {
   return applyDetail(eventsToday.filter((e) => !e.deleted), me, detail).length;
-}
-
-/* F20: the Grid month card's own unique-events-in-month collection,
-   pulled out so it can run once against the filtered index (the card's
-   body and the heat-strip, F12/F17, unaffected) and once against an
-   unfiltered-by-category index (the "N plans" count, which must match
-   what Agenda actually shows once you jump there -- Isa: category
-   filters are a Calendar display choice, not a count that should lie
-   about how many plans exist). `on` is a day -> events accessor, same
-   shape as a frame's `on`. */
-export function eventsInMonth(on, key, days) {
-  const out = [];
-  for (let dd = 1; dd <= days; dd++) {
-    const d = `${key}-${String(dd).padStart(2, "0")}`;
-    for (const e of on(d)) if (!out.includes(e)) out.push(e);
-  }
-  return out;
 }
 
 /* The emoji for an event, drawn for this viewer. A dated idea shows ❔. */
@@ -209,27 +171,10 @@ export function guestsExcludingViewer(guests, viewerName) {
     .join(", ");
 }
 
-/* F67 (supersedes F37/F60): the single-day sheet's line under an event's
-   title never repeats the status -- F39's pill above it already shows that,
-   guests or not. F60 only fixed the no-guests case (dropping the bare
-   status word); an event *with* guests still read "Planned · Mora, Charles"
-   here, duplicating the pill. So this line is guests alone, or empty --
-   the status parameter is gone entirely, not just its no-guests fallback. */
+/* The line under an event's title in the day sheet: guests alone, or
+   empty. Never the status, which the pill above already shows. */
 export function statusGuestsLine(guestsText) {
   return guestsText || "";
-}
-
-/* F61 (corrects F58/F12): the Grid heat-strip squares must not respect
-   the category filter -- same reasoning as F20's "N plans", which already
-   reads from the unfiltered accessor. `on` here is meant to be
-   frame.onAll, not frame.on; the itemised lines below the squares are the
-   only thing that stays category-filtered (calendar.js passes frame.on
-   for those, unchanged). Pure so the fill rule is tested without a DOM. */
-export function heatFill(on, d, isCurrentMonth, me) {
-  const evs = on(d);
-  const mine = evs.some((e) => e.owner === me || e.owner === "shared");
-  if (isCurrentMonth) return mine ? "mine" : evs.length ? "other" : "";
-  return mine ? "future" : "";
 }
 
 const fold = (s) => String(s || "").toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");

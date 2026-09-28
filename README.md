@@ -3,17 +3,15 @@
 The household planner: events, what they cost, trips, and the loose ends
 attached to them. Replaces Google Calendar and the yearly planning sheet.
 
-**`main` is sub-project A, live at v1.0** (26/09/2026): the data model and
-sync engine, the Calendar tab (Weekly/Monthly/Yearly, one sheet with
-levels), the event page and form, Settings, and three years imported from
-the yearly planning sheet. Insights, Trips and Radar are still dashed
-stubs, built in sub-projects B, C and D. A's design is one document in the
-private kave-hub repo,
-`docs/superpowers/specs/2026-09-24-compass-a-core-design.md`, and its plan
-(now closed) is `docs/superpowers/plans/2026-09-24-compass-a-core.md`. The
-product brainstorm for the later sub-projects (Trips and Radar, Insights,
-the box's jobs) is `calendar/data/compass-planning-app-brainstorm.md`
-there.
+**`main` is sub-project A** (the live version is `VERSION` in
+`service-worker.js`): the data model and sync engine, the Calendar tab
+(Grid and Agenda, one sheet with levels), the event page and form,
+Settings, and three years imported from the yearly planning sheet.
+Insights, Trips and Radar are still dashed stubs, built in sub-projects B,
+C and D. A's design is one document in the private kave-hub repo,
+`docs/superpowers/specs/2026-09-24-compass-a-core-design.md`; what is next
+is `calendar/data/roadmap.md` there, and the product brainstorm for the
+later sub-projects is `calendar/data/compass-planning-app-brainstorm.md`.
 
 **This repo is the static app shell only.** No data, no secrets. It is public
 so GitHub Pages can serve it for free.
@@ -187,11 +185,11 @@ Native ES modules, no bundler, no build step.
 | `js/calendar.js` | the Calendar tab: drawing and its handlers |
 | `js/sheet.js` | levels, history, the sheet's depth animation |
 | `js/view-event.js`, `js/event-form.js` | the event page and form |
-| `js/prefs.js` | Settings' category toggles and defaults |
+| `js/prefs.js` | Calendar defaults and free-time blocking |
 | `js/updates.js` | check-for-updates, ported from Spoon |
-| `js/render.js` | the frame, Settings, no-token/who-am-I screens |
+| `js/gate.js` | the first-run gate: token, who, theme (the hub site's screen) |
+| `js/render.js` | the frame and Settings |
 | `js/wire.js` | one-time listeners, the banner |
-| `js/pull-to-sync.js` | the pull gesture, armed per tab |
 | `js/boot.js` | entry point, service-worker registration |
 | `github.js` | Contents API client, carried over from Spoon |
 
@@ -212,12 +210,10 @@ features.
 
 ## Status
 
-**`main` is v1.0** (26/09/2026, commit `1455435`): sub-project A complete.
-The Calendar tab (Weekly/Monthly/Yearly, the event sheet and form),
-Settings (token, who-am-I, palette, categories, sync status, check for
-updates), and three years of real data imported from the sheet. Built
-through the usual prototype-then-code gates, then seven rounds of testing
-live on the phone against real data before release. 133 browser tests
-(`tests/`), 28 pytest (`calendar/tools` in kave-hub).
+Sub-project A is complete and live. The Calendar tab (Grid and Agenda,
+the event sheet and form), Settings (palette, calendar defaults, free
+time, sync status, token, who-am-I, check for updates), the first-run gate,
+and three years of real data imported from the sheet. The browser tests
+live in `tests/` (open `http://localhost:8778/tests/`).
 
 Next: sub-project B (Trips and Radar).

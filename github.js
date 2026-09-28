@@ -1,6 +1,7 @@
-/* Compass: GitHub Contents API client. Carried over from Spoon unchanged
-   except for the coordinates below - same auth model, same error kinds,
-   same 304 handling. If a bug is found here, fix it in both.
+/* Compass: GitHub Contents API client, shared in spirit with Spoon's copy:
+   same auth model, same error kinds, same 304 handling. Spoon's has named
+   data paths and a listDir the Compass one does not need. If a bug is
+   found in the shared part, fix it in both.
 
    No app logic. Typed get / put against one private repo. The app pushes the
    token in with github.setToken(); nothing here reads localStorage or the
@@ -13,23 +14,14 @@
 */
 "use strict";
 
-/* Exported, because Compass is an ES-module app. Spoon still loads its
-   copy as a classic script, where this is a top-level const instead. That
-   is the only difference between the two files; keep it that way. */
+/* Exported: both apps are ES-module apps. */
 export const github = {
   config: {
     owner: "DarkpizzAi",
     repo: "kave-hub",
     branch: "main",
-    // Data paths are deliberately absent. Compass's data model has not been
-    // designed yet - that needs its own spec - and inventing shapes here
-    // would prejudge it. getFile/putFile take a path argument; add the named
-    // paths when the feature spec settles what they are.
-    //
-    // Whatever they become, they live under calendar/data/ in kave-hub.
-    // Compass is the confirmation gate: what someone reviewed and accepted,
-    // or entered by hand, is authoritative and is handed to a finance app
-    // later. The unconfirmed remainder is that app's problem, not this one's.
+    // Data paths live with the code that uses them (js/sync.js pathFor):
+    // calendar/data/compass/events-<year>.json in kave-hub.
   },
   // GitHub's suggested minimum seconds between polls, if it ever sends one
   pollInterval: 60,

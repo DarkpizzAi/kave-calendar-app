@@ -13,7 +13,7 @@
 import { escapeHtml as esc, safeUrl } from "./util.js";
 import { addDays, dayOfWeek } from "./dates.js";
 import { isoWeek } from "./views.js";
-import { holidayOn } from "./holidays.js";
+import { holidayOn, isProvisional } from "./holidays.js";
 import { tappable, iconsOf, hasOpenTodos, guestsExcludingViewer, statusGuestsLine, gesture } from "./cal-model.js";
 import { rows, frameNow, detailGrey, place } from "./calendar.js";
 import { ICON } from "./chrome-icons.js";
@@ -83,25 +83,17 @@ function weekBody(m, f) {
 /* Day level: no cards, a strip per event; a time and names say what they
    are, so no "When / Who / Where" labels. Layout A (title left, icons right,
    a chevron column) until Task 9c settles it. */
-/* F13: the icons sit on the same line as the disclosure chevron, vertically
-   centred with it -- both are now siblings of the (possibly multi-line)
-   title block in the same flex row, rather than the icons living inside the
-   title's own row, which left them centred on just that line instead of on
-   the chevron's. */
-/* F39: the person's name(s) sit before the title, the status pill after --
-   name, title, status, in that reading order. Named only when it isn't the
-   viewer's own event or a shared one, same condition the old second line
-   used. */
+/* The icons share a flex row with the chevron, beside the (possibly
+   multi-line) title block, so they centre on the chevron rather than on
+   the title's first line. */
+/* Name, title, status pill, in that order. Named only when the event is
+   neither the viewer's own nor shared. */
 function stripName(e, f) { return e.owner !== f.me && e.owner !== "shared" ? who(e.owner) : ""; }
 
 function strip(e, f) {
-  /* F67 (supersedes F37/F60): the line under the title is guests alone,
-     with the viewer's own name filtered out -- never "Isa · Apu" on Isa's
-     phone -- and never the status, which F39's pill above already carries,
-     guests or not. statusGuestsLine (cal-model.js, tested) is the one
-     place that rule lives. */
-  /* F43: the "until Sun" day-span used to repeat here too, redundant with
-     the date already named by the day this strip belongs to. */
+  /* The line under the title: guests alone, the viewer's own name removed
+     (never "Isa · Apu" on Isa's phone), and never the status, which the pill
+     already carries. statusGuestsLine (cal-model.js, tested) owns the rule. */
   const statusGuests = statusGuestsLine(guestsExcludingViewer(e.guests, who(f.me)));
   const lines = [statusGuests].filter(Boolean);
   const name = stripName(e, f);
@@ -117,7 +109,9 @@ function strip(e, f) {
 }
 function dayBody(d, f) {
   const evs = f.on(d), hol = holidayOn(d);
-  return `<div class="dpage">${hol ? `<p class="dhol">Bank holiday: ${esc(hol)}</p>` : ""}${evs.map((e) => strip(e, f)).join("")}</div>`;
+  /* a year the Generalitat has not published yet is our own guess: say so */
+  const holText = hol ? `Bank holiday: ${hol}${isProvisional(d) ? " (provisional)" : ""}` : "";
+  return `<div class="dpage">${hol ? `<p class="dhol">${esc(holText)}</p>` : ""}${evs.map((e) => strip(e, f)).join("")}</div>`;
 }
 
 /* Event level: a page, like a Spoon recipe. Its full design, with editing,

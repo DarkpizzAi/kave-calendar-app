@@ -1,7 +1,7 @@
 import { test, eq, ok, throws } from "./run.js";
 import { memStorage, fakeGh } from "./helpers.js";
 import { createLocal } from "../js/local.js";
-import { createSync, pathFor } from "../js/sync.js";
+import { createSync, pathFor, probeToken } from "../js/sync.js";
 
 const ev = (id, at, extra = {}) => ({ id, title: id + at, updated: { at, by: "isa" }, deleted: false, ...extra });
 const file = (events, n = 1) => ({ json: { schema: 1, year: 2026, events }, sha: "s" + n, etag: "e" + n });
@@ -80,4 +80,36 @@ test("review I1: an edit queued while a sync runs is sent by that sync's rerun",
   await first;
   eq(gh.files["calendar/data/compass/events-2026.json"].json.events.map((e) => e.id).sort(), ["a", "bb"]);
   eq(local.pendingYears(), []);
+});
+
+/* The token check reads a JSON events file: getFile parses what it reads,
+   and a markdown file once made every good token read as a failure. */
+const probeGh = (files) => ({
+  asked: [], token: "",
+  setToken(t) { this.token = t; },
+  async getFile(path) {
+    this.asked.push(path);
+    if (files[path] === "401") { const e = new Error("no"); e.gh = "unauthorized"; throw e; }
+    if (!files[path]) { const e = new Error("nf"); e.gh = "notFound"; throw e; }
+    return { json: JSON.parse(files[path]), sha: "s" };
+  },
+});
+test("probeToken: a token that reads this year's events file works", async () => {
+  const gh = probeGh({ [pathFor(2026)]: '{"events":[]}' });
+  eq((await probeToken("t", gh, 2026)).ok, true);
+  eq([gh.token, gh.asked], ["t", [pathFor(2026)]]);
+});
+test("probeToken: early January falls back to last year's file", async () => {
+  const gh = probeGh({ [pathFor(2026)]: '{"events":[]}' });
+  eq((await probeToken("t", gh, 2027)).ok, true);
+  eq(gh.asked, [pathFor(2027), pathFor(2026)]);
+});
+test("probeToken: a rejected token fails with its kind, and does not try again", async () => {
+  const gh = probeGh({ [pathFor(2026)]: "401" });
+  const r = await probeToken("bad", gh, 2026);
+  eq([r.ok, r.error.gh, gh.asked.length], [false, "unauthorized", 1]);
+});
+test("probeToken: a token that reaches neither file fails as not found", async () => {
+  const r = await probeToken("t", probeGh({}), 2026);
+  eq([r.ok, r.error.gh], [false, "notFound"]);
 });

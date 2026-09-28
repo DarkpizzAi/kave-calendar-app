@@ -6,8 +6,6 @@
 
 import { isAway } from "./cal-model.js";
 
-export const DETAIL_LEVELS = ["full", "partial", "minimal"];
-
 export function applyDetail(events, me, level) {
   const out = [];
   for (const event of events) {
