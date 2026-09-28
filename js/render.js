@@ -199,7 +199,11 @@ export function render() {
   const main = document.getElementById("view");
   /* The gate first: no token (or no "who am I") and nothing else draws. */
   const step = gateStep();
+  const wasGated = document.body.classList.contains("gated");
   document.body.classList.toggle("gated", !!step);
+  /* the header was hidden while gated, so --header-h measured 0: wire.js
+     measures it again on resize */
+  if (wasGated && !step) window.dispatchEvent(new Event("resize"));
   if (step) {
     main.classList.remove("is-cal");
     main.innerHTML = gateHtml(step);
