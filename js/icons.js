@@ -20,7 +20,7 @@ export const CATEGORIES = [
   { type: "live-music", label: "Live music", group: "Nightlife & Social", icons: [{ icon: "🎶" }, { icon: "🎸", note: "rock" }, { icon: "🎻", note: "classical" }] },
   { type: "clubbing", label: "Clubbing", group: "Nightlife & Social", icons: [{ icon: "🪩" }, { icon: "dancing" }] },
   { type: "drinks", label: "Drinks", group: "Nightlife & Social", icons: [{ icon: "🍺" }, { icon: "🍷" }, { icon: "🥂" }, { icon: "🍹" }, { icon: "🍻", note: "pre-drinks" }] },
-  { type: "eating", label: "Eating out", group: "Nightlife & Social", icons: [{ icon: "🍔" }, { icon: "🥩" }, { icon: "🍕" }, { icon: "🍝" }, { icon: "🍜" }, { icon: "🍙" }, { icon: "🍣" }, { icon: "🌮" }, { icon: "🥞", note: "brunch" }, { icon: "☕", note: "coffee" }] },
+  { type: "eating", label: "Eating out", group: "Nightlife & Social", icons: [{ icon: "🍴" }, { icon: "🍔" }, { icon: "🥩" }, { icon: "🍕" }, { icon: "🍝" }, { icon: "🍜" }, { icon: "🍙" }, { icon: "🍣" }, { icon: "🌮" }, { icon: "🥞", note: "brunch" }, { icon: "☕", note: "coffee" }] },
   { type: "birthday", label: "Birthday party", group: "Nightlife & Social", icons: [{ icon: "🎂" }] },
   { type: "cinema", label: "Cinema", group: "Entertainment & Leisure", icons: [{ icon: "🎬" }] },
   { type: "activity", label: "Paid activity", group: "Entertainment & Leisure", icons: [{ icon: "🎟" }, { icon: "🏛", note: "museum" }, { icon: "🖼", note: "exhibition" }, { icon: "🏺", note: "pottery" }, { icon: "🎨", note: "workshop" }, { icon: "🎤", note: "karaoke" }, { icon: "🎭", note: "theatre" }, { icon: "🩰", note: "ballet" }, { icon: "🎳", note: "bowling" }, { icon: "🎢", note: "amusement park" }, { icon: "🧗", note: "climbing" }] },
