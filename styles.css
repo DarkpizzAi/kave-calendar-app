@@ -409,7 +409,13 @@ a.ticket{color:inherit;text-decoration:none}
 /* Sunday is the last day of a Monday-first week: its margin is the gap
    between two different weeks, kept at the size Agenda always used. */
 .daycard.week-end{margin-bottom:var(--sp-2)}
-.daycard > .cd{display:block;font-size:var(--fs-micro);font-weight:500;color:var(--text-dim);margin-bottom:2px}
+/* Weekday top-left, day+month top-right, a dashed leader between them
+   filling whatever space is left -- "Mon -------- 28 Sep". The leader is
+   currentColor so it follows .cd's own color overrides below (today,
+   clear) without a rule of its own for each. */
+.daycard > .cd{display:flex;align-items:baseline;gap:6px;font-size:var(--fs-micro);font-weight:500;color:var(--text-dim);margin-bottom:2px}
+.daycard > .cd .cd-dow,.daycard > .cd .cd-date{flex:none}
+.daycard > .cd .cd-fill{flex:1;min-width:12px;border-bottom:1px dashed currentColor;opacity:.35;margin-bottom:3px}
 .daycard.weekend{background:var(--surface-2)}
 .daycard.today{background:var(--accent)}
 .daycard.today > .cd{color:var(--accent-text)}
