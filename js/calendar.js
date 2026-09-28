@@ -180,23 +180,42 @@ function agendaDay(d, m, freeDays, note) {
     + away.map((e) => `<span class="away${frame.grey.has(e.id) ? " grey" : ""}">${esc(icons(e)[0])} ${esc(awayText(e, frame.thisYear))}</span>`).join("")
     + `<ul class="rows">${rest.map((e) => row(e, false, false)).join("")}${noteLine}</ul></div>`;
 }
-/* Agenda: within one week, weekdays match the tallest weekday and the
-   weekend matches the tallest weekend day -- two independent groups, not
-   one across all seven (a quiet Sat/Sun shouldn't grow just because
-   Friday had a busy day, and vice versa). Cards render at their own
-   natural height first (no CSS floor any more, see styles.css); this
-   runs after, over whatever daycards are actually in the DOM (the main
-   view or the Archive popup), and stretches each to its group's max. */
+/* Agenda's per-card height rule -- two independent groups per week
+   (weekdays, weekend), not one across all seven:
+     - a card with content is at least one line tall, and taller still if
+       it has more than one line -- its own height, never matched up to a
+       busier sibling.
+     - a card with nothing on it is also one line tall, PROVIDED its group
+       (Mon-Fri, or Sat+Sun) has something somewhere that week -- otherwise
+       the whole group is thin, not even one line (an ordinary quiet week
+       stays quiet-looking).
+   "One line" isn't a card's own content, so it can't come from measuring
+   that card -- oneLineHeight renders a one-off, one-row reference card
+   (detached, same width as the real ones) once per draw and reuses the
+   number for every card that needs the floor. */
+function oneLineHeight(root) {
+  const probe = document.createElement("div");
+  probe.className = "daycard";
+  probe.style.cssText = "position:absolute;visibility:hidden;pointer-events:none";
+  probe.innerHTML = '<div class="cd"><span class="cd-dow">Mon</span><span class="cd-date">1 Jan</span></div>'
+    + '<ul class="rows"><li data-act="event" style="--n:1"><span class="c-i">•</span><span class="c-t">x</span></li></ul>';
+  root.appendChild(probe);
+  const h = probe.getBoundingClientRect().height;
+  probe.remove();
+  return h;
+}
 function equalizeAgendaHeights(root) {
+  const cards = root.querySelectorAll(".daycard[data-week]");
+  cards.forEach((el) => { el.style.minHeight = ""; });
+  if (!cards.length) return;
   const groups = new Map();
-  root.querySelectorAll(".daycard[data-week]").forEach((el) => {
-    el.style.height = "";
+  cards.forEach((el) => {
     const key = `${el.dataset.week}:${el.classList.contains("weekend") ? "we" : "wd"}`;
     (groups.get(key) || groups.set(key, []).get(key)).push(el);
   });
+  const oneLine = oneLineHeight(root);
   for (const els of groups.values()) {
-    const max = Math.max(...els.map((el) => el.offsetHeight));
-    els.forEach((el) => { el.style.height = `${max}px`; });
+    if (els.some((el) => el.querySelector(".rows li, .away"))) els.forEach((el) => { el.style.minHeight = `${oneLine}px`; });
   }
 }
 /* A calendar week almost never fits neatly inside one month: this breaks
