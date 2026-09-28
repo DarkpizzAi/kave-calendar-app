@@ -30,11 +30,15 @@ export function loadRange(today, lastEventDay, floorYear) {
   return { min: from + "-01-01", max: lastEventDay && lastEventDay > max ? lastEventDay : max };
 }
 
-/* ---- free weekends (Agenda): any future one, not the one underway ---- */
+/* ---- free weekends (Agenda): any future one, not the one underway ----
+   Saturday and Sunday only -- a blocking plan on the Friday before doesn't
+   touch the weekend itself, it just means this isn't also a long weekend
+   (that's longWeekends/weekFreeNote's own, holiday-anchored concept,
+   entirely separate from this). */
 export function freeWeekendSaturday(monday, eventsOn, today, blocks) {
   const sat = addDays(monday, 5);
   if (sat <= today) return null;
-  return [4, 5, 6].every((k) => !eventsOn(addDays(monday, k)).some(blocks)) ? sat : null;
+  return [5, 6].every((k) => !eventsOn(addDays(monday, k)).some(blocks)) ? sat : null;
 }
 
 /* Clear: nobody has anything that day. Open: somebody does, but nothing
