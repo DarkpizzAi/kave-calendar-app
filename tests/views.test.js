@@ -56,8 +56,9 @@ test("classify: a Thursday or Tuesday holiday is an opportunity (one bridge day 
   eq(classifyWeekend({ anchor: "2026-12-08", start: "2026-12-08", end: "2026-12-08", length: 1 }),
      { kind: "chance", start: "2026-12-05", end: "2026-12-08" });
 });
-test("classify: a Wednesday holiday is not a long weekend", () => {
-  eq(classifyWeekend({ anchor: "2026-06-24", start: "2026-06-24", end: "2026-06-24", length: 1 }), null);
+test("classify: a Wednesday holiday is never a long-weekend opportunity, just its own \"lone\" day", () => {
+  eq(classifyWeekend({ anchor: "2026-06-24", start: "2026-06-24", end: "2026-06-24", length: 1 }),
+     { kind: "lone", start: "2026-06-24", end: "2026-06-24" });
 });
 test("long weekends are labelled free, long, or opportunity, with the holiday names", () => {
   const blocksAll = () => true;
@@ -135,6 +136,17 @@ test("weekFreeDays: a long weekend block is excluded once today is its first day
 test("weekFreeDays: nothing qualifying this week is an empty list", () => {
   const blocksAll = () => true;
   eq(weekFreeDays("2026-09-21", {}, on([ev("x", "2026-09-26")]), "2026-09-24", blocksAll), []);
+});
+test("a lone Wednesday holiday flags only its own day, with its own name as the text", () => {
+  const blocksAll = () => true;
+  // 2026-06-24 (Sant Joan) is a Wednesday with no weekend to bridge to
+  const lw = longWeekends(HOLIDAYS, "2026-06-01", "2026-06-30", on([]), blocksAll);
+  const w = lw.find((x) => x.start === "2026-06-24");
+  eq([w.kind, w.start, w.end, w.text], ["lone", "2026-06-24", "2026-06-24", "Sant Joan"]);
+  const note = weekFreeNote("2026-06-22", HOLIDAYS, on([]), "2026-06-01", blocksAll);
+  eq(note, { on: "2026-06-24", text: "Sant Joan", kind: "long" },
+     "weekFreeNote always reports kind \"long\" for anything longWeekends found -- that's what earns the 🔍 badge");
+  eq(weekFreeDays("2026-06-22", HOLIDAYS, on([]), "2026-06-01", blocksAll), ["2026-06-24"]);
 });
 
 /* ---- detail levels ---- */

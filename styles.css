@@ -414,6 +414,11 @@ a.ticket{color:inherit;text-decoration:none}
 .month{margin:var(--sp-3) 0 0;font-size:var(--fs-title-lg);font-weight:var(--fw-strong);letter-spacing:var(--tracking-heading);line-height:var(--lh-title)}
 .away{margin:0;display:grid;grid-template-columns:20px minmax(0,1fr);column-gap:var(--sp-2);font-size:var(--fs-meta);background:var(--surface-2);border-radius:var(--r-control);padding:var(--sp-1) var(--sp-2)}
 .away.grey{color:var(--text-dim)}
+/* A bank holiday, plain text, no icon -- there's no glyph for "the day
+   itself is a holiday" the way an activity's own icon stands for that
+   activity. Unconditional (not tied to S.freeOn): it's what the day is,
+   same as an away pill. */
+.holiday{margin:0;font-size:var(--fs-meta);font-style:italic;color:var(--text-dim)}
 .daycard{background:var(--panel);border-radius:var(--r-card);padding:6px var(--sp-2);cursor:pointer}
 /* .content is a flex column with its own gap (sp-3) between every child,
    so it's never the whole story: a bare margin-bottom just adds to that
@@ -434,6 +439,10 @@ a.ticket{color:inherit;text-decoration:none}
 .daycard.clear{background:var(--free-tx);color:var(--free-bg)}
 .daycard.clear > .cd{color:var(--free-bg)}
 .daycard.open{border:2px solid var(--free-tx)}
+/* A weekday bank holiday (never Sat/Sun -- a weekend already reads as a
+   holiday by being one): an accent border, the same 2px weight as Open's
+   free-tx border above so the two read as the same kind of mark. */
+.daycard.holiday-border{border:2px solid var(--accent)}
 /* grid: a real Monday-first month grid, blank pad cells outside the month.
    No card: just the squares, month to month, with no boxed container or
    border around the group. */
@@ -442,7 +451,10 @@ a.ticket{color:inherit;text-decoration:none}
 .wdhead span{text-align:center;font-size:var(--fs-micro);font-weight:var(--fw-medium);color:var(--text-dim)}
 .monthgrid{display:flex;flex-direction:column;gap:4px}
 .grid7{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));gap:4px}
-.dsq{aspect-ratio:5/6;border-radius:8px;background:#000;position:relative;cursor:pointer}
+/* var(--panel), not a literal black -- a hardcoded #000 here was the bug:
+   Grid's squares stayed black in light mode (the comment above has always
+   said var(--panel), the rule just never matched it). */
+.dsq{aspect-ratio:5/6;border-radius:8px;background:var(--panel);position:relative;cursor:pointer}
 .dsq.pad{background:transparent;cursor:default}
 .dsq .num{position:absolute;top:4px;left:5px;font-size:var(--fs-micro);font-weight:var(--fw-medium);color:var(--text-dim)}
 /* F16's checkbox glyph, top-right -- at least one event that day still has

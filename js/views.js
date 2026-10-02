@@ -116,17 +116,23 @@ export function weekendBlocks(holidays, from, to) {
 }
 
 /* Decide what a block of days off is worth to plan around.
-   Returns { kind: "long" | "chance", start, end } or null.
+   Returns { kind: "long" | "chance" | "lone", start, end } or null.
    - "long": the block is already three or more days off in a row.
    - "chance": a one-day holiday on a Thursday or a Tuesday, where taking the
      Friday or the Monday off makes four days (start and end cover all four).
-   - null: anything else (a lone Wednesday, say), not worth flagging. */
+   - "lone": a one-day holiday on a Wednesday -- the one weekday a single
+     extra day off can't bridge to a weekend either direction, so it's
+     never a long-weekend opportunity, just worth marking on its own day.
+   - null: anything else, not worth flagging (there isn't one: Mon/Fri
+     holidays already grow into the adjacent weekend in weekendBlocks,
+     making block.length >= 3 before classifyWeekend ever sees them). */
 export function classifyWeekend(block) {
   if (block.length >= 3) return { kind: "long", start: block.start, end: block.end };
   if (block.length !== 1) return null;
   const dow = dayOfWeek(block.anchor);
   if (dow === 3) return { kind: "chance", start: block.anchor, end: addDays(block.anchor, 3) };
   if (dow === 1) return { kind: "chance", start: addDays(block.anchor, -3), end: block.anchor };
+  if (dow === 2) return { kind: "lone", start: block.anchor, end: block.anchor };
   return null;
 }
 
@@ -139,9 +145,10 @@ export function longWeekends(holidays, from, to, eventsOn, blocks) {
     for (let d = c.start; d <= c.end; d = addDays(d, 1)) days.push(d);
     const busy = days.some((d) => eventsOn(d).some(blocks));
     const names = [...new Set(days.filter((d) => holidays[d]).map((d) => holidays[d]))].join(", ");
-    const text = c.kind === "chance" ? "Long weekend opportunity" : busy ? "Long weekend" : "Free long weekend";
+    /* "lone" has no long weekend to describe -- the holiday's own name is
+       the whole point of flagging its Wednesday at all. */
+    const text = c.kind === "chance" ? "Long weekend opportunity" : c.kind === "lone" ? names : busy ? "Long weekend" : "Free long weekend";
     out.push({ ...c, text, names });
   }
   return out;
 }
-

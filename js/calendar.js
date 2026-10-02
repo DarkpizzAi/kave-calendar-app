@@ -10,7 +10,7 @@
 import { escapeHtml as esc } from "./util.js";
 import { addDays, dayOfWeek, mondayOf, todayKey } from "./dates.js";
 import { loadRange, dayFreeState, weekFreeNote, weekFreeDays } from "./views.js";
-import { HOLIDAYS } from "./holidays.js";
+import { HOLIDAYS, holidayOn, isProvisional } from "./holidays.js";
 import { applyDetail } from "./filter.js";
 import { store } from "./store.js";
 import { indexByDay, zoomWeekTarget, zoomMonthTarget, isAway, awayText, AWAY,
@@ -173,12 +173,22 @@ function agendaDay(d, m, freeDays, note) {
   /* Every day card opens the day, empty or not -- matches Grid's own
      squares (gridSquare below), which have always worked this way. */
   const tap = ` role="button" tabindex="0" data-act="day" data-d="${d}"`;
+  /* Every bank holiday gets its own plain text line, no icon (there's no
+     glyph that means "day off" the way an activity's own icon means that
+     activity) -- unconditional, not tied to S.freeOn, since it's simply
+     what the day is, the same way an away pill is. */
+  const hol = holidayOn(d);
+  const holLine = hol ? `<p class="holiday">${esc(hol)}${isProvisional(d) ? " (provisional)" : ""}</p>` : "";
+  /* A weekday holiday (never Sat/Sun, which already read as a holiday by
+     being a weekend) gets an accent border, unconditional like the line
+     above -- what the day is, not a free-time highlight. */
+  const holBorder = hol && !weekend ? " holiday-border" : "";
   /* A plain free weekend is colour only (Clear/Open, above); only a real
      long weekend or opportunity earns the 🔍 and its explanatory text, on
      the day its window opens. */
   const noteLine = (note && note.kind === "long" && note.on === d)
     ? `<li style="--n:1"><span class="c-i">🔍</span><span class="c-t">${esc(note.text)}</span></li>` : "";
-  return `<div class="daycard ${periodState(d, freeDays)}${weekend}${weekStart}" data-week="${m}"${tap}>${cd}`
+  return `<div class="daycard ${periodState(d, freeDays)}${weekend}${weekStart}${holBorder}" data-week="${m}"${tap}>${cd}${holLine}`
     + away.map((e) => `<span class="away${frame.grey.has(e.id) ? " grey" : ""}">${esc(icons(e)[0])} ${esc(awayText(e, frame.thisYear))}</span>`).join("")
     + `<ul class="rows">${rest.map((e) => row(e, false, false)).join("")}${noteLine}</ul></div>`;
 }
