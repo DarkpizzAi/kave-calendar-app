@@ -12,12 +12,14 @@
 
 import { escapeHtml as esc, safeUrl } from "./util.js";
 import { addDays, dayOfWeek } from "./dates.js";
-import { isoWeek } from "./views.js";
-import { holidayOn, isProvisional } from "./holidays.js";
+import { isoWeek, longWeekends } from "./views.js";
+import { HOLIDAYS, holidayOn, isProvisional } from "./holidays.js";
 import { tappable, iconsOf, hasOpenTodos, guestsExcludingViewer, statusGuestsLine, gesture } from "./cal-model.js";
 import { rows, frameNow, detailGrey, place } from "./calendar.js";
 import { ICON } from "./chrome-icons.js";
 import { STATUS_LABEL } from "./model.js";
+import { readPrefs, eventBlocksFreeTime } from "./prefs.js";
+import { store } from "./store.js";
 
 const LONGDOW = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"];
 const MONTHS = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
@@ -107,11 +109,19 @@ function strip(e, f) {
     + lines.map((l) => `<p class="dline">${esc(l)}</p>`).join("") + tickets(e)
     + `</div><span class="dicons">${todoIcon}${iconsOf(e, f.me).map(esc).join("")}</span><span class="dchev">${ICON.chev}</span></section>`;
 }
+const dayFreeBlocks = (e) => eventBlocksFreeTime(readPrefs(store.state.settings), e);
 function dayBody(d, f) {
   const evs = f.on(d), hol = holidayOn(d);
   /* a year the Generalitat has not published yet is our own guess: say so */
   const holText = hol ? `Bank holiday: ${hol}${isProvisional(d) ? " (provisional)" : ""}` : "";
-  return `<div class="dpage">${hol ? `<p class="dhol">${esc(holText)}</p>` : ""}${evs.map((e) => strip(e, f)).join("")}</div>`;
+  /* The day itself, not "any future one, not the one underway" (that's
+     weekFreeNote's own list-view heuristic) -- opening this exact day is
+     always worth saying whether it's the first day of a long weekend or
+     opportunity. "lone" (a Wednesday holiday with no long weekend) is
+     skipped: its text is just the holiday's own name, already said above. */
+  const lw = longWeekends(HOLIDAYS, addDays(d, -7), addDays(d, 7), f.onAll, dayFreeBlocks)
+    .find((w) => w.start === d && w.kind !== "lone");
+  return `<div class="dpage">${hol ? `<p class="dhol">${esc(holText)}</p>` : ""}${lw ? `<p class="dhol">${esc(lw.text)}</p>` : ""}${evs.map((e) => strip(e, f)).join("")}</div>`;
 }
 
 /* Event level: a page, like a Spoon recipe. Its full design, with editing,
