@@ -10,7 +10,7 @@
 import { escapeHtml as esc } from "./util.js";
 import { addDays, dayOfWeek, mondayOf, todayKey } from "./dates.js";
 import { loadRange, dayFreeState, weekFreeNote, weekFreeDays } from "./views.js";
-import { HOLIDAYS, holidayOn, isProvisional } from "./holidays.js";
+import { HOLIDAYS, holidayOn } from "./holidays.js";
 import { applyDetail } from "./filter.js";
 import { store } from "./store.js";
 import { indexByDay, zoomWeekTarget, zoomMonthTarget, AWAY,
@@ -169,20 +169,15 @@ function agendaDay(d, m, freeDays, note) {
   const weekStart = dayOfWeek(d) === 0 ? " week-start" : "";
   const dow = DOW[dayOfWeek(d)][0] + DOW[dayOfWeek(d)].slice(1).toLowerCase();
   const hol = holidayOn(d);
-  /* A weekday bank holiday is named in the card header, centred between the
-     weekday and the date (ellipsised if it is too long); a weekend holiday
-     keeps its plain line below, since the header has no room to spare there
-     and the weekend tint already marks the day. */
-  const holName = hol && !weekend ? `<span class="cd-hol">${esc(hol)}</span>` : "";
+  /* Every bank holiday is named in the card header, centred between the
+     weekday and the date, in the header's own type (ellipsised if too long).
+     Unconditional, not tied to S.freeOn: it is simply what the day is. The
+     provisional note lives in the day sheet. */
+  const holName = hol ? `<span class="cd-hol">${esc(hol)}</span>` : "";
   const cd = `<div class="cd"><span class="cd-dow">${dow}</span>${holName}<span class="cd-date">${dayMonth(d)}</span></div>`;
   /* Every day card opens the day, empty or not -- matches Grid's own
      squares (gridSquare below), which have always worked this way. */
   const tap = ` role="button" tabindex="0" data-act="day" data-d="${d}"`;
-  /* A weekend bank holiday gets its own plain text line, no icon (there's no
-     glyph that means "day off" the way an activity's own icon means that
-     activity) -- unconditional, not tied to S.freeOn, since it's simply
-     what the day is. Weekday ones are named in the header (holName). */
-  const holLine = hol && weekend ? `<p class="holiday">${esc(hol)}${isProvisional(d) ? " (provisional)" : ""}</p>` : "";
   /* A weekday holiday (never Sat/Sun, which already read as a holiday by
      being a weekend) gets an accent border, unconditional like the line
      above -- what the day is, not a free-time highlight. */
@@ -192,7 +187,7 @@ function agendaDay(d, m, freeDays, note) {
      the day its window opens. */
   const noteLine = (note && note.kind === "long" && note.on === d)
     ? `<li style="--n:1"><span class="c-i">🔍</span><span class="c-t">${esc(note.text)}</span></li>` : "";
-  return `<div class="daycard ${periodState(d, freeDays)}${weekend}${weekStart}${holBorder}" data-week="${m}"${tap}>${cd}${holLine}`
+  return `<div class="daycard ${periodState(d, freeDays)}${weekend}${weekStart}${holBorder}" data-week="${m}"${tap}>${cd}`
     + `<ul class="rows">${evs.map((e) => row(e, false, false)).join("")}${noteLine}</ul></div>`;
 }
 /* Agenda's per-card height rule -- two independent groups per week
