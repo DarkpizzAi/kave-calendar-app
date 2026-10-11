@@ -12,11 +12,11 @@ const oneOf = (list, v, fallback) => (list.some(([k]) => k === v) ? v : fallback
 const labelOf = (list, v) => list.find(([k]) => k === v)[1];
 
 /* Old view names that may still sit in a saved defaultView: yearly and
-   glance became grid, monthly became agenda. weekly and the old "grid" (a
-   weekly grid, since dropped) have nothing to map to, so they fall back to
-   the default. */
-const OLD_VIEW_NAME = { weekly: null, monthly: "agenda", yearly: "grid", grid: null, glance: "grid" };
-const migrateViewKey = (v) => (v in OLD_VIEW_NAME ? OLD_VIEW_NAME[v] : v);
+   glance became grid, monthly became agenda; weekly has nothing to map to,
+   so it falls back to the default. "grid" is not here: it is today's Grid,
+   a valid choice, never an old name to drop. */
+const OLD_VIEW_NAME = { weekly: null, monthly: "agenda", yearly: "grid", glance: "grid" };
+const migrateViewKey = (v) => (Object.prototype.hasOwnProperty.call(OLD_VIEW_NAME, v) ? OLD_VIEW_NAME[v] : v);
 
 /* Settings as stored -> clean preferences. Anything unexpected falls back. */
 export function readPrefs(settings) {

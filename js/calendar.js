@@ -12,12 +12,12 @@ import { addDays, dayOfWeek, mondayOf, todayKey } from "./dates.js";
 import { loadRange } from "./views.js";
 import { holidayOn } from "./holidays.js";
 import { readPrefs } from "./prefs.js";
-import { applyDetail } from "./filter.js";
+import { applyDetail, isTheirs } from "./filter.js";
 import { store } from "./store.js";
-import { indexByDay, zoomWeekTarget, zoomMonthTarget, isMidStay, stayLabel, pickDayIcon,
+import { indexByDay, eventsOn, isMidStay, stayLabel, pickDayIcon,
   shouldLoadMore, nextCount, iconsOf, searchEvents, shortDate, pastMonths, gesture, lastEventDay,
-  fullPastWeeks, fullPastMonths, backToTodayState, todaysCount as cmTodaysCount, hideCancelled,
-  hasLoadedOlder, hasOpenTodos, gridDots } from "./cal-model.js";
+  fullPastWeeks, fullPastMonths, todaysCount as cmTodaysCount, hideCancelled,
+  hasOpenTodos, gridDots } from "./cal-model.js";
 import { openLevel, sheetOpen } from "./sheet.js";
 import { ICON } from "./chrome-icons.js";
 import { iconFor } from "./icons.js";
@@ -27,12 +27,13 @@ const DOW = ["MON", "TUE", "WED", "THU", "FRI", "SAT", "SUN"];
 export const VIEWS = ["grid", "agenda"];
 
 /* Transient UI state: not persisted, reset when the app opens. The defaults
-   come from Settings. */
+   come from Settings. The main view always opens on today and never holds
+   the past: that is the Archive's job. */
 const S = {
   view: null, detail: null, fromView: null, slide: "",
-  past: { grid: 0, agenda: 0 }, future: { grid: 15, agenda: 10 },
-  searchOpen: false, query: "",
-  scrollTo: null, keepAnchor: false, pending: false,
+  future: { grid: 15, agenda: 10 },
+  searchOpen: false, query: "", qCaret: null,
+  scrollTo: null, pending: false,
   /* older years, loaded on demand for search: the oldest year fetched from
      kave-hub, and whether it has anything older still */
   floor: null, exhausted: false,
@@ -44,16 +45,17 @@ const S = {
    loading and no category/detail filtering (Isa: "all events, no filters").
    It draws with the exact same gridMonth/weekBlocks machinery as the main
    view (frame is swapped for the duration of the draw, see archiveFrame),
-   so grid and agenda look identical in and out of Archive. */
-const AR = { open: false, view: null, floor: null, exhausted: false, loading: false, keepAnchor: false };
+   so grid and agenda look identical in and out of Archive. `hist` is true
+   while its history entry is on the stack, so phone Back closes it. */
+const AR = { open: false, view: null, floor: null, exhausted: false, loading: false, hist: false };
 
 let ctx = null;          // { data, render, isCalendar, sync }
 let frame = null;        // what this draw is built from; rebuilt every draw
 
 function prefs() {
-  const s = store.state.settings;
-  if (!S.view) S.view = VIEWS.includes(s.defaultView) ? s.defaultView : "grid";
-  if (!S.detail) S.detail = ["full", "partial", "minimal"].includes(s.defaultDetail) ? s.defaultDetail : "full";
+  const s = store.state.settings, p = readPrefs(s);
+  if (!S.view) S.view = p.defaultView;
+  if (!S.detail) S.detail = p.defaultDetail;
   return { me: s.me };
 }
 
@@ -61,37 +63,36 @@ function buildFrame() {
   const { me } = prefs();
   const today = todayKey();
   const thisYear = today.slice(0, 4);
-  const detailed = applyDetail(ctx.data.events(), me, S.detail);
-  const grey = new Set(detailed.filter((x) => x.grey).map((x) => x.event.id));
+  /* every event at this detail level, cancelled included: what the Day
+     popup lists, whichever view it was opened from */
+  const all = applyDetail(ctx.data.events(), me, S.detail).map((x) => x.event);
   /* F35: Grid hides a cancelled event outright; Agenda keeps it (struck
      through, cls() below). */
-  const events = hideCancelled(detailed.map((x) => x.event), S.view);
+  const events = hideCancelled(all, S.view);
   const idx = indexByDay(events);
   const last = lastEventDay(events);
   if (!S.floor) S.floor = thisYear;
   const range = loadRange(today, last, S.floor);
-  /* onAll: every event at this detail level, before Grid drops cancelled
-     ones; the free-time colouring reads this. */
-  const allIdx = indexByDay(detailed.map((x) => x.event));
-  return { me, today, thisYear, events, idx, grey, range,
-    on: (d) => idx.get(d) || [], onAll: (d) => allIdx.get(d) || [],
-    thisMonday: mondayOf(today), firstMonday: mondayOf(range.min) };
+  return { me, today, thisYear, all, events, idx, range,
+    grey: (e) => isTheirs(e, me),
+    on: (d) => idx.get(d) || [],
+    thisMonday: mondayOf(today) };
 }
 
 /* ---- pieces ---- */
 const icons = (e) => iconsOf(e, frame.me);
 /* What a day shows in Agenda and Grid: an accommodation only on check-in and
    check-out (isMidStay), so the two views agree. The day sheet lists the whole
-   stay on every day, and free-time and trip-city logic still count it. */
+   stay on every day, and trip-city logic still counts it. */
 const visibleOn = (d) => frame.on(d).filter((e) => !isMidStay(e, d));
 /* F35: Agenda keeps a cancelled event visible, title struck through; Grid
    never sees one here at all (hideCancelled in buildFrame). */
-const cls = (e) => `${frame.grey.has(e.id) ? "grey" : ""}${e.status === "idea" ? " idea" : ""}${e.status === "cancelled" ? " cancelled" : ""}`;
+const cls = (e) => `${frame.grey(e) ? "grey" : ""}${e.status === "idea" ? " idea" : ""}${e.status === "cancelled" ? " cancelled" : ""}`;
 
 function row(e, withDate, click, tag = "") {
   const ic = icons(e);
   return `<li class="${cls(e)}" style="--n:${ic.length}"${click ? ` data-act="event" data-id="${esc(e.id)}"` : ""}>`
-    + (withDate ? `<span class="c-d">${esc(shortDate(e.start, frame.thisYear))}</span>` : "")
+    + (withDate ? `<span class="c-d">${esc(shortDate(e.start))}</span>` : "")
     + `<span class="c-i">${ic.map(esc).join("")}</span>${tag
       ? `<span class="c-t has-tag"><span class="c-name">${esc(e.title)}</span><span class="c-tag">&nbsp;&middot; ${esc(tag)}</span></span>`
       : `<span class="c-t">${esc(e.title)}</span>`}`
@@ -100,9 +101,8 @@ function row(e, withDate, click, tag = "") {
 const list = (items, dated) => (items ? `<ul class="rows${dated ? " dated" : ""}">${items}</ul>` : "");
 export const rows = (evs, dated, click) => list(evs.map((e) => row(e, dated, click)).join(""), dated);
 
-/* ---- Today: a bare anchor between the past and the future, which Back to
-   today and onScroll's visibility check scroll to. ---- */
-const place = (e) => [e.venue, e.city && e.city[0].toUpperCase() + e.city.slice(1)].filter(Boolean).join(", ");
+/* ---- Today: a bare anchor at the top of the list, which Back to today and
+   the first draw scroll to. ---- */
 function todayAnchor() {
   return `<span id="today" aria-hidden="true"></span>`;
 }
@@ -144,10 +144,9 @@ function periodState(d) {
    cards"). Every day still shows, never skipped, never a "Nothing planned"
    line -- an empty day is just a day card with nothing in it. Black
    (var(--panel)), same as Grid's own square; a weekend gets the branding's
-   own card grey (--surface-2) instead, unconditionally -- Clear/Open and
-   today still win over it, same priority as before. data-week carries the
-   week's Monday on every one of its days (not a separate wrapper), so a
-   jump target still has something to scroll to. */
+   own card grey (--surface-2) instead, unconditionally -- today still wins
+   over it. data-week carries the week's Monday on every one of its days
+   (not a separate wrapper), so the height rule below can group a week. */
 /* Top-left the weekday, top-right the day and month, plain empty space
    between the two (no rule, no dots); the month only shows here, not just
    once per section, because a week now routinely breaks across two of
@@ -227,16 +226,16 @@ function equalizeAgendaHeights(root) {
    month its Thursday happened to land in. cur tracks the last month
    heading actually drawn, across every week in this run, so a month
    heading appears exactly once, right before its first day, even when
-   that's day 3 of a week already under way. The week itself -- freeDays,
-   the long-weekend note, data-week for spacing/grouping -- stays whole;
-   only which heading a day falls under is per-day. */
+   that's day 3 of a week already under way. The week itself (data-week,
+   for the height rule's grouping) stays whole; only which heading a day
+   falls under is per-day. */
 function weekBlocks(from, count) {
   let out = "", cur = "";
   for (let m = from, i = 0; i < count && m <= frame.range.max; i++, m = addDays(m, 7)) {
     /* Only the week underway trims to today -- Isa: Agenda opens on today
-       at the top, but "load older" must still reveal real past weeks in
-       full, not empty cards (m !== frame.thisMonday is always entirely in
-       the past or entirely in the future here, never split by today). */
+       at the top, but the Archive must still show real past weeks in full,
+       not empty cards (m !== frame.thisMonday is always entirely in the
+       past or entirely in the future here, never split by today). */
     const days = [0, 1, 2, 3, 4, 5, 6].map((k) => addDays(m, k)).filter((d) => m !== frame.thisMonday || d >= frame.today);
     for (const d of days) {
       const ym = d.slice(0, 7);
@@ -246,11 +245,7 @@ function weekBlocks(from, count) {
   }
   return out;
 }
-function weeks() {
-  const from = addDays(frame.thisMonday, -7 * S.past.agenda);
-  return { past: weekBlocks(from, S.past.agenda),
-    future: weekBlocks(frame.thisMonday, S.future.agenda) };
-}
+const weeks = () => weekBlocks(frame.thisMonday, S.future.agenda);
 
 /* ---- Grid: a real Monday-first month grid, one card per month ---- */
 const ymOf = (y, mo) => `${y}-${String(mo + 1).padStart(2, "0")}`;
@@ -279,14 +274,13 @@ function gridIcon(d) {
   const evs = visibleOn(d);
   const best = pickDayIcon(evs, d);
   if (!best) return { emo: "", dots: "" };
-  const grey = best.e.owner !== frame.me && best.e.owner !== "shared";
   /* one dot per event beyond the one the emoji stands for, top right beside
      the day number; gridDots (cal-model.js, tested) says how many fit. The
      day sheet has the full list. */
   const g = gridDots(evs.length - 1);
   const dots = g.dots || g.plus
     ? `<span class="ddots" aria-label="${evs.length} events">${"<i></i>".repeat(g.dots)}${g.plus ? "<b>+</b>" : ""}</span>` : "";
-  return { emo: `<span class="emo${grey ? " grey" : ""}">${esc(iconFor(best.a, best.e, frame.me))}</span>`, dots };
+  return { emo: `<span class="emo${frame.grey(best.e) ? " grey" : ""}">${esc(iconFor(best.a, best.e, frame.me))}</span>`, dots };
 }
 function gridSquare(d) {
   if (!d) return `<div class="dsq pad"></div>`;
@@ -295,7 +289,6 @@ function gridSquare(d) {
      cards work the same way, agendaDay above): it is also the entry point
      for the day-swipe browser in sheet.js, which needs to be able to land
      on a day with nothing on it. */
-  /* The long-weekend 🔍 is Agenda's alone: a Grid square stays quiet. */
   const weekend = dayOfWeek(d) >= 5 ? " weekend" : "";
   const holBorder = holidayOn(d) && !weekend ? " holiday-border" : "";
   /* All the info sits on the top edge: the day number left, the event dots
@@ -316,15 +309,12 @@ function gridMonth(y, mo) {
 }
 function grid() {
   const y0 = Number(frame.thisYear), m0 = Number(frame.today.slice(5, 7)) - 1;
-  const shown = pastMonths(frame.today, S.floor, S.past.grid);
-  let past = "";
-  for (const ym of shown) past += gridMonthHead(ym + "-01") + gridMonth(Number(ym.slice(0, 4)), Number(ym.slice(5, 7)) - 1);
-  let future = "";
+  let out = "";
   for (let y = y0, mo = m0, n = 0; ymOf(y, mo) + "-01" <= frame.range.max && n < S.future.grid; n++) {
-    future += gridMonthHead(ymOf(y, mo) + "-01") + gridMonth(y, mo);
+    out += gridMonthHead(ymOf(y, mo) + "-01") + gridMonth(y, mo);
     if (++mo === 12) { mo = 0; y++; }
   }
-  return { past, future };
+  return out;
 }
 function yearlyCap() {
   const [y, m] = frame.range.max.split("-").map(Number), [y0, m0] = frame.today.split("-").map(Number);
@@ -332,13 +322,17 @@ function yearlyCap() {
 }
 const weeksCap = () => Math.round((Date.parse(frame.range.max) - Date.parse(frame.thisMonday)) / 6048e5) + 1;
 
-function searchPage() {
-  const hits = searchEvents(frame.events, S.query);
+/* Search looks through every event loaded -- any detail level, any view,
+   cancelled ones included (struck through) -- as its field promises. */
+function searchResults() {
   if (!S.query.trim()) return '<p class="hint">Type a name, a place or a guest.</p>';
+  const hits = searchEvents(ctx.data.events(), S.query);
   return `<p class="hint">${hits.length} result${hits.length === 1 ? "" : "s"}</p>${hits.length ? `<div class="card">${rows(hits, true, true)}</div>` : ""}`;
 }
 
-/* The years a draw touches: they load on demand, once each. */
+/* The years a draw touches: they load on demand, once each. Asked after the
+   draw, never during it: ensureYear notifies (and so redraws) before its
+   first await, which from here would start a second draw inside this one. */
 const asked = new Set();
 function ensureYears() {
   const want = new Set([frame.thisYear, String(Number(frame.thisYear) + 1)]);
@@ -346,13 +340,14 @@ function ensureYears() {
   else want.add(addDays(frame.thisMonday, 7 * S.future[S.view]).slice(0, 4));
   for (const y of want) if (!asked.has(y) && y <= frame.range.max.slice(0, 4)) {
     asked.add(y);
-    ctx.data.ensureYear(y).catch(() => { /* offline or no token: the cache is shown; Settings says why */ });
+    Promise.resolve().then(() => ctx.data.ensureYear(y))
+      .catch(() => { /* offline or no token: the cache is shown; Settings says why */ });
   }
 }
 
-/* ---- the tab: the control row (it scrolls with the page), then the view
-   between its past and future halves, with the Today anchor between them.
-   The swipe animation moves only .content, never the controls. ---- */
+/* ---- the tab: the control row (it scrolls with the page), then the view,
+   from today on. The swipe animation moves only .content, never the
+   controls. ---- */
 /* F34: the swipe animation now applies only to .content (the list), not
    the whole .page -- the controls stay put; only the view toggle's own
    .seg-thumb (its own transform/animation, untouched) visibly slides to its
@@ -360,47 +355,32 @@ function ensureYears() {
 export function calendarHtml() {
   frame = buildFrame();
   ensureYears();
-  if (S.searchOpen) return `<div class="page">${controls()}${searchPage()}</div>`;
+  if (S.searchOpen) return `<div class="page">${controls()}<div id="sres">${searchResults()}</div></div>`;
   const v = S.view === "grid" ? grid() : weeks();
-  return `<div class="page">${controls()}<div class="content ${S.slide}">${v.past}${todayAnchor()}${v.future}</div></div>`;
+  return `<div class="page">${controls()}<div class="content ${S.slide}">${todayAnchor()}${v}</div></div>`;
 }
 
 /* After the tab's HTML is in place: scroll, focus, clear one-shot state. */
 export function afterCalendar(mn, before) {
-  if (S.view === "agenda") equalizeAgendaHeights(mn);
-  if (S.keepAnchor) mn.scrollTop = before.top + (mn.scrollHeight - before.height);
-  else if (S.scrollTo) { const t = mn.querySelector(S.scrollTo); if (t) t.scrollIntoView({ block: "start" }); }
+  if (S.view === "agenda" && !S.searchOpen) equalizeAgendaHeights(mn);
+  if (S.scrollTo) { const t = mn.querySelector(S.scrollTo); if (t) t.scrollIntoView({ block: "start" }); }
   else if (before.first) { const t = mn.querySelector("#today"); if (t) t.scrollIntoView({ block: "start" }); }
   else mn.scrollTop = before.top;
   const q = mn.querySelector("#q");
-  if (q) { q.focus(); q.setSelectionRange(q.value.length, q.value.length); q.addEventListener("input", () => { S.query = q.value; ctx.render(); }); }
-  S.slide = ""; S.fromView = null; S.scrollTo = null; S.keepAnchor = false;
-  onScroll();
-}
-
-/* ---- the up and down buttons share one slot above "+" and never show
-   together: up once today has scrolled out above the view, down while today
-   is still below it. Measured on screen, because an animation's transform
-   throws offsetTop off. ---- */
-export function onScroll() {
-  const mn = document.getElementById("view"), t = document.getElementById("today");
-  const up = document.querySelector(".fab.up"), down = document.querySelector(".fab.down");
-  if (!mn || !up || !down) return;
-  if (!t) { up.classList.remove("show"); down.classList.remove("show"); return; }
-  const r = t.getBoundingClientRect(), box = mn.getBoundingClientRect();
-  const top = Math.max(box.top, 0), bottom = Math.min(box.bottom, window.innerHeight);
-  const pastTop = r.bottom <= top + 60;    // today has scrolled up and out: show up (back to top)
-  const pastBottom = r.top >= bottom;      // today is still below the fold: show down (jump to today)
-  up.classList.toggle("show", pastTop);
-  down.classList.toggle("show", !pastTop && pastBottom);
-}
-
-/* F28: the up button -- scrolls back to the top of the list, revealing the
-   (now non-floating) controls again. */
-export function scrollToTop() {
-  const mn = document.getElementById("view");
-  if (!mn) return;
-  mn.scrollTo({ top: 0, behavior: matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth" });
+  if (q) {
+    /* Typing redraws the results only, never the field: a rebuilt field
+       loses the cursor (it jumped to the end) and breaks a phone's
+       predictive and dictated input mid-word. A full redraw (new data)
+       puts the cursor back where it was. */
+    const at = S.qCaret == null ? q.value.length : Math.min(S.qCaret, q.value.length);
+    q.focus(); q.setSelectionRange(at, at);
+    q.addEventListener("input", () => {
+      S.query = q.value; S.qCaret = q.selectionStart;
+      const r = mn.querySelector("#sres");
+      if (r) r.innerHTML = searchResults();
+    });
+  }
+  S.slide = ""; S.fromView = null; S.scrollTo = null;
 }
 
 /* Only a real scroll event calls this, never a draw. */
@@ -413,9 +393,9 @@ function loadMore(mn) {
   setTimeout(() => { S.pending = false; ctx.render(); }, 0);
 }
 
-/* ---- older years on demand (spec: See previous, search, opening an old
-   event). kave-hub is asked for the year before the oldest one shown; an
-   empty or missing year means there is nothing older. ---- */
+/* ---- older years on demand, for Search. kave-hub is asked for the year
+   before the oldest one loaded; an empty or missing year means there is
+   nothing older. ---- */
 let olderInFlight = null;
 function loadOlder() {
   /* a tap while another load runs waits for it instead of being lost (M4) */
@@ -425,7 +405,6 @@ function loadOlder() {
 }
 async function loadOlderOnce() {
   if (S.exhausted) return false;
-  S.loadingOlder = true;
   const y = String(Number(S.floor) - 1);
   try {
     await ctx.data.ensureYear(y);
@@ -436,8 +415,6 @@ async function loadOlderOnce() {
        try again on the next tap */
     if (ctx.data.events().some((e) => e.start.startsWith(y))) { S.floor = y; return true; }
     return false;
-  } finally {
-    S.loadingOlder = false;
   }
 }
 async function loadAllOlder() {
@@ -453,11 +430,10 @@ async function loadAllOlder() {
    It draws with the same gridMonth/weekBlocks the main view uses, against
    a swapped-in frame, so both look identical. */
 function archiveFrame() {
-  const today = todayKey(), thisYear = today.slice(0, 4);
+  const today = todayKey(), thisYear = today.slice(0, 4), me = store.state.settings.me;
   const events = hideCancelled(ctx.data.events(), AR.view);
   const idx = indexByDay(events);
-  return { me: store.state.settings.me, today, thisYear,
-    events, idx, grey: new Set(), on: (d) => idx.get(d) || [], onAll: (d) => idx.get(d) || [],
+  return { me, today, thisYear, events, idx, grey: (e) => isTheirs(e, me), on: (d) => idx.get(d) || [],
     thisMonday: mondayOf(today), range: { max: today } };
 }
 function archiveBody() {
@@ -479,7 +455,10 @@ function archiveHtml() {
     + '<div class="stitle-wrap"><h2 class="stitle" id="archtitle">Archive</h2></div></header>'
     + `<div class="sstage"><div class="sbody archive-body">${more}${body}</div></div></section>`;
 }
-function renderArchive() {
+/* keep: "bottom" (first open: the newest past at the bottom), "anchor"
+   (older content added above: stay on what was in view), "place" (a redraw
+   for new data: stay exactly where the reader was) */
+function renderArchive(keep = "bottom") {
   const root = document.getElementById("archiveRoot");
   if (!root) return;
   if (!AR.open) { root.innerHTML = ""; return; }
@@ -488,19 +467,28 @@ function renderArchive() {
   root.innerHTML = archiveHtml();
   const fresh = root.querySelector(".archive-body");
   if (fresh && AR.view === "agenda") equalizeAgendaHeights(fresh);
-  if (fresh) fresh.scrollTop = AR.keepAnchor && before ? before.top + (fresh.scrollHeight - before.height) : fresh.scrollHeight;
-  AR.keepAnchor = false;
+  if (fresh) fresh.scrollTop = !before || keep === "bottom" ? fresh.scrollHeight
+    : keep === "anchor" ? before.top + (fresh.scrollHeight - before.height) : before.top;
 }
+/* render() calls this after every draw: a sync landing while the Archive is
+   open shows in it. */
+export function refreshArchive() { if (AR.open) renderArchive("place"); }
 export function openArchive() {
   if (!frame) return;
-  Object.assign(AR, { open: true, view: S.view, floor: frame.thisYear, exhausted: false, loading: false, keepAnchor: false });
+  Object.assign(AR, { open: true, view: S.view, floor: frame.thisYear, exhausted: false, loading: false, hist: false });
+  try { history.pushState({ compassArchive: true }, ""); AR.hist = true; } catch { /* sandboxed host */ }
   renderArchive();
 }
-function closeArchive() { AR.open = false; renderArchive(); }
+/* Close by going back through the Archive's own history entry, so phone
+   Back and the close tap leave the same history; popstate does the close. */
+function closeArchive() {
+  if (AR.hist) { try { history.back(); return; } catch { /* fall through */ } }
+  AR.open = false; AR.hist = false; renderArchive();
+}
 async function loadMoreArchive() {
   if (AR.loading || AR.exhausted) return;
   AR.loading = true;
-  renderArchive();
+  renderArchive("place");
   const y = String(Number(AR.floor) - 1);
   try {
     await ctx.data.ensureYear(y);
@@ -509,8 +497,7 @@ async function loadMoreArchive() {
     if (ctx.data.events().some((e) => e.start.startsWith(y))) AR.floor = y;
   } finally {
     AR.loading = false;
-    AR.keepAnchor = true;
-    renderArchive();
+    renderArchive("anchor");
   }
 }
 function archiveClick(e) {
@@ -519,24 +506,25 @@ function archiveClick(e) {
   const a = b.dataset.act;
   if (a === "archiveclose") closeArchive();
   else if (a === "archivemore") loadMoreArchive();
-  else if (a === "day") openLevel({ kind: "day", d: b.dataset.d });
-  else if (a === "week") openLevel({ kind: "week", m: b.dataset.m });
-  else if (a === "event") { e.stopPropagation(); openLevel({ kind: "event", id: b.dataset.id }); }
+  /* archive: the Day popup lists every event, like the Archive itself */
+  else if (a === "day") openLevel({ kind: "day", d: b.dataset.d, archive: true });
   else return;
   e.preventDefault();
 }
 
-function setView(v, target) {
-  if (v === S.view && !target) return;
-  S.slide = VIEWS.indexOf(v) > VIEWS.indexOf(S.view) ? "slide-left" : v === S.view ? "" : "slide-right";
+function setView(v) {
+  if (v === S.view) return;
+  S.slide = VIEWS.indexOf(v) > VIEWS.indexOf(S.view) ? "slide-left" : "slide-right";
   S.fromView = S.view; S.view = v;
-  if (target) {
-    const need = Math.round((Date.parse(frame.thisMonday) - Date.parse(target)) / 6048e5);
-    if (need > 0) S.past[v] = Math.max(S.past[v], need + 1);
-    S.future[v] = Math.max(S.future[v], -need + 12);
-    S.scrollTo = `[data-week="${target}"]`;
-  }
   ctx.render();
+}
+
+/* One day's events for the Day popup: every event on the day at this
+   detail level, cancelled included, whichever view it was opened from; from
+   the Archive, every event with no detail filtering (as the Archive). */
+export function dayEvents(d, archive) {
+  if (archive) return eventsOn(ctx.data.events(), d);
+  return frame ? eventsOn(frame.all, d) : [];
 }
 
 /* F3: the nav icon's badge. Independent of whatever view is drawn (the
@@ -544,10 +532,9 @@ function setView(v, target) {
    reads straight from the data instance rather than the last-built frame. */
 export function todaysCount() {
   if (!ctx || !store.state.settings.me) return 0;
-  const detail = S.detail || (["full", "partial", "minimal"].includes(store.state.settings.defaultDetail) ? store.state.settings.defaultDetail : "full");
+  const detail = S.detail || readPrefs(store.state.settings).defaultDetail;
   const today = todayKey();
-  const idx = indexByDay(ctx.data.events());
-  return cmTodaysCount(idx.get(today) || [], store.state.settings.me, detail);
+  return cmTodaysCount(eventsOn(ctx.data.events(), today), store.state.settings.me, detail, today);
 }
 
 function onClick(e) {
@@ -560,37 +547,23 @@ function onClick(e) {
   if (a === "view") setView(b.dataset.v);
   else if (a === "today") backToToday();
   else if (a === "addnew") ctx.add();
-  else if (a === "search") { S.searchOpen = true; ctx.render(); loadAllOlder(); }
+  else if (a === "search") { S.searchOpen = true; S.qCaret = null; ctx.render(); loadAllOlder(); }
   else if (a === "closesearch") { S.searchOpen = false; S.query = ""; ctx.render(); }
-  /* F29: "load older" is now one of the inline control buttons, not a
-     floating round button; it now opens the Archive popup (F6/F7's
-     "load straight to 1 January" idea lives on inside it). */
-  else if (a === "zoomweek") { e.stopPropagation(); setView("agenda", zoomWeekTarget(b.dataset.m)); }
-  else if (a === "zoommonth") setView("agenda", zoomMonthTarget(b.dataset.ym));
   else if (a === "day") openLevel({ kind: "day", d: b.dataset.d });
-  else if (a === "week") openLevel({ kind: "week", m: b.dataset.m });
   else if (a === "event") { e.stopPropagation(); openLevel({ kind: "event", id: b.dataset.id }); }
   else return;
   e.preventDefault();
 }
 
-/* F7/F28: the down button -- jumps to today and discards whatever earlier
-   data "load older" pulled in, so the list is back to its normal range and
-   pull to refresh (F53) works again. */
+/* Back to today: the list opens on today, so this is a scroll to it. */
 export function backToToday() {
   const t = document.getElementById("today");
-  if (frame && hasLoadedOlder(S.past)) {
-    Object.assign(S, backToTodayState(frame.thisYear));
-    S.scrollTo = "#today";
-    ctx.render();
-    return;
-  }
   if (t) t.scrollIntoView({ block: "start", behavior: matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth" });
 }
 
 /* Things the sheet needs to draw its levels, from the same frame. */
 export const frameNow = () => frame;
-export const detailGrey = (e) => !!frame && frame.grey.has(e.id);
+export const detailGrey = (e) => !!frame && frame.grey(e);
 
 /* Settings changed a default: the Calendar opens on it next time it draws. */
 export function resetCalendarDefaults() { S.view = null; S.detail = null; }
@@ -605,14 +578,23 @@ export function closeMenus() {
 export function initCalendar(c) {
   ctx = c;
   const mn = document.getElementById("view");
-  mn.addEventListener("scroll", () => { onScroll(); if (ctx.isCalendar()) loadMore(mn); }, { passive: true });
-  window.addEventListener("scroll", onScroll, { passive: true });
+  mn.addEventListener("scroll", () => { if (ctx.isCalendar()) loadMore(mn); }, { passive: true });
   document.addEventListener("click", onClick);
   const ar = document.getElementById("archiveRoot");
   if (ar) ar.addEventListener("click", archiveClick);
+  /* The Archive's history entry: landing anywhere below it (phone Back,
+     browser Back, or closeArchive's own history.back) closes it. A sheet
+     level opened over the Archive sits above it, so Back closes that
+     first. */
+  window.addEventListener("popstate", () => {
+    if (!AR.open || !AR.hist) return;
+    const st = history.state;
+    if (st && (st.compassArchive || st.compassLevel)) return;
+    AR.open = false; AR.hist = false; renderArchive();
+  });
 
   /* Gestures: swipe the list sideways to change view; pull down at the top
-     (or wheel up) to reveal See previous. */
+     (or wheel up) to sync. */
   /* Mouse and pen use pointer events. A finger uses touch events: when a
      touch starts to scroll, the browser cancels the pointer and never sends
      pointerup, so a pull would never register on a phone (final review I6). */
@@ -620,15 +602,12 @@ export function initCalendar(c) {
   const start = (x, y) => { g = ctx.isCalendar() && !sheetOpen() ? { x, y, top: mn.scrollTop <= 0 } : null; };
   const end = (x, y) => {
     if (!g) return;
-    const act = gesture({ dx: x - g.x, dy: y - g.y, top: g.top, searching: S.searchOpen, loadedOlder: hasLoadedOlder(S.past) });
+    const act = gesture({ dx: x - g.x, dy: y - g.y, top: g.top, searching: S.searchOpen });
     g = null;
     if (act === "next" || act === "prev") {
       const i = VIEWS.indexOf(S.view) + (act === "next" ? 1 : -1);
       if (i >= 0 && i < VIEWS.length) { swallowClick(); setView(VIEWS[i]); }
     } else if (act === "pull") {
-      /* F53: only reachable once the true top is today's own range again
-         (gesture() itself refuses to arm otherwise); the down button (F28)
-         is what gets a person back here after loading older data. */
       ctx.sync();
     }
   };
@@ -636,9 +615,9 @@ export function initCalendar(c) {
   document.addEventListener("pointerup", (e) => { if (e.pointerType !== "touch") end(e.clientX, e.clientY); });
   mn.addEventListener("touchstart", (e) => { if (e.touches.length === 1) start(e.touches[0].clientX, e.touches[0].clientY); }, { passive: true });
   mn.addEventListener("touchend", (e) => { const t = e.changedTouches[0]; if (t) end(t.clientX, t.clientY); }, { passive: true });
-  /* F53: a wheel "pull" (desktop) obeys the same true-top rule. */
+  /* a wheel "pull" (desktop) obeys the same top rule */
   mn.addEventListener("wheel", (e) => {
-    if (ctx.isCalendar() && mn.scrollTop <= 0 && !hasLoadedOlder(S.past) && e.deltaY < -30 && !S.searchOpen) ctx.sync();
+    if (ctx.isCalendar() && mn.scrollTop <= 0 && e.deltaY < -30 && !S.searchOpen) ctx.sync();
   }, { passive: true });
 }
 
@@ -648,5 +627,3 @@ function swallowClick() {
   document.addEventListener("click", eat, { capture: true, once: true });
   setTimeout(() => document.removeEventListener("click", eat, { capture: true }), 400);
 }
-
-export { place };

@@ -14,7 +14,7 @@ import { escapeHtml, copyText } from "./util.js";
 import { PALETTES, applyPalette, themeBootRan, paletteAccents, paletteSofts } from "./theme.js";
 import { status as syncStatus, checkToken } from "./sync.js";
 import { ICON } from "./chrome-icons.js";
-import { calendarHtml, afterCalendar, onScroll, backToToday, todaysCount } from "./calendar.js";
+import { calendarHtml, afterCalendar, backToToday, todaysCount, refreshArchive } from "./calendar.js";
 import { refreshSheet, openLevel, registerLevel } from "./sheet.js";
 import { readPrefs, defaultsSummary, VIEW_NAMES, DETAIL_NAMES, toggleWeekdayHeader } from "./prefs.js";
 import { CATEGORIES, iconFor } from "./icons.js";
@@ -190,7 +190,6 @@ export function render() {
     main.classList.remove("is-cal");
     main.innerHTML = gateHtml(step);
     document.getElementById("nav").innerHTML = "";
-    document.getElementById("fabs").innerHTML = "";
     bindGate(main, { onToken: () => { if (actions.sync) actions.sync(); } });
     return;
   }
@@ -200,12 +199,11 @@ export function render() {
     : current === "calendar" ? calendarHtml() : renderStub(current);
   main.classList.toggle("is-cal", current === "calendar");
   document.getElementById("nav").innerHTML = renderNav();
-  /* No floating buttons any more: Today and "+" sit in the Calendar's own
-     control row (calendar.js controls()). */
-  document.getElementById("fabs").innerHTML = "";
+  /* No floating buttons any more (#fabs stays empty): Today and "+" sit in
+     the Calendar's own control row (calendar.js controls()). */
   if (current === "calendar") { afterCalendar(main, before); firstDraw = false; }
-  else onScroll();
   refreshSheet();
+  refreshArchive();
   bindView();
 }
 

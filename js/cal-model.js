@@ -4,7 +4,6 @@
 "use strict";
 
 import { addDays, dayOfWeek, mondayOf, daysOf } from "./dates.js";
-import { firstWeekOf } from "./views.js";
 import { CATEGORIES, iconFor } from "./icons.js";
 import { applyDetail } from "./filter.js";
 import { statusOf } from "./model.js";
@@ -12,9 +11,8 @@ import { statusOf } from "./model.js";
 const DOW = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
 
 /* "Mon 21": weekday and day of the month only. Every card already names its
-   own month and year, so the line does not repeat them. `thisYear` stays in
-   the signature because every caller passes it. */
-export function shortDate(day, thisYear) {
+   own month and year, so the line does not repeat them. */
+export function shortDate(day) {
   return `${DOW[dayOfWeek(day)]} ${Number(day.slice(8))}`;
 }
 
@@ -45,12 +43,10 @@ export function indexByDay(events) {
   return new Map([...idx.entries()].sort((a, b) => (a[0] < b[0] ? -1 : 1)));
 }
 
-/* Empty is blank and cannot be tapped (spec: day cards, week cards, rows). */
-export const tappable = (events) => events.length > 0;
-
-/* Jumps land the target week at the top of Agenda. */
-export const zoomWeekTarget = (day) => mondayOf(day);
-export const zoomMonthTarget = (ym) => firstWeekOf(ym);
+/* One day's events, in day order, without indexing every day of every
+   event: what the Day popup and the nav badge need. */
+const covers = (e, d) => !e.deleted && e.start <= d && lastDay(e) >= d;
+export const eventsOn = (events, d) => indexByDay(events.filter((e) => covers(e, d))).get(d) || [];
 
 const has = (e, types) => (e.activities || []).some((a) => types.includes(a.type));
 /* The "who is away" categories. Exported: Grid ranks a day's emoji by it. */
@@ -131,11 +127,6 @@ export function tripCityFor(events, date) {
 /* F22: the form's actual default -- Barcelona, unless a trip's city wins. */
 export const defaultCity = (events, date) => tripCityFor(events, date) || "barcelona";
 
-export function awayText(e, thisYear) {
-  const who = e.owner === "shared" ? e.title : `${e.owner === "isa" ? "Isa" : "Hugo"} in ${e.title}`;
-  return `${who}, ${shortDate(e.start, thisYear)} to ${shortDate(lastDay(e), thisYear)}`;
-}
-
 /* Load more only on a real scroll of a list that actually scrolls, near its
    bottom, never past the range. A host that lets the page grow to full
    height makes "near the bottom" always true; loading from a draw there
@@ -148,25 +139,15 @@ export function shouldLoadMore(box, { count, cap, pending, searching }) {
 export const nextCount = (count, step, cap) => Math.min(cap, count + step);
 
 /* One rule for a finished drag, mouse or touch: a clear sideways swipe
-   changes view, a pull down from the very top reveals See previous (and
-   syncs); anything else is an ordinary scroll. F53: "the very top" only
-   counts as the true top -- scrollTop<=0 alone is not enough once "load
-   older" (F6/F29) has pulled earlier data in, because scrollTop 0 then sits
-   at the start of THAT older content, not at today's normal range. A pull
-   there must not arm; the down button (F28) is what collapses it back, and
-   only after that does a pull at the visual top mean anything again. */
-export function gesture({ dx, dy, top, searching, loadedOlder }) {
+   changes view, a pull down from the very top syncs; anything else is an
+   ordinary scroll. (The main view never holds past weeks any more -- the
+   Archive does -- so its top is always today's.) */
+export function gesture({ dx, dy, top, searching }) {
   if (searching) return null;
   if (Math.abs(dx) > 70 && Math.abs(dx) > 1.5 * Math.abs(dy)) return dx < 0 ? "next" : "prev";
-  if (top && !loadedOlder && dy > 60 && Math.abs(dy) > Math.abs(dx)) return "pull";
+  if (top && dy > 60 && Math.abs(dy) > Math.abs(dx)) return "pull";
   return null;
 }
-
-/* F53: whether the currently loaded content's visual top is still today's
-   normal range, or whether "load older" has moved it -- the same state
-   backToTodayState resets. Pure so gesture()'s arming condition and the
-   down button's own "is there anything to collapse" both read one answer. */
-export const hasLoadedOlder = (past) => Object.values(past).some(Boolean);
 
 /* Grid's past months, oldest first: the last `count` months before this
    one, never before January of the floor year. */
@@ -191,20 +172,14 @@ export function fullPastMonths(today, floorYear) {
   return pastMonths(today, floorYear, 9999).length;
 }
 
-/* F7: "Back to today" discards whatever earlier years were loaded, so the
-   list is back to its normal range (this year on) and pull to refresh works
-   again -- the bug was old, loaded years sitting in the DOM state. */
-export function backToTodayState(thisYear) {
-  return { past: { grid: 0, agenda: 0 }, floor: thisYear, exhausted: false };
-}
-
-/* F3: the Calendar nav icon's badge. Minimal shows only the viewer's own
-   (and shared) events today; Partial and Full show both people's -- exactly
-   applyDetail's own "minimal drops theirs" rule, reused rather than
-   reinvented. `eventsToday` is undeduped by span (indexByDay already gives
-   one entry per day). */
-export function todaysCount(eventsToday, me, detail) {
-  return applyDetail(eventsToday.filter((e) => !e.deleted), me, detail).length;
+/* F3: the Calendar nav icon's badge: what the views show on `day`. Minimal
+   shows only the viewer's own (and shared) events; Partial and Full show
+   both people's -- applyDetail's own rule, reused. A cancelled event and
+   the middle nights of a stay are not counted: no view shows them on the
+   day. */
+export function todaysCount(eventsToday, me, detail, day) {
+  const shown = eventsToday.filter((e) => !e.deleted && e.status !== "cancelled" && !isMidStay(e, day));
+  return applyDetail(shown, me, detail).length;
 }
 
 /* The emoji for an event, drawn for this viewer. A dated idea shows ❔. */
@@ -232,12 +207,6 @@ export function guestsExcludingViewer(guests, viewerName) {
     .map((g) => g.trim())
     .filter((g) => g && g.toLowerCase() !== vn)
     .join(", ");
-}
-
-/* The line under an event's title in the day sheet: guests alone, or
-   empty. Never the status, which the pill above already shows. */
-export function statusGuestsLine(guestsText) {
-  return guestsText || "";
 }
 
 const fold = (s) => String(s || "").toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");

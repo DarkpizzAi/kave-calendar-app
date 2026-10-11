@@ -1,5 +1,5 @@
 import { test, eq, ok, throws } from "./run.js";
-import { CATEGORIES, toCents, formatCents, shareOf, visibleCosts, newCostLine, setCostAmount } from "../js/money.js";
+import { CATEGORIES, toCents, formatCents, shareOf, visibleCosts, newCostLine } from "../js/money.js";
 
 const NOW = new Date("2026-09-24T10:00:00Z");
 
@@ -35,11 +35,9 @@ test("newCostLine records typed evidence", () => {
   eq([l.state, l.currency, l.evidence.length, l.evidence[0].kind, l.evidence[0].amount], ["recorded", "EUR", 1, "typed", 18000]);
   ok(l.id.startsWith("co_"));
 });
-test("setCostAmount appends evidence; a locked line refuses", async () => {
-  const l = newCostLine({ category: "food/eating-out", payer: "isa", amount: 5000, scope: "personal", me: "isa", now: NOW });
-  const l2 = setCostAmount(l, 5200, "isa", NOW);
-  eq([l2.amount, l2.evidence.length], [5200, 2]);
-  await throws(() => setCostAmount({ ...l2, state: "locked" }, 1, "isa", NOW), "locked");
+test("review: formatCents never throws on a currency it does not know, or none", () => {
+  eq(formatCents(1850, "XYZ1"), "18,50 XYZ1");
+  eq(formatCents(1850, null).replace(/\s/g, " "), "18,50 €", "none reads as euros");
 });
 test("A cannot create confirmed or locked lines", async () => {
   await throws(() => newCostLine({ category: "travel/flights", payer: "isa", amount: 1, scope: "shared", state: "locked", me: "isa", now: NOW }));

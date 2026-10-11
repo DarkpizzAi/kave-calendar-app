@@ -1,19 +1,11 @@
 import { test, eq, ok } from "./run.js";
-import { isoWeek, monthOfWeek, firstWeekOf, loadRange } from "../js/views.js";
+import { loadRange } from "../js/views.js";
 import { applyDetail } from "../js/filter.js";
 import { CATEGORIES, iconFor, onlyIcon, categoryOf } from "../js/icons.js";
 import { HOLIDAYS, STATUS, isProvisional } from "../js/holidays.js";
 
 const ev = (id, s, extra = {}) => ({ id, title: id, start: s, end: null, owner: "shared", activities: [], ...extra });
 
-/* ---- weeks ---- */
-test("ISO week numbers", () => {
-  eq([isoWeek("2026-09-21"), isoWeek("2026-01-01"), isoWeek("2027-01-03"), isoWeek("2026-12-28")], [39, 1, 53, 53]);
-});
-test("a week belongs to the month holding its Thursday", () => {
-  eq([monthOfWeek("2026-09-28"), monthOfWeek("2026-11-30"), monthOfWeek("2026-06-29")], ["2026-10", "2026-12", "2026-07"]);
-  eq([firstWeekOf("2026-10"), firstWeekOf("2026-12"), firstWeekOf("2027-03")], ["2026-09-28", "2026-11-30", "2027-03-01"]);
-});
 test("load range: 1 January back, end of the year after next forward, or the last event", () => {
   eq(loadRange("2026-09-24", "2026-12-12"), { min: "2026-01-01", max: "2028-12-31" });
   eq(loadRange("2026-09-24", "2029-05-02"), { min: "2026-01-01", max: "2029-05-02" });
@@ -28,7 +20,7 @@ test("holidays: every listed year has a status, and no holiday falls on a Sunday
 });
 
 /* ---- detail levels ---- */
-test("detail levels: full, partial greys the other person, minimal hides them except when away", () => {
+test("detail levels: the other person is greyed at every level, minimal hides them except when away", () => {
   const list = [
     ev("m", "2026-10-01", { owner: "isa" }),
     ev("o", "2026-10-01"),
@@ -36,7 +28,9 @@ test("detail levels: full, partial greys the other person, minimal hides them ex
     ev("trip", "2026-10-01", { owner: "hugo", activities: [{ type: "transport" }] }),
   ];
   eq(applyDetail(list, "isa", "full").map((x) => [x.event.id, x.grey]),
-     [["m", false], ["o", false], ["t", false], ["trip", false]]);
+     [["m", false], ["o", false], ["t", true], ["trip", true]], "Agenda greys like Grid (Isa, 2026-10-11)");
+  eq(applyDetail(list, "isa", "minimal").map((x) => [x.event.id, x.grey]),
+     [["m", false], ["o", false], ["trip", true]]);
   eq(applyDetail(list, "isa", "partial").map((x) => [x.event.id, x.grey]),
      [["m", false], ["o", false], ["t", true], ["trip", true]]);
   eq(applyDetail(list, "isa", "minimal").map((x) => x.event.id), ["m", "o", "trip"],

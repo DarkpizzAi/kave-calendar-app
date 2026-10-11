@@ -35,10 +35,18 @@ export function toCents(text) {
   return Number(m[1]) * 100 + Number(frac.slice(0, 2)) + (Number(frac[2]) >= 5 ? 1 : 0);
 }
 
+/* A currency the browser does not know (or none, from a sweep's line) must
+   not throw: a throw here aborts the event page's draw halfway. It prints
+   as a plain number and the code instead. */
 const FORMATS = {};
 export function formatCents(cents, currency = "EUR") {
-  FORMATS[currency] = FORMATS[currency] || new Intl.NumberFormat("fr-FR", { style: "currency", currency });
-  return FORMATS[currency].format(cents / 100);
+  const code = currency || "EUR";
+  try {
+    FORMATS[code] = FORMATS[code] || new Intl.NumberFormat("fr-FR", { style: "currency", currency: code });
+    return FORMATS[code].format(cents / 100);
+  } catch {
+    return `${(cents / 100).toFixed(2).replace(".", ",")} ${code}`;
+  }
 }
 
 /* Who carries how much of one line. A shared line splits in half; the odd
@@ -63,14 +71,5 @@ export function newCostLine({ category, payer, amount, scope, state = "recorded"
     id: "co_" + uid(), name: String(name || "").trim(), category, payer, scope, amount, currency, state,
     evidence: [{ kind: "typed", amount, currency, by: me, at }],
     enteredBy: me,
-  };
-}
-
-export function setCostAmount(line, amount, me, now) {
-  if (!EDITABLE_STATES.includes(line.state)) throw new Error("this line is " + line.state + " and cannot be edited");
-  if (!Number.isInteger(amount) || amount < 0) throw new Error("amount must be whole cents");
-  return {
-    ...line, amount,
-    evidence: [...line.evidence, { kind: "typed", amount, currency: "EUR", by: me, at: now.toISOString() }],
   };
 }

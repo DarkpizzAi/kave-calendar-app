@@ -1,8 +1,8 @@
 import { test, eq, ok } from "./run.js";
-import { indexByDay, isMidStay, stayRole, stayLabel, pickDayIcon, tappable, zoomWeekTarget, zoomMonthTarget, isAway, awayText,
+import { indexByDay, eventsOn, isMidStay, stayRole, stayLabel, pickDayIcon, isAway,
   shouldLoadMore, nextCount, iconsOf, searchEvents, todaysCount, fullPastWeeks, fullPastMonths,
-  backToTodayState, tripCityFor, defaultCity, hideCancelled,
-  hasOpenTodos, guestsExcludingViewer, statusGuestsLine, rowLinks, shownStatus, gridDots } from "../js/cal-model.js";
+  tripCityFor, defaultCity, hideCancelled,
+  hasOpenTodos, guestsExcludingViewer, rowLinks, shownStatus, gridDots } from "../js/cal-model.js";
 
 const ev = (id, start, extra = {}) => ({ id, title: id, start, end: null, owner: "shared", status: "planned", activities: [], ...extra });
 const act = (type, icon) => ({ type, icon });
@@ -63,23 +63,17 @@ test("cal: the Grid emoji of a day: a visit's first day tops everything, then tr
   eq(pick([ev("plain", "2026-10-29")], "2026-10-29"), "plain");
   eq(pick([], "2026-10-29"), null);
 });
-test("cal: a day or week with nothing cannot be tapped", () => {
-  eq([tappable([]), tappable([ev("a", "2026-10-01")])], [false, true]);
-});
-test("cal: jump targets land on a Monday", () => {
-  eq(zoomWeekTarget("2026-09-24"), "2026-09-21");
-  eq(zoomMonthTarget("2026-10"), "2026-09-28");
-  eq(zoomMonthTarget("2026-11"), "2026-11-02");
+test("review: eventsOn gives one day's events in day order, spans and cancelled included, deleted not", () => {
+  const evs = [ev("late", "2026-10-16", { startTime: "21:00" }), ev("trip", "2026-10-14", { end: "2026-10-18" }),
+    ev("off", "2026-10-16", { status: "cancelled" }), ev("gone", "2026-10-16", { deleted: true }), ev("other", "2026-10-17")];
+  eq(eventsOn(evs, "2026-10-16").map((e) => e.id), ["trip", "off", "late"]);
+  eq(eventsOn(evs, "2026-10-20"), []);
 });
 test("cal: away", () => {
   const flight = ev("f", "2026-10-01", { activities: [act("transport")] });
   const visit = ev("v", "2026-10-01", { activities: [act("visitor")] });
   const dinner = ev("d", "2026-10-01", { activities: [act("eating")] });
   eq([isAway(flight), isAway(visit), isAway(dinner)], [true, false, false]);
-});
-test("cal: away text names the person unless shared", () => {
-  eq(awayText(ev("Anglet", "2026-10-16", { owner: "hugo", end: "2026-10-18" }), "2026"), "Hugo in Anglet, Fri 16 to Sun 18");
-  eq(awayText(ev("Porto", "2026-10-16", { owner: "shared" }), "2026"), "Porto, Fri 16 to Fri 16");
 });
 test("cal: load more only on a real scroll near the bottom, under the cap", () => {
   const box = { scrollHeight: 3000, clientHeight: 800, scrollTop: 1900 };
@@ -127,7 +121,7 @@ test("review I2: a sync never redraws an open form (the keyboard would close)", 
   eq([refreshable({ kind: "edit" }), refreshable({ kind: "new" }), refreshable({ kind: "event" }), refreshable(null)], [false, false, true, false]);
 });
 
-import { gesture, hasLoadedOlder } from "../js/cal-model.js";
+import { gesture } from "../js/cal-model.js";
 test("review I6: one gesture rule for mouse and touch (swipe sideways, pull at the top)", () => {
   eq(gesture({ dx: -120, dy: 10, top: false, searching: false }), "next");
   eq(gesture({ dx: 120, dy: -10, top: true, searching: false }), "prev");
@@ -136,21 +130,12 @@ test("review I6: one gesture rule for mouse and touch (swipe sideways, pull at t
   eq(gesture({ dx: -120, dy: 10, top: false, searching: true }), null, "no swipes while searching");
   eq(gesture({ dx: 80, dy: 70, top: false, searching: false }), null, "diagonal is a scroll");
 });
-test("cal: F53 -- a pull only arms at the true top, not once load older has moved it", () => {
-  eq(gesture({ dx: 5, dy: 90, top: true, searching: false, loadedOlder: false }), "pull");
-  eq(gesture({ dx: 5, dy: 90, top: true, searching: false, loadedOlder: true }), null,
-    "scrollTop<=0 after load older sits at the older content's own top, not today's range");
-  eq(hasLoadedOlder({ grid: 0, agenda: 0 }), false);
-  eq(hasLoadedOlder({ grid: 3, agenda: 0 }), true);
-});
 
 /* ---- deferred minors from the final review ---- */
 import { lastEventDay } from "../js/cal-model.js";
-test("M1: a typo'd far end date stretches neither the range nor the text", () => {
+test("M1: a typo'd far end date does not stretch the range", () => {
   const typo = { id: "t", title: "Anglet", owner: "hugo", start: "2026-10-16", end: "2099-01-01" };
   eq(lastEventDay([typo, { id: "b", start: "2026-11-01", end: null }]), "2026-12-16", "62 days from the start at most");
-  ok(!awayText(typo, "2026").includes("2099"));
-  eq(awayText({ ...typo, end: "2026-10-01" }, "2026"), "Hugo in Anglet, Fri 16 to Fri 16", "an end before the start is one day");
 });
 import { createPopGate } from "../js/sheet.js";
 test("M3: Back events are ignored one by one, never more than were caused", () => {
@@ -167,10 +152,17 @@ test("cal: todaysCount is minimal-only-mine, both people at partial and full", (
     ev("theirs", "2026-09-25", { owner: "hugo" }),
     ev("gone", "2026-09-25", { owner: "hugo", deleted: true }),
   ];
-  eq(todaysCount(evs, "isa", "minimal"), 2, "only mine and shared");
-  eq(todaysCount(evs, "isa", "partial"), 3, "both, greyed or not");
-  eq(todaysCount(evs, "isa", "full"), 3);
-  eq(todaysCount([], "isa", "full"), 0);
+  const D = "2026-09-25";
+  eq(todaysCount(evs, "isa", "minimal", D), 2, "only mine and shared");
+  eq(todaysCount(evs, "isa", "partial", D), 3, "both, greyed or not");
+  eq(todaysCount(evs, "isa", "full", D), 3);
+  eq(todaysCount([], "isa", "full", D), 0);
+});
+test("review: the badge counts what the views show -- no cancelled event, no middle night of a stay", () => {
+  const stay = ev("stay", "2026-09-24", { end: "2026-09-26", activities: [act("accommodation", "🏨")] });
+  const evs = [ev("on", "2026-09-25"), ev("off", "2026-09-25", { status: "cancelled" }), stay];
+  eq(todaysCount(evs, "isa", "full", "2026-09-25"), 1, "the stay's middle night and the cancelled event are left out");
+  eq(todaysCount([stay], "isa", "full", "2026-09-26"), 1, "check-out day counts");
 });
 
 /* ---- F7: "load older" jumps straight to 1 January of the floor year, and
@@ -179,9 +171,6 @@ test("cal: fullPastWeeks and fullPastMonths reach exactly 1 January of the floor
   eq(fullPastWeeks("2026-09-21", "2026"), 38, "38 Mondays from the first week of 2026 to late September");
   eq(fullPastWeeks("2026-01-05", "2026"), 1);
   eq(fullPastMonths("2026-09-24", "2025"), 20, "January 2025 to August 2026");
-});
-test("cal: Back to today discards the loaded past, the floor resets to this year", () => {
-  eq(backToTodayState("2026"), { past: { grid: 0, agenda: 0 }, floor: "2026", exhausted: false });
 });
 
 /* ---- F22: default city, trip-aware -- reuses isAway (Agenda's "away"
@@ -216,15 +205,6 @@ test("cal: guestsExcludingViewer drops the viewer's own name, case-insensitively
   eq(guestsExcludingViewer("", "Isa"), "");
   eq(guestsExcludingViewer(null, "Isa"), "");
   eq(guestsExcludingViewer("Apu,  Jordi ,Isa", "Isa"), "Apu, Jordi", "extra whitespace around names is trimmed");
-});
-
-/* ---- F67 (supersedes F37/F60): the day-sheet's line under an event's
-   title never repeats the status -- F39's pill above it already carries
-   it, guests or not -- so this line is guests alone, or empty. */
-test("cal: statusGuestsLine never repeats the status -- guests alone, or empty", () => {
-  eq(statusGuestsLine(""), "", "no guests -- nothing to show, the pill already carries the status");
-  eq(statusGuestsLine("Apu, Jordi"), "Apu, Jordi", "guests alone, no 'Planned ·' prefix");
-  eq(statusGuestsLine(null), "");
 });
 
 /* ---- F38: does this event have at least one open to-do ---- */

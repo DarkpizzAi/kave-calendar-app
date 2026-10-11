@@ -1,6 +1,7 @@
 /* Compass: the one sheet (spec section 3, "The sheet").
 
-   Levels, top to bottom: weeks, days, a single day, a single event. Tapping
+   Levels, top to bottom: a single day, then whatever other screens register
+   (the event page and form, Settings' sheets). Tapping
    inside replaces the content and the title; there is never a second sheet.
    Each level is a history entry, so phone Back, browser Back, Escape and
    Backspace go up one level; tapping or swiping the header closes it.
@@ -12,13 +13,11 @@
 
 import { escapeHtml as esc, safeUrl } from "./util.js";
 import { addDays, dayOfWeek } from "./dates.js";
-import { isoWeek } from "./views.js";
 import { holidayOn, isProvisional } from "./holidays.js";
-import { tappable, iconsOf, hasOpenTodos, guestsExcludingViewer, statusGuestsLine, rowLinks, shownStatus, gesture } from "./cal-model.js";
-import { rows, frameNow, detailGrey, place } from "./calendar.js";
+import { iconsOf, guestsExcludingViewer, rowLinks, shownStatus, gesture } from "./cal-model.js";
+import { frameNow, detailGrey, dayEvents } from "./calendar.js";
 import { ICON } from "./chrome-icons.js";
 import { STATUS_LABEL } from "./model.js";
-import { store } from "./store.js";
 
 const LONGDOW = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"];
 const MONTHS = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
@@ -54,32 +53,12 @@ export function registerLevel(kind, def) { custom[kind] = def; }
 export const sheetOpen = () => stack.length > 0;
 export const topLevel = () => stack[stack.length - 1] || null;
 
-function findEvent(id) { const f = frameNow(); return f && f.events.find((e) => e.id === id); }
-
 function title(l) {
   if (custom[l.kind]) return custom[l.kind].title(l);
-  if (l.kind === "week") return `Week ${isoWeek(l.m)}`;
-  if (l.kind === "day") return longDay(l.d);
-  const e = findEvent(l.id); return e ? e.title : "";
+  return l.kind === "day" ? longDay(l.d) : "";
 }
 
 const who = (o) => (o === "isa" ? "Isa" : o === "hugo" ? "Hugo" : "Both of you");
-const checklist = (e) => (e.checklist || []).map((c) =>
-  `<p class="todo-l${c.done ? " done" : ""}"><span class="box" aria-hidden="true"></span>${esc(c.text)}</p>`).join("");
-const tickets = (e) => (e.links || []).map((l) => {
-  const u = safeUrl(l.url);
-  return u ? `<a class="ticket" href="${esc(u)}" target="_blank" rel="noopener noreferrer">🎟 ${esc(l.label)}</a>` : "";
-}).join("");
-
-/* Week level: a roomy row per day; an empty day is blank and cannot be tapped. */
-function weekBody(m, f) {
-  return [0, 1, 2, 3, 4, 5, 6].map((k) => {
-    const d = addDays(m, k), evs = f.on(d);
-    const tap = tappable(evs) ? ` role="button" tabindex="0" data-sact="day" data-d="${d}"` : "";
-    return `<div class="lrow${d === f.today ? " today" : ""}${evs.length ? "" : " empty"}"${tap}>`
-      + `<span class="lday">${LONGDOW[k]} ${Number(d.slice(8))}</span>${rows(evs, false, false)}</div>`;
-  }).join("");
-}
 
 /* Day level: no cards, a strip per event; a time and names say what they
    are, so no "When / Who / Where" labels. Layout A (title left, icons right,
@@ -95,8 +74,8 @@ const LINK_GLYPH = ["🎟", "📱", "🌐"];
 function strip(e, f, d) {
   /* Emoji left; title; one grey line (time, guests, open to-dos); the best
      tier of links, a line each, then "+ N more"; status top right. The guests
-     rule (viewer's own name removed) stays in statusGuestsLine. */
-  const guests = statusGuestsLine(guestsExcludingViewer(e.guests, who(f.me)));
+     rule (viewer's own name removed) stays in guestsExcludingViewer. */
+  const guests = guestsExcludingViewer(e.guests, who(f.me));
   const name = stripName(e, f);
   const open = (e.checklist || []).filter((c) => !c.done).length;
   const meta = [d === e.start ? e.startTime : "", guests].filter(Boolean).map(esc).join('<span class="dsep">·</span>');
@@ -114,35 +93,21 @@ function strip(e, f, d) {
     + (meta || count ? `<p class="dline">${meta}</p>${count}` : "") + (links ? `<div class="dlinks">${links}</div>` : "")
     + `</div></section>`;
 }
-function dayBody(d, f) {
-  const evs = f.on(d), hol = holidayOn(d);
+/* The day's events come from dayEvents (calendar.js): the same list
+   whichever view the day was opened from -- cancelled ones included, shown
+   with their Cancelled status -- and every event when opened from the
+   Archive (`archive` on the level). */
+function dayBody(l, f) {
+  const d = l.d, evs = dayEvents(d, l.archive), hol = holidayOn(d);
   /* a year the Generalitat has not published yet is our own guess: say so */
   const holText = hol ? `Bank holiday: ${hol}${isProvisional(d) ? " (provisional)" : ""}` : "";
   return `<div class="dpage">${hol ? `<p class="dhol">${esc(holText)}</p>` : ""}${evs.map((e) => strip(e, f, d)).join("")}</div>`;
 }
 
-/* Event level: a page, like a Spoon recipe. Its full design, with editing,
-   is round 2 (Task 10). */
-function eventBody(e, f) {
-  const sec = (h, body) => (body ? `<section class="esec"><h3>${h}</h3>${body}</section>` : "");
-  const when = e.end && e.end !== e.start ? `${longDay(e.start)} to ${longDay(e.end)}` : longDay(e.start);
-  return `<div class="epage"><div class="ehero${detailGrey(e) ? " greyw" : ""}"><span class="eicons">${iconsOf(e, f.me).map(esc).join("")}</span>`
-    + `<p class="esub">${esc(when)}${e.start.slice(0, 4) !== f.thisYear ? " " + e.start.slice(0, 4) : ""}</p></div>`
-    + sec("Where", place(e) ? `<p>${esc(place(e))}</p>` : "")
-    + sec("Who", `<p>${esc(who(e.owner))}${e.guests ? ", with " + esc(e.guests) : ""}</p>`)
-    + sec("To do", checklist(e)) + sec("Tickets", tickets(e))
-    + sec("Notes", e.notes ? `<p>${esc(e.notes)}</p>` : "")
-    + '<p class="hint">The full event page, with editing and costs, arrives in round 2.</p></div>';
-}
-
 function body(l) {
   if (custom[l.kind]) return custom[l.kind].body(l);
   const f = frameNow();
-  if (!f) return "";
-  if (l.kind === "week") return weekBody(l.m, f);
-  if (l.kind === "day") return dayBody(l.d, f);
-  const e = findEvent(l.id);
-  return e ? eventBody(e, f) : '<p class="hint">This event is no longer here.</p>';
+  return f && l.kind === "day" ? dayBody(l, f) : "";
 }
 
 /* ---- drawing ---- */
@@ -287,7 +252,6 @@ export function initSheet() {
     }
     const a = b.dataset.sact;
     if (a === "close") closeAll();
-    else if (a === "day") openLevel({ kind: "day", d: b.dataset.d });
     else if (a === "event") openLevel({ kind: "event", id: b.dataset.id });
   });
   const onField = (e) => {
@@ -319,16 +283,16 @@ export function initSheet() {
   let d0 = null;
   const dayStart = (x, y) => {
     const l = stack[stack.length - 1];
-    d0 = l && l.kind === "day" ? { x, y, d: l.d } : null;
+    d0 = l && l.kind === "day" ? { x, y, d: l.d, archive: l.archive } : null;
   };
   const dayEnd = (x, y) => {
     if (!d0) return;
-    const act = gesture({ dx: x - d0.x, dy: y - d0.y, top: false, searching: false, loadedOlder: false });
-    const from = d0.d;
+    const act = gesture({ dx: x - d0.x, dy: y - d0.y, top: false, searching: false });
+    const { d: from, archive } = d0;
     d0 = null;
     if (act === "next" || act === "prev") {
       swallowSheetClick();
-      replaceTop({ kind: "day", d: addDays(from, act === "next" ? 1 : -1) }, act);
+      replaceTop({ kind: "day", d: addDays(from, act === "next" ? 1 : -1), archive }, act);
     }
   };
   root.addEventListener("pointerdown", (e) => {

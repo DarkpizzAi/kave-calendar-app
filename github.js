@@ -23,8 +23,6 @@ export const github = {
     // Data paths live with the code that uses them (js/sync.js pathFor):
     // calendar/data/compass/events-<year>.json in kave-hub.
   },
-  // GitHub's suggested minimum seconds between polls, if it ever sends one
-  pollInterval: 60,
 };
 
 (() => {
@@ -32,7 +30,6 @@ export const github = {
   let token = "";
 
   github.setToken = (t) => { token = (t || "").trim(); };
-  github.hasToken = () => !!token;
 
   /* ---- base64 <-> UTF-8 (the API wraps its base64 at 60 cols) ---- */
   function b64encode(str) {
@@ -86,9 +83,6 @@ export const github = {
       throw ghError("offline", { cause: e });
     }
 
-    const poll = Number(res.headers.get("X-Poll-Interval"));
-    if (poll > 0) github.pollInterval = Math.max(60, poll);
-
     if (res.status === 304 || res.ok) return res;
 
     if (res.status === 401) throw ghError("unauthorized", { status: 401 });
@@ -141,12 +135,5 @@ export const github = {
     const res = await request("PUT", contentsUrl(path, false), payload);
     const out = await res.json();
     return { sha: out.content && out.content.sha, commit: out.commit && out.commit.sha };
-  };
-
-  // { login } - used only for the "connected as" check in Settings
-  github.getUser = async () => {
-    const res = await request("GET", API + "/user");
-    const u = await res.json();
-    return { login: u.login };
   };
 })();

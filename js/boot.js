@@ -12,7 +12,7 @@ import { render, isCalendar, dataSync, actions } from "./render.js";
 import { wire, showBanner } from "./wire.js";
 import { appData } from "./data.js";
 import { store } from "./store.js";
-import { initCalendar, backToToday, closeMenus, scrollToTop } from "./calendar.js";
+import { initCalendar, closeMenus } from "./calendar.js";
 import { initSheet, back, sheetOpen, refreshSheet, setDayAdd } from "./sheet.js";
 import { initEvent, newEventForm } from "./view-event.js";
 
@@ -48,17 +48,6 @@ syncNow();
 document.addEventListener("visibilitychange", () => { if (document.visibilityState === "visible") syncNow(); });
 window.addEventListener("online", syncNow);
 
-/* F28: the three round buttons -- "+", up (scroll to top) and down (back to
-   today, collapsing loaded-older data). "Load older" (F29) moved inline
-   into the control row and is bound there, in calendar.js's own onClick. */
-document.getElementById("fabs").addEventListener("click", (e) => {
-  const b = e.target.closest("[data-fab]");
-  if (!b) return;
-  if (b.dataset.fab === "up") scrollToTop();
-  else if (b.dataset.fab === "down") backToToday();
-  else newEventForm();
-});
-
 /* Backspace = Back on a computer (except while typing), like the phone's
    Back; Escape too. Up one sheet level, else close a menu or search. */
 document.addEventListener("keydown", (e) => {
@@ -67,7 +56,8 @@ document.addEventListener("keydown", (e) => {
     if (sheetOpen()) { e.preventDefault(); back(); }
     else if (e.key === "Escape" && closeMenus()) e.preventDefault();
   }
-  if ((e.key === "Enter" || e.key === " ") && !typing && e.target.matches && e.target.matches("#view [data-act][role=button]")) {
+  /* day cards and squares, in the Calendar and in the Archive alike */
+  if ((e.key === "Enter" || e.key === " ") && !typing && e.target.matches && e.target.matches("#view [data-act][role=button], #archiveRoot [data-act][role=button]")) {
     e.preventDefault(); e.target.click();
   }
 });
