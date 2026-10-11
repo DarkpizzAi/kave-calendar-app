@@ -1,5 +1,5 @@
 import { test, eq, ok } from "./run.js";
-import { indexByDay, isMidStay, tappable, zoomWeekTarget, zoomMonthTarget, isAway, awayText,
+import { indexByDay, isMidStay, stayRole, stayLabel, tappable, zoomWeekTarget, zoomMonthTarget, isAway, awayText,
   shouldLoadMore, nextCount, iconsOf, searchEvents, todaysCount, fullPastWeeks, fullPastMonths,
   backToTodayState, tripCityFor, defaultCity, hideCancelled,
   hasOpenTodos, guestsExcludingViewer, statusGuestsLine } from "../js/cal-model.js";
@@ -39,6 +39,14 @@ test("cal: an accommodation shows on check-in and check-out only", () => {
   eq(isMidStay(ev("night", "2026-10-16", { end: "2026-10-17", activities: [act("accommodation", "🏨")] }), "2026-10-17"), false);
   eq(isMidStay(ev("one", "2026-10-16", { activities: [act("accommodation", "🏨")] }), "2026-10-16"), false);
   eq(isMidStay(ev("trip", "2026-10-16", { end: "2026-10-18", activities: [act("transport", "🚆")] }), "2026-10-17"), false);
+});
+test("cal: a stay is in on its first day, out on its last, mid between; only an accommodation is a stay", () => {
+  const stay = ev("stay", "2026-10-16", { end: "2026-10-18", activities: [act("accommodation", "🏨")] });
+  eq(["2026-10-16", "2026-10-17", "2026-10-18"].map((d) => stayRole(stay, d)), ["in", "mid", "out"]);
+  eq(["2026-10-16", "2026-10-17", "2026-10-18"].map((d) => stayLabel(stay, d)), ["Check in", "", "Check out"]);
+  const one = ev("one", "2026-10-16", { activities: [act("accommodation", "🏨")] });
+  eq([stayRole(one, "2026-10-16"), stayLabel(one, "2026-10-16")], ["in", ""]);
+  eq(stayRole(ev("t", "2026-10-16", { end: "2026-10-18", activities: [act("transport", "🚆")] }), "2026-10-17"), null);
 });
 test("cal: a day or week with nothing cannot be tapped", () => {
   eq([tappable([]), tappable([ev("a", "2026-10-01")])], [false, true]);

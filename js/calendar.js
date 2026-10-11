@@ -13,7 +13,7 @@ import { loadRange, dayFreeState, weekFreeNote, weekFreeDays } from "./views.js"
 import { HOLIDAYS, holidayOn } from "./holidays.js";
 import { applyDetail } from "./filter.js";
 import { store } from "./store.js";
-import { indexByDay, zoomWeekTarget, zoomMonthTarget, AWAY, isMidStay,
+import { indexByDay, zoomWeekTarget, zoomMonthTarget, AWAY, isMidStay, stayLabel, stayRole,
   shouldLoadMore, nextCount, iconsOf, searchEvents, shortDate, pastMonths, gesture, lastEventDay,
   fullPastWeeks, fullPastMonths, backToTodayState, todaysCount as cmTodaysCount, hideCancelled,
   hasLoadedOlder, hasOpenTodos } from "./cal-model.js";
@@ -84,11 +84,11 @@ const icons = (e) => iconsOf(e, frame.me);
    never sees one here at all (hideCancelled in buildFrame). */
 const cls = (e) => `${frame.grey.has(e.id) ? "grey" : ""}${e.status === "idea" ? " idea" : ""}${e.status === "cancelled" ? " cancelled" : ""}`;
 
-function row(e, withDate, click) {
+function row(e, withDate, click, tag = "") {
   const ic = icons(e);
   return `<li class="${cls(e)}" style="--n:${ic.length}"${click ? ` data-act="event" data-id="${esc(e.id)}"` : ""}>`
     + (withDate ? `<span class="c-d">${esc(shortDate(e.start, frame.thisYear))}</span>` : "")
-    + `<span class="c-i">${ic.map(esc).join("")}</span><span class="c-t">${esc(e.title)}</span>`
+    + `<span class="c-i">${ic.map(esc).join("")}</span><span class="c-t">${tag ? `<span class="c-tag">${esc(tag)} &middot; </span>` : ""}${esc(e.title)}</span>`
     + (hasOpenTodos(e) ? `<span class="todo-ic" aria-label="Open to-dos">${ICON.checkbox}</span>` : "") + "</li>";
 }
 const list = (items, dated) => (items ? `<ul class="rows${dated ? " dated" : ""}">${items}</ul>` : "");
@@ -190,7 +190,7 @@ function agendaDay(d, m, freeDays, note) {
   const noteLine = (note && note.kind === "long" && note.on === d)
     ? `<li style="--n:1"><span class="c-i">🔍</span><span class="c-t">${esc(note.text)}</span></li>` : "";
   return `<div class="daycard ${periodState(d, freeDays)}${weekend}${weekStart}${holBorder}" data-week="${m}"${tap}>${cd}`
-    + `<ul class="rows">${evs.map((e) => row(e, false, false)).join("")}${noteLine}</ul></div>`;
+    + `<ul class="rows">${evs.map((e) => row(e, false, false, stayLabel(e, d))).join("")}${noteLine}</ul></div>`;
 }
 /* Agenda's per-card height rule -- two independent groups per week
    (weekdays, weekend), not one across all seven:
@@ -296,7 +296,9 @@ function gridIcon(d) {
   for (const e of evs) {
     const acts = e.activities && e.activities.length ? e.activities : [{ type: "none" }];
     for (const a of acts) {
-      const rank = DAY_PRIORITY.indexOf(a.type);
+      /* a stay's icon outranks everything on check-in only; on the middle
+         days and check-out any other icon wins (and it still shows alone). */
+      const rank = a.type === "accommodation" && stayRole(e, d) !== "in" ? DAY_PRIORITY.length : DAY_PRIORITY.indexOf(a.type);
       if (rank < bestRank) { bestRank = rank; best = { a, e }; }
     }
   }

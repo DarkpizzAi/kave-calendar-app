@@ -69,10 +69,23 @@ export const hideCancelled = (events, view) => (view === "grid" ? events.filter(
    (final review M1). */
 const lastDay = (e) => { const d = daysOf(e); return d.length ? d[d.length - 1] : e.start; };
 
-/* An accommodation stay shows on its first day (check-in) and its last
-   (check-out) only; the days in between are just the stay going on, so the
-   Agenda leaves them off. A one-night or one-day stay has no middle. */
-export const isMidStay = (e, d) => has(e, ["accommodation"]) && d > e.start && d < lastDay(e);
+/* Where a day sits in an accommodation stay: "in" (its first day, check-in,
+   also a one-day stay), "out" (its last day, check-out), "mid" (the days
+   between), or null for anything that is not a stay. The Agenda shows a stay
+   on check-in and check-out only and names them; Grid keeps the stay's icon
+   on every day but ranks it first only on check-in. */
+export function stayRole(e, d) {
+  if (!has(e, ["accommodation"])) return null;
+  if (d === e.start) return "in";
+  return d === lastDay(e) ? "out" : "mid";
+}
+export const isMidStay = (e, d) => stayRole(e, d) === "mid";
+/* The words the Agenda adds to a stay's row; a one-day stay has no check-out
+   to name, so it gets none. */
+export const stayLabel = (e, d) => {
+  const role = stayRole(e, d);
+  return role === "in" && lastDay(e) > e.start ? "Check in" : role === "out" ? "Check out" : "";
+};
 export function lastEventDay(events) {
   return events.reduce((m, e) => { const l = lastDay(e); return l > m ? l : m; }, "");
 }
