@@ -197,7 +197,7 @@ test("the catalogue has a work event category (Isa, 2026-09-24)", () => {
 });
 
 test("iconFor only ever returns a catalogue icon", () => {
-  eq(iconFor({ type: "transport", icon: "✈️" }, { owner: "isa" }, "isa"), "🛫", "a retired icon falls back to the category's first");
-  eq(iconFor({ type: "eating", icon: '<b id="x">x</b>' }, { owner: "isa" }, "isa"), "🍔", "markup in the data never comes back out");
+  eq(iconFor({ type: "transport", icon: "🛩" }, { owner: "isa" }, "isa"), "✈️", "a retired icon falls back to the category's first");
+  eq(iconFor({ type: "eating", icon: '<b id="x">x</b>' }, { owner: "isa" }, "isa"), "🍴", "markup in the data never comes back out");
   eq(iconFor({ type: "eating", icon: "🍕" }, { owner: "isa" }, "isa"), "🍕", "a listed icon is kept");
 });

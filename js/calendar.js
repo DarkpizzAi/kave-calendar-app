@@ -80,6 +80,10 @@ function buildFrame() {
 
 /* ---- pieces ---- */
 const icons = (e) => iconsOf(e, frame.me);
+/* What a day shows in Agenda and Grid: an accommodation only on check-in and
+   check-out (isMidStay), so the two views agree. The day sheet lists the whole
+   stay on every day, and free-time and trip-city logic still count it. */
+const visibleOn = (d) => frame.on(d).filter((e) => !isMidStay(e, d));
 /* F35: Agenda keeps a cancelled event visible, title struck through; Grid
    never sees one here at all (hideCancelled in buildFrame). */
 const cls = (e) => `${frame.grey.has(e.id) ? "grey" : ""}${e.status === "idea" ? " idea" : ""}${e.status === "cancelled" ? " cancelled" : ""}`;
@@ -163,8 +167,7 @@ function periodState(d, freeDays) {
    frame.thisYear (Archive, mostly). */
 const dayMonth = (d) => `${Number(d.slice(8))} ${MONTHS[Number(d.slice(5, 7)) - 1].slice(0, 3)}${d.slice(0, 4) !== frame.thisYear ? " " + d.slice(0, 4) : ""}`;
 function agendaDay(d, m, freeDays, note) {
-  /* An accommodation shows on check-in and check-out only (isMidStay). */
-  const evs = frame.on(d).filter((e) => !isMidStay(e, d));
+  const evs = visibleOn(d);
   const weekend = dayOfWeek(d) >= 5 ? " weekend" : "";
   /* Monday is the first day of the week: it's the one day that keeps the
      wider between-weeks gap (.content's own flex gap); every other day
@@ -289,7 +292,7 @@ function gridRows(key, n) {
 const MAX_DOTS = 3;
 /* One emoji per day: pickDayIcon (cal-model.js) chooses it by a fixed priority. */
 function gridIcon(d) {
-  const evs = frame.on(d);
+  const evs = visibleOn(d);
   const best = pickDayIcon(evs, d);
   if (!best) return "";
   const grey = best.e.owner !== frame.me && best.e.owner !== "shared";
@@ -311,7 +314,7 @@ function gridSquare(d, freeDays, note) {
      on a day with nothing on it. */
   /* F16's own glyph, reused rather than re-derived: at least one event
      that day still has an unchecked to-do. */
-  const todo = frame.on(d).some(hasOpenTodos) ? `<span class="dtodo" aria-label="Open to-dos">${ICON.checkbox}</span>` : "";
+  const todo = visibleOn(d).some(hasOpenTodos) ? `<span class="dtodo" aria-label="Open to-dos">${ICON.checkbox}</span>` : "";
   /* The long-weekend 🔍 is Agenda's alone: a Grid square stays quiet. */
   const weekend = dayOfWeek(d) >= 5 ? " weekend" : "";
   const holBorder = holidayOn(d) && !weekend ? " holiday-border" : "";
