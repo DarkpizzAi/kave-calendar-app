@@ -42,7 +42,7 @@ actions.sync = syncNow;
 initSheet();
 initEvent({ data, refresh: refreshSheet });
 setDayAdd(newEventForm); // F21: the day-level sheet's own "+"
-initCalendar({ data, render, isCalendar, sync: syncNow });
+initCalendar({ data, render, isCalendar, sync: syncNow, add: newEventForm });
 render();
 syncNow();
 document.addEventListener("visibilitychange", () => { if (document.visibilityState === "visible") syncNow(); });

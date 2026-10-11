@@ -12,13 +12,12 @@
 
 import { escapeHtml as esc, safeUrl } from "./util.js";
 import { addDays, dayOfWeek } from "./dates.js";
-import { isoWeek, longWeekends } from "./views.js";
-import { HOLIDAYS, holidayOn, isProvisional } from "./holidays.js";
-import { tappable, iconsOf, hasOpenTodos, guestsExcludingViewer, statusGuestsLine, gesture } from "./cal-model.js";
+import { isoWeek } from "./views.js";
+import { holidayOn, isProvisional } from "./holidays.js";
+import { tappable, iconsOf, hasOpenTodos, guestsExcludingViewer, statusGuestsLine, rowLinks, shownStatus, gesture } from "./cal-model.js";
 import { rows, frameNow, detailGrey, place } from "./calendar.js";
 import { ICON } from "./chrome-icons.js";
 import { STATUS_LABEL } from "./model.js";
-import { readPrefs, eventBlocksFreeTime } from "./prefs.js";
 import { store } from "./store.js";
 
 const LONGDOW = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"];
@@ -92,36 +91,34 @@ function weekBody(m, f) {
    neither the viewer's own nor shared. */
 function stripName(e, f) { return e.owner !== f.me && e.owner !== "shared" ? who(e.owner) : ""; }
 
-function strip(e, f) {
-  /* The line under the title: guests alone, the viewer's own name removed
-     (never "Isa · Apu" on Isa's phone), and never the status, which the pill
-     already carries. statusGuestsLine (cal-model.js, tested) owns the rule. */
-  const statusGuests = statusGuestsLine(guestsExcludingViewer(e.guests, who(f.me)));
-  const lines = [statusGuests].filter(Boolean);
+const LINK_GLYPH = ["🎟", "📱", "🌐"];
+function strip(e, f, d) {
+  /* Emoji left; title; one grey line (time, guests, open to-dos); the best
+     tier of links, a line each, then "+ N more"; status top right. The guests
+     rule (viewer's own name removed) stays in statusGuestsLine. */
+  const guests = statusGuestsLine(guestsExcludingViewer(e.guests, who(f.me)));
   const name = stripName(e, f);
-  /* F38: no inline add-task in this view -- a small checkbox glyph (F16)
-     stands in for the whole to-do list, to the left of the category icons,
-     only when something is still unchecked. Adding a task stays on the
-     full event page. */
-  const todoIcon = hasOpenTodos(e) ? `<span class="todo-ic" aria-label="Open to-dos">${ICON.checkbox}</span>` : "";
-  return `<section class="dsec layA${detailGrey(e) ? " greyw" : ""}" data-sact="event" data-id="${esc(e.id)}" role="button" tabindex="0">`
-    + `<div class="dmain"><h3>${name ? `${esc(name)} ` : ""}${esc(e.title)} <span class="flag soft">${esc(STATUS_LABEL[e.status] || "")}</span></h3>`
-    + lines.map((l) => `<p class="dline">${esc(l)}</p>`).join("") + tickets(e)
-    + `</div><span class="dicons">${todoIcon}${iconsOf(e, f.me).map(esc).join("")}</span><span class="dchev">${ICON.chev}</span></section>`;
+  const open = (e.checklist || []).filter((c) => !c.done).length;
+  const meta = [d === e.start ? e.startTime : "", guests].filter(Boolean).map(esc).join('<span class="dsep">·</span>');
+  const count = open ? `<span class="dcount" role="img" aria-label="${open} open to-do${open > 1 ? "s" : ""}">${open}${ICON.checkbox}</span>` : "";
+  const { shown, more, tier } = rowLinks((e.links || []).filter((l) => safeUrl(l.url)));
+  const links = shown.map((l) => `<a class="dlink" href="${esc(safeUrl(l.url))}" target="_blank" rel="noopener noreferrer">`
+    + `<span aria-hidden="true">${LINK_GLYPH[tier]}</span><span class="dlt">${esc(l.label)}</span>${ICON.chev}</a>`).join("")
+    + (more ? `<p class="dmore">+ ${more} more link${more > 1 ? "s" : ""}</p>` : "");
+  const status = shownStatus(e);
+  const st = status === "booked" ? " st-b" : status === "cancelled" ? " st-c" : "";
+  return `<section class="dsec dst${st}${detailGrey(e) ? " greyw" : ""}" data-sact="event" data-id="${esc(e.id)}" role="button" tabindex="0">`
+    + `<span class="dem">${iconsOf(e, f.me).map(esc).join("")}</span>`
+    + `<div class="dmain"><h3>${name ? `${esc(name)} ` : ""}${esc(e.title)}</h3>`
+    + `<span class="dstat">${esc(STATUS_LABEL[status] || "")}</span>`
+    + (meta || count ? `<p class="dline">${meta}</p>${count}` : "") + (links ? `<div class="dlinks">${links}</div>` : "")
+    + `</div></section>`;
 }
-const dayFreeBlocks = (e) => eventBlocksFreeTime(readPrefs(store.state.settings), e);
 function dayBody(d, f) {
   const evs = f.on(d), hol = holidayOn(d);
   /* a year the Generalitat has not published yet is our own guess: say so */
   const holText = hol ? `Bank holiday: ${hol}${isProvisional(d) ? " (provisional)" : ""}` : "";
-  /* The day itself, not "any future one, not the one underway" (that's
-     weekFreeNote's own list-view heuristic) -- opening this exact day is
-     always worth saying whether it's the first day of a long weekend or
-     opportunity. "lone" (a Wednesday holiday with no long weekend) is
-     skipped: its text is just the holiday's own name, already said above. */
-  const lw = longWeekends(HOLIDAYS, addDays(d, -7), addDays(d, 7), f.onAll, dayFreeBlocks)
-    .find((w) => w.start === d && w.kind !== "lone");
-  return `<div class="dpage">${hol ? `<p class="dhol">${esc(holText)}</p>` : ""}${lw ? `<p class="dhol">${esc(lw.text)}</p>` : ""}${evs.map((e) => strip(e, f)).join("")}</div>`;
+  return `<div class="dpage">${hol ? `<p class="dhol">${esc(holText)}</p>` : ""}${evs.map((e) => strip(e, f, d)).join("")}</div>`;
 }
 
 /* Event level: a page, like a Spoon recipe. Its full design, with editing,
@@ -273,6 +270,7 @@ export function initSheet() {
        dispatch through onAction below by data-act instead) -- caught here,
        ahead of that split, or the .bar-acts branch below would swallow it
        looking for an onAction "day" never registers. */
+    if (e.target.closest("a.dlink")) return;
     const newDayBtn = e.target.closest('[data-sact="newday"]');
     if (newDayBtn) { const l = stack[stack.length - 1]; if (dayAdd && l) dayAdd(l.d); return; }
     const barBtn = e.target.closest(".bar-acts button");

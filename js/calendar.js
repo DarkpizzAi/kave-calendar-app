@@ -9,18 +9,18 @@
 
 import { escapeHtml as esc } from "./util.js";
 import { addDays, dayOfWeek, mondayOf, todayKey } from "./dates.js";
-import { loadRange, dayFreeState, weekFreeNote, weekFreeDays } from "./views.js";
-import { HOLIDAYS, holidayOn } from "./holidays.js";
+import { loadRange } from "./views.js";
+import { holidayOn } from "./holidays.js";
+import { readPrefs } from "./prefs.js";
 import { applyDetail } from "./filter.js";
 import { store } from "./store.js";
 import { indexByDay, zoomWeekTarget, zoomMonthTarget, isMidStay, stayLabel, pickDayIcon,
   shouldLoadMore, nextCount, iconsOf, searchEvents, shortDate, pastMonths, gesture, lastEventDay,
   fullPastWeeks, fullPastMonths, backToTodayState, todaysCount as cmTodaysCount, hideCancelled,
-  hasLoadedOlder, hasOpenTodos } from "./cal-model.js";
+  hasLoadedOlder, hasOpenTodos, gridDots } from "./cal-model.js";
 import { openLevel, sheetOpen } from "./sheet.js";
 import { ICON } from "./chrome-icons.js";
 import { iconFor } from "./icons.js";
-import { readPrefs, eventBlocksFreeTime } from "./prefs.js";
 
 const MONTHS = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
 const DOW = ["MON", "TUE", "WED", "THU", "FRI", "SAT", "SUN"];
@@ -31,14 +31,14 @@ export const VIEWS = ["grid", "agenda"];
 const S = {
   view: null, detail: null, fromView: null, slide: "",
   past: { grid: 0, agenda: 0 }, future: { grid: 15, agenda: 10 },
-  searchOpen: false, freeOn: false, query: "", menu: false,
+  searchOpen: false, query: "",
   scrollTo: null, keepAnchor: false, pending: false,
   /* older years, loaded on demand for search: the oldest year fetched from
      kave-hub, and whether it has anything older still */
   floor: null, exhausted: false,
 };
 
-/* ---- Archive: the popup opened by the "older" control button. Unlike the
+/* ---- Archive: the popup opened from Settings. Unlike the
    main view (always pinned to today), Archive shows only the past -- newest
    at the bottom, oldest at the top -- with no future, no scroll-triggered
    loading and no category/detail filtering (Isa: "all events, no filters").
@@ -108,47 +108,36 @@ function todayAnchor() {
 }
 
 /* ---- control row ----
-   The view toggle, detail and search controls stay at the top while the
-   list scrolls (sticky, with a fade -- see .ctl in styles.css). F28 once
-   made this row scroll away; that was reversed for the fade design. */
+   The view toggle, search, back-to-today and add controls stay at the top
+   while the list scrolls, as floating pills (see .ctl in styles.css). */
 function controls() {
   const idx = VIEWS.indexOf(S.view), from = S.fromView == null ? idx : VIEWS.indexOf(S.fromView);
   /* F59: Spoon's .segment/.seg-thumb construction, copied verbatim
      (styles.css) -- .ind became .seg-thumb, .views became .segment. */
   const views = `<div class="segment" role="tablist"><span class="seg-thumb" style="--i:${idx};--from:${from}"></span>`
     + VIEWS.map((v) => `<button role="tab" aria-selected="${S.view === v}" data-act="view" data-v="${v}">${v[0].toUpperCase() + v.slice(1)}</button>`).join("") + "</div>";
-  const detail = `<button class="ib" data-act="menu" aria-label="Detail level" aria-expanded="${S.menu}">${ICON.eye}</button>`;
-  const free = `<button class="ib${S.freeOn ? " on" : ""}" data-act="free" aria-label="Highlight free time" aria-pressed="${S.freeOn}">${ICON.leaf}</button>`;
-  /* "older" is an inline control button, between detail and search; it
-     opens the Archive popup. */
-  const older = showLoadOlder() ? `<button class="ib" data-act="older" aria-label="Open archive">${ICON.older}</button>` : "";
+  /* After the toggle: search, back to today (a calendar page showing today's
+     date, like Google Calendar) and add, all grey. Detail level lives in
+     Settings, Calendar defaults; the archive in Settings too. */
+  const dayNum = Number((frame ? frame.today : todayKey()).slice(8));
+  const today = `<button class="ib today" data-act="today" aria-label="Back to today"><svg class="tdy" viewBox="0 0 24 24" aria-hidden="true"><rect x="4" y="5" width="16" height="16" rx="3"/><path d="M8 3v4M16 3v4"/><text x="12" y="${dayNum < 10 ? 17.4 : 16.9}" font-size="${dayNum < 10 ? 11 : 9.5}">${dayNum}</text></svg></button>`;
+  const add = `<button class="ib" data-act="addnew" aria-label="Add an event">${ICON.plus}</button>`;
   const search = S.searchOpen
     ? `<div class="sfield"><span class="si">${ICON.search}</span><input id="q" type="search" placeholder="Search every event" value="${esc(S.query)}" autocomplete="off"><button class="clr" data-act="closesearch" aria-label="Close search">${ICON.x}</button></div>`
     : `<button class="ib" data-act="search" aria-label="Search">${ICON.search}</button>`;
-  const menu = S.menu ? `<div class="menu"><p class="mt">Detail level</p>${[["full", "Full"], ["partial", "Partial"], ["minimal", "Minimal"]]
-    .map(([k, l]) => `<button class="opt${S.detail === k ? " on" : ""}" data-act="detail" data-v="${k}">${l}</button>`).join("")}`
-    + '<p class="mh">Full: both of you. Partial: the other person greyed. Minimal: yours and shared only.</p></div>' : "";
-  return `<div class="ctl${S.searchOpen ? " searching" : ""}">${S.searchOpen ? "" : views}<div class="ctl2">${S.searchOpen ? "" : free + detail + older}${search}</div>${menu}</div>`;
+  return `<div class="ctl${S.searchOpen ? " searching" : ""}">${S.searchOpen ? "" : views}<div class="ctl2">${search}${S.searchOpen ? "" : today + add}</div></div>`;
 }
 
 /* ---- Agenda: a run of weeks ---- */
 /* the plain, non-sticky month heading, drawn once per month */
 const monthLabel = (d) => `${MONTHS[Number(d.slice(5, 7)) - 1]}${d.slice(0, 4) !== frame.thisYear ? " " + d.slice(0, 4) : ""}`;
 const monthHead = (d) => `<h3 class="month">${esc(monthLabel(d))}</h3>`;
-/* Agenda's card model: a "period card" (one calendar week, var(--panel),
-   black in dark mode) holding one smaller "day card" per day
-   (var(--surface-2), grey, CSS) -- never a border. Today is the one day
-   card whose FILL turns solid accent, always wins over Clear/Open. Free
-   time (S.freeOn) colours Clear/Open only on days that are actually part of
-   a detected free weekend/long weekend/opportunity (weekFreeDays) -- never
-   a bare weekday just because nothing happens to land on it. Grid (below)
-   shares the same free-time colouring logic via periodState/freeBlocks, but
-   draws its own month-grid card model. */
-function freeBlocks(e) { return eventBlocksFreeTime(readPrefs(store.state.settings), e); }
-function periodState(d, freeDays) {
-  if (d === frame.today) return "today";
-  if (!S.freeOn || !freeDays.has(d)) return "";
-  return dayFreeState(d, frame.onAll, freeBlocks) || "";
+/* Agenda's card model: one card per day. Today is the one card whose FILL
+   turns solid accent. (Free-weekend and long-weekend highlighting was removed
+   on 2026-10-11: Grid reads clearly enough without it.) Grid, below, draws its
+   own month-grid card model with the same periodState. */
+function periodState(d) {
+  return d === frame.today ? "today" : "";
 }
 /* Agenda: one card per day, straight in a run -- no week-card wrapper
    holding several of them (Isa: "no card containing all the individual day
@@ -166,7 +155,7 @@ function periodState(d, freeDays) {
    the 1st of a new month. The year only joins in when the day isn't in
    frame.thisYear (Archive, mostly). */
 const dayMonth = (d) => `${Number(d.slice(8))} ${MONTHS[Number(d.slice(5, 7)) - 1].slice(0, 3)}${d.slice(0, 4) !== frame.thisYear ? " " + d.slice(0, 4) : ""}`;
-function agendaDay(d, m, freeDays, note) {
+function agendaDay(d, m) {
   const evs = visibleOn(d);
   const weekend = dayOfWeek(d) >= 5 ? " weekend" : "";
   /* Monday is the first day of the week: it's the one day that keeps the
@@ -177,11 +166,11 @@ function agendaDay(d, m, freeDays, note) {
   const hol = holidayOn(d);
   /* A weekday bank holiday is named in the card header, centred between the
      weekday and the date, in the header's own type (ellipsised if too long).
-     Unconditional, not tied to S.freeOn: it is simply what the day is. A
+     Unconditional: it is simply what the day is. A
      weekend holiday has no name here (the weekend tint already marks it).
      The provisional note lives in the day sheet. */
   const holName = hol && !weekend ? `<span class="cd-hol">${esc(hol)}</span>` : "";
-  const cd = `<div class="cd"><span class="cd-dow">${dow}</span>${holName}<span class="cd-date">${dayMonth(d)}</span></div>`;
+  const cd = `<div class="cd"><span class="cd-date">${dayMonth(d)}</span>${holName}</div>`;
   /* Every day card opens the day, empty or not -- matches Grid's own
      squares (gridSquare below), which have always worked this way. */
   const tap = ` role="button" tabindex="0" data-act="day" data-d="${d}"`;
@@ -189,13 +178,11 @@ function agendaDay(d, m, freeDays, note) {
      being a weekend) gets an accent border, unconditional like the line
      above -- what the day is, not a free-time highlight. */
   const holBorder = hol && !weekend ? " holiday-border" : "";
-  /* A plain free weekend is colour only (Clear/Open, above); only a real
-     long weekend or opportunity earns the 🔍 and its explanatory text, on
-     the day its window opens. */
-  const noteLine = (note && note.kind === "long" && note.on === d)
-    ? `<li style="--n:1"><span class="c-i">🔍</span><span class="c-t">${esc(note.text)}</span></li>` : "";
-  return `<div class="daycard ${periodState(d, freeDays)}${weekend}${weekStart}${holBorder}" data-week="${m}"${tap}>${cd}`
-    + `<ul class="rows">${evs.map((e) => row(e, false, false, stayLabel(e, d))).join("")}${noteLine}</ul></div>`;
+  /* The weekday sits outside the card, on the left (Isa, 2026-10-11): a row
+     holds the label and the card, and carries the week spacing and data-week. */
+  return `<div class="dayrow${weekStart}" data-week="${m}"><span class="wdl${d === frame.today ? " today" : ""}">${dow}</span>`
+    + `<div class="daycard ${periodState(d)}${weekend}${holBorder}"${tap}>${cd}`
+    + `<ul class="rows">${evs.map((e) => row(e, false, false, stayLabel(e, d))).join("")}</ul></div></div>`;
 }
 /* Agenda's per-card height rule -- two independent groups per week
    (weekdays, weekend), not one across all seven:
@@ -214,7 +201,7 @@ function oneLineHeight(root) {
   const probe = document.createElement("div");
   probe.className = "daycard";
   probe.style.cssText = "position:absolute;visibility:hidden;pointer-events:none";
-  probe.innerHTML = '<div class="cd"><span class="cd-dow">Mon</span><span class="cd-date">1 Jan</span></div>'
+  probe.innerHTML = '<div class="cd"><span class="cd-date">1 Jan</span></div>'
     + '<ul class="rows"><li data-act="event" style="--n:1"><span class="c-i">•</span><span class="c-t">x</span></li></ul>';
   root.appendChild(probe);
   const h = probe.getBoundingClientRect().height;
@@ -222,12 +209,12 @@ function oneLineHeight(root) {
   return h;
 }
 function equalizeAgendaHeights(root) {
-  const cards = root.querySelectorAll(".daycard[data-week]");
+  const cards = root.querySelectorAll(".dayrow[data-week] > .daycard");
   cards.forEach((el) => { el.style.minHeight = ""; });
   if (!cards.length) return;
   const groups = new Map();
   cards.forEach((el) => {
-    const key = `${el.dataset.week}:${el.classList.contains("weekend") ? "we" : "wd"}`;
+    const key = `${el.parentElement.dataset.week}:${el.classList.contains("weekend") ? "we" : "wd"}`;
     (groups.get(key) || groups.set(key, []).get(key)).push(el);
   });
   const oneLine = oneLineHeight(root);
@@ -246,8 +233,6 @@ function equalizeAgendaHeights(root) {
 function weekBlocks(from, count) {
   let out = "", cur = "";
   for (let m = from, i = 0; i < count && m <= frame.range.max; i++, m = addDays(m, 7)) {
-    const freeDays = S.freeOn ? new Set(weekFreeDays(m, HOLIDAYS, frame.onAll, frame.today, freeBlocks)) : new Set();
-    const note = S.freeOn ? weekFreeNote(m, HOLIDAYS, frame.onAll, frame.today, freeBlocks) : null;
     /* Only the week underway trims to today -- Isa: Agenda opens on today
        at the top, but "load older" must still reveal real past weeks in
        full, not empty cards (m !== frame.thisMonday is always entirely in
@@ -256,7 +241,7 @@ function weekBlocks(from, count) {
     for (const d of days) {
       const ym = d.slice(0, 7);
       if (ym !== cur) { cur = ym; out += monthHead(`${ym}-01`); }
-      out += agendaDay(d, m, freeDays, note);
+      out += agendaDay(d, m);
     }
   }
   return out;
@@ -276,7 +261,7 @@ const daysIn = (y, mo) => new Date(Date.UTC(y, mo + 1, 0)).getUTCDate();
    once per month instead of once per year. */
 const gridMonthHead = (d) => `<p class="year-big">${esc(monthLabel(d))}</p>`;
 /* Lead-padded, Monday-first cells for one calendar month, chunked into
-   real weeks (each row's own Monday, for weekFreeDays) -- padded only to
+   real weeks (each row's own Monday) -- padded only to
    the next multiple of 7, never a whole extra blank row. */
 function gridRows(key, n) {
   const lead = dayOfWeek(`${key}-01`);
@@ -289,43 +274,41 @@ function gridRows(key, n) {
   for (let i = 0; i < cells.length; i += 7) rows.push({ monday: addDays(start, i), days: cells.slice(i, i + 7) });
   return rows;
 }
-const MAX_DOTS = 3;
 /* One emoji per day: pickDayIcon (cal-model.js) chooses it by a fixed priority. */
 function gridIcon(d) {
   const evs = visibleOn(d);
   const best = pickDayIcon(evs, d);
-  if (!best) return "";
+  if (!best) return { emo: "", dots: "" };
   const grey = best.e.owner !== frame.me && best.e.owner !== "shared";
-  /* one dot per event beyond the one the emoji stands for, bottom left. A
-     square is about 43px wide on a phone and the to-do box takes the bottom
-     right, so room runs out at three: past that, two dots and a "+" say there
-     are more (the day sheet has the full list). */
-  const extra = evs.length - 1;
-  const dots = extra > 0
-    ? `<span class="ddots" aria-label="${evs.length} events">${"<i></i>".repeat(extra > MAX_DOTS ? MAX_DOTS - 1 : extra)}${extra > MAX_DOTS ? "<b>+</b>" : ""}</span>` : "";
-  return `<span class="emo${grey ? " grey" : ""}">${esc(iconFor(best.a, best.e, frame.me))}</span>${dots}`;
+  /* one dot per event beyond the one the emoji stands for, top right beside
+     the day number; gridDots (cal-model.js, tested) says how many fit. The
+     day sheet has the full list. */
+  const g = gridDots(evs.length - 1);
+  const dots = g.dots || g.plus
+    ? `<span class="ddots" aria-label="${evs.length} events">${"<i></i>".repeat(g.dots)}${g.plus ? "<b>+</b>" : ""}</span>` : "";
+  return { emo: `<span class="emo${grey ? " grey" : ""}">${esc(iconFor(best.a, best.e, frame.me))}</span>`, dots };
 }
-function gridSquare(d, freeDays, note) {
+function gridSquare(d) {
   if (!d) return `<div class="dsq pad"></div>`;
-  const st = periodState(d, freeDays);
+  const st = periodState(d);
   /* Every Grid square opens the single day, empty or not (Agenda's day
      cards work the same way, agendaDay above): it is also the entry point
      for the day-swipe browser in sheet.js, which needs to be able to land
      on a day with nothing on it. */
-  /* F16's own glyph, reused rather than re-derived: at least one event
-     that day still has an unchecked to-do. */
-  const todo = visibleOn(d).some(hasOpenTodos) ? `<span class="dtodo" aria-label="Open to-dos">${ICON.checkbox}</span>` : "";
   /* The long-weekend 🔍 is Agenda's alone: a Grid square stays quiet. */
   const weekend = dayOfWeek(d) >= 5 ? " weekend" : "";
   const holBorder = holidayOn(d) && !weekend ? " holiday-border" : "";
-  return `<div class="dsq ${st}${weekend}${holBorder}" role="button" tabindex="0" data-act="day" data-d="${d}"><span class="num">${Number(d.slice(8))}</span>${todo}${gridIcon(d)}</div>`;
+  /* All the info sits on the top edge: the day number left, the event dots
+     right; the emoji alone takes the lower part. The open-to-do tick is the
+     day sheet's, not Grid's. */
+  const { emo, dots } = gridIcon(d);
+  const info = dots ? `<span class="dinfo">${dots}</span>` : "";
+  return `<div class="dsq ${st}${weekend}${holBorder}" role="button" tabindex="0" data-act="day" data-d="${d}"><span class="num">${Number(d.slice(8))}</span>${info}${emo}</div>`;
 }
 function gridMonth(y, mo) {
   const key = ymOf(y, mo), n = daysIn(y, mo), now = key === frame.today.slice(0, 7);
   const rows = gridRows(key, n).map((r) => {
-    const freeDays = S.freeOn ? new Set(weekFreeDays(r.monday, HOLIDAYS, frame.onAll, frame.today, freeBlocks)) : new Set();
-    const note = S.freeOn ? weekFreeNote(r.monday, HOLIDAYS, frame.onAll, frame.today, freeBlocks) : null;
-    return `<div class="grid7">${r.days.map((d) => gridSquare(d, freeDays, note)).join("")}</div>`;
+    return `<div class="grid7">${r.days.map((d) => gridSquare(d)).join("")}</div>`;
   }).join("");
   const wdhead = readPrefs(store.state.settings).showWeekdayHeader
     ? `<div class="wdhead">${DOW.map((w) => `<span>${w[0]}</span>`).join("")}</div>` : "";
@@ -461,7 +444,7 @@ async function loadAllOlder() {
   for (let i = 0; i < 15 && !S.exhausted; i++) if (!(await loadOlder())) break;
   if (S.searchOpen) ctx.render();
 }
-/* ---- Archive: the popup the "older" button opens. The main view always
+/* ---- Archive: the popup Settings opens. The main view always
    opens on today and never grows into the past; Archive shows only the past,
    oldest at the top, from 1 January of this year, one more January per
    "Load more". It keeps its own floor/exhausted (S.floor/S.exhausted track
@@ -508,7 +491,7 @@ function renderArchive() {
   if (fresh) fresh.scrollTop = AR.keepAnchor && before ? before.top + (fresh.scrollHeight - before.height) : fresh.scrollHeight;
   AR.keepAnchor = false;
 }
-function openArchive() {
+export function openArchive() {
   if (!frame) return;
   Object.assign(AR, { open: true, view: S.view, floor: frame.thisYear, exhausted: false, loading: false, keepAnchor: false });
   renderArchive();
@@ -546,7 +529,7 @@ function archiveClick(e) {
 function setView(v, target) {
   if (v === S.view && !target) return;
   S.slide = VIEWS.indexOf(v) > VIEWS.indexOf(S.view) ? "slide-left" : v === S.view ? "" : "slide-right";
-  S.fromView = S.view; S.view = v; S.menu = false;
+  S.fromView = S.view; S.view = v;
   if (target) {
     const need = Math.round((Date.parse(frame.thisMonday) - Date.parse(target)) / 6048e5);
     if (need > 0) S.past[v] = Math.max(S.past[v], need + 1);
@@ -555,11 +538,6 @@ function setView(v, target) {
   }
   ctx.render();
 }
-
-/* F29: "load older" is now an inline control button (drawn in controls()
-   above, not with the round buttons); hidden while searching, where it
-   makes no sense. */
-export const showLoadOlder = () => !S.searchOpen;
 
 /* F3: the nav icon's badge. Independent of whatever view is drawn (the
    badge shows even before the Calendar has been opened this session), so it
@@ -576,20 +554,17 @@ function onClick(e) {
   if (!ctx.isCalendar()) return;
   const b = e.target.closest("[data-act]");
   if (!b || !b.closest("#view")) {
-    if (S.menu && !e.target.closest(".menu")) { S.menu = false; ctx.render(); }
     return;
   }
   const a = b.dataset.act;
   if (a === "view") setView(b.dataset.v);
-  else if (a === "menu") { S.menu = !S.menu; ctx.render(); }
-  else if (a === "free") { S.freeOn = !S.freeOn; ctx.render(); }
-  else if (a === "detail") { S.detail = b.dataset.v; S.menu = false; ctx.render(); }
-  else if (a === "search") { S.searchOpen = true; S.menu = false; ctx.render(); loadAllOlder(); }
+  else if (a === "today") backToToday();
+  else if (a === "addnew") ctx.add();
+  else if (a === "search") { S.searchOpen = true; ctx.render(); loadAllOlder(); }
   else if (a === "closesearch") { S.searchOpen = false; S.query = ""; ctx.render(); }
   /* F29: "load older" is now one of the inline control buttons, not a
      floating round button; it now opens the Archive popup (F6/F7's
      "load straight to 1 January" idea lives on inside it). */
-  else if (a === "older") openArchive();
   else if (a === "zoomweek") { e.stopPropagation(); setView("agenda", zoomWeekTarget(b.dataset.m)); }
   else if (a === "zoommonth") setView("agenda", zoomMonthTarget(b.dataset.ym));
   else if (a === "day") openLevel({ kind: "day", d: b.dataset.d });
@@ -622,7 +597,6 @@ export function resetCalendarDefaults() { S.view = null; S.detail = null; }
 
 export function closeMenus() {
   if (AR.open) { closeArchive(); return true; }
-  if (S.menu) { S.menu = false; ctx.render(); return true; }
   if (S.searchOpen) { S.searchOpen = false; S.query = ""; ctx.render(); return true; }
   return false;
 }

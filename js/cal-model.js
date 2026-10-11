@@ -240,6 +240,41 @@ export function statusGuestsLine(guestsText) {
 }
 
 const fold = (s) => String(s || "").toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+/* Grid square: how many event dots fit on the top edge beside the day number
+   on a 43px phone square. `extra` is the events beyond the one the emoji
+   stands for: up to 3 dots, past that 2 and a "+". */
+export function gridDots(extra) {
+  if (extra <= 0) return { dots: 0, plus: false };
+  return extra > 3 ? { dots: 2, plus: true } : { dots: extra, plus: false };
+}
+
+/* Day sheet links. A link is one of three tiers: tickets (0), the official
+   app (1), the official website (2). TEMPORARY: links carry no type yet
+   (typed links are on the roadmap), so the tier is read from the label. */
+export function linkTier(l) {
+  const t = fold(l && l.label);
+  if (/ticket|wallet|boarding|voucher|billet|entrada/.test(t)) return 0;
+  if (/\bapp\b/.test(t)) return 1;
+  return 2;
+}
+/* The status the day sheet shows: an event with a ticket link counts as
+   booked, unless it is cancelled. Display only, the stored status is never
+   rewritten. */
+export function shownStatus(e) {
+  if (e.status === "cancelled") return e.status;
+  return (e.links || []).some((l) => l && l.url && linkTier(l) === 0) ? "booked" : e.status;
+}
+/* A row shows only the best tier it has: all of it up to 3 links, or the
+   first 2 when there are 4 or more. Everything else is counted in `more`. */
+export function rowLinks(links) {
+  const list = (links || []).filter((l) => l && l.url);
+  if (!list.length) return { shown: [], more: 0, tier: 0 };
+  const top = Math.min(...list.map(linkTier));
+  const tier = list.filter((l) => linkTier(l) === top);
+  const shown = tier.length <= 3 ? tier : tier.slice(0, 2);
+  return { shown, more: list.length - shown.length, tier: top };
+}
+
 export function searchEvents(events, query) {
   const q = fold(query).trim();
   if (!q) return [];

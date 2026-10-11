@@ -326,13 +326,15 @@ a.ticket{color:inherit;text-decoration:none}
 .slide-right{animation:sr var(--motion-base) var(--ease-drag);will-change:transform,opacity}
 @keyframes sl{from{transform:translateX(18%);opacity:0}}
 @keyframes sr{from{transform:translateX(-18%);opacity:0}}
-/* The control row stays put while the list scrolls under it: sticky, solid in the
-   page colour, with a short fade below so cards dissolve into it rather than being
-   cut by a line. .mn pads its top by --sp-4, so the row pulls itself up by that
-   much and pads itself back down: it sits flush at the top edge when stuck. Equal padding
-   above and below the buttons, so the gap to the panel edge matches the gap to the fade. */
-.ctl{position:sticky;top:calc(-1 * var(--sp-4));z-index:5;margin-top:calc(-1 * var(--sp-4));padding:var(--sp-4) 0;background:var(--surface)}
-.ctl::after{content:"";position:absolute;left:0;right:0;top:100%;height:var(--sp-4);background:linear-gradient(var(--surface),transparent);pointer-events:none}
+/* The control row stays put while the list scrolls under it, as floating
+   controls (Apple Maps style, Isa 2026-10-11): no bar and no fade, each control
+   its own small shadowed pill, the list visible between them. The row itself
+   ignores taps so the list scrolls and taps through the gaps. .mn pads its top
+   by --sp-4, so the row pulls itself up by that much and pads itself back down:
+   it sits flush at the top edge when stuck. */
+.ctl{position:sticky;top:calc(-1 * var(--sp-4));z-index:5;margin-top:calc(-1 * var(--sp-4));padding:var(--sp-4) 0;pointer-events:none}
+.ctl > *{pointer-events:auto}
+.ctl .segment,.ctl .ib,.ctl .sfield{box-shadow:0 1px 4px rgba(0,0,0,.22),0 0 0 .5px var(--rule)}
 .ctl2{display:flex;gap:6px;align-items:center}
 .ctl.searching .ctl2{flex:1}
 /* F59: Spoon's real .segment/.seg-thumb/.segment button construction
@@ -373,7 +375,6 @@ a.ticket{color:inherit;text-decoration:none}
    custom property that .segment reads -- the actual fix, so no ambient
    touch-target rule can push .ib taller than the toggle again. */
 .ib{flex:none;width:var(--ctl-h);height:var(--ctl-h);min-height:var(--ctl-h);border:0;border-radius:var(--r-round);background:var(--surface-2);color:var(--text-dim);display:grid;place-items:center;padding:0}
-.ib.on{background:var(--free-bg);color:var(--free-tx)}
 .sfield{flex:1;display:flex;align-items:center;gap:var(--sp-2);height:40px;padding:0 var(--sp-1) 0 var(--sp-3);border-radius:var(--r-control);background:var(--surface-2);transform-origin:right center;animation:grow var(--motion-slow) var(--ease-sheet)}
 @keyframes grow{from{clip-path:inset(0 0 0 calc(100% - 40px) round var(--r-round))}to{clip-path:inset(0 0 0 0 round var(--r-control))}}
 .sfield .si{display:grid;color:var(--text-dim)}
@@ -428,35 +429,36 @@ a.ticket{color:inherit;text-decoration:none}
    what every daycard used before any of this); every other day in the
    week pulls in well past it, with a negative margin-top, down to Grid's
    own intra-month row gap (.monthgrid, 4px) total. */
-.daycard.week-start{margin-top:var(--sp-2)}
-.daycard:not(.week-start){margin-top:calc(4px - var(--sp-3))}
+.dayrow{display:flex;gap:var(--sp-2);align-items:stretch}
+.dayrow.week-start{margin-top:var(--sp-2)}
+.dayrow:not(.week-start){margin-top:calc(4px - var(--sp-3))}
+/* the weekday sits outside the card, on the left; today's takes the accent */
+.wdl{flex:none;width:28px;padding-top:6px;font-size:var(--fs-micro);font-weight:500;color:var(--text-dim)}
+.wdl.today{color:var(--accent-ink)}
+.dayrow > .daycard{flex:1;min-width:0}
 /* Weekday top-left, day+month top-right, plain empty space between them
    (no rule, no dots) -- flex justify-content does the work. */
-.daycard > .cd{display:flex;justify-content:space-between;align-items:baseline;gap:6px;font-size:var(--fs-micro);font-weight:500;color:var(--text-dim);margin-bottom:var(--sp-2)}
-.daycard.weekend{background:var(--accent-soft)}
+.daycard > .cd{display:flex;justify-content:flex-start;align-items:baseline;gap:var(--sp-2);font-size:var(--fs-micro);font-weight:500;color:var(--text-dim);margin-bottom:var(--sp-2)}
+.daycard.weekend,.daycard.holiday-border{background:var(--accent-soft)}
 .daycard.today{background:var(--accent);color:var(--accent-text)}
 .daycard.today > .cd{color:var(--accent-text)}
-.daycard.clear{background:var(--free-tx);color:var(--free-bg)}
-.daycard.clear > .cd{color:var(--free-bg)}
-.daycard.open{border:2px solid var(--free-tx)}
 /* Text on a solid card (today, Clear) takes that card's own ink, never the page's --text:
    chartreuse and amber are light fills, and --text is near-white in dark mode. The to-do icon sets --text-dim itself, so it inherits the ink back here. */
-.daycard.today .todo-ic,.daycard.clear .todo-ic{color:inherit;opacity:.75}
+.daycard.today .todo-ic{color:inherit;opacity:.75}
 /* "Check in" / "Check out" after a stay's title, quieter than it. A long title
    ellipsises on its own; the tag never shrinks, so it is always readable. */
 .c-t.has-tag{display:flex;min-width:0}
 .c-name{min-width:0;overflow:hidden;white-space:nowrap;text-overflow:ellipsis}
 .c-tag{flex:none;white-space:nowrap;color:var(--text-dim)}
-.daycard.today .c-tag,.daycard.clear .c-tag{color:inherit;opacity:.75}
+.daycard.today .c-tag{color:inherit;opacity:.75}
 /* a dimmed (other person's) event keeps the card's full ink on a solid card: any dimming drops chartreuse, amber and cobalt below 4.5:1; its icon is still greyed */
-.daycard.today .grey .c-t,.daycard.clear .grey .c-t{color:inherit}
+.daycard.today .grey .c-t{color:inherit}
 
-/* A weekday bank holiday (never Sat/Sun -- a weekend already reads as a
-   holiday by being one): an accent border, the same 2px weight as Open's
-   free-tx border above so the two read as the same kind of mark. */
-.daycard.holiday-border{border:2px solid var(--accent)}
+/* A weekday bank holiday (never Sat/Sun) is shaded like a weekend: its
+   class (holiday-border, a leftover name) shares the .weekend rule above,
+   declared before Clear/Open/today so they still win. */
 /* the holiday's name in the header: the middle of three slots, shrinking and ellipsising before it can push the date */
-.cd-hol{flex:1;min-width:0;text-align:center;overflow:hidden;white-space:nowrap;text-overflow:ellipsis}
+.cd-hol{flex:1;min-width:0;text-align:left;overflow:hidden;white-space:nowrap;text-overflow:ellipsis}
 /* grid: a real Monday-first month grid, blank pad cells outside the month.
    No card: just the squares, month to month, with no boxed container or
    border around the group. */
@@ -471,35 +473,25 @@ a.ticket{color:inherit;text-decoration:none}
 .dsq{aspect-ratio:5/6;border-radius:8px;background:var(--panel);position:relative;cursor:pointer}
 .dsq.pad{background:transparent;cursor:default}
 .dsq .num{position:absolute;top:4px;left:5px;font-size:var(--fs-micro);font-weight:var(--fw-medium);color:var(--text-dim)}
-/* F16's checkbox glyph, top-right -- at least one event that day still has
-   an unchecked to-do. A line icon, never an emoji, same as the sheet's own
-   .todo-ic. */
-.dsq .dtodo{position:absolute;bottom:5px;right:5px;display:flex;color:var(--text-dim)}
-/* one dot per extra event that day, bottom left; a "+" past four */
-.dsq .ddots{position:absolute;bottom:9px;left:5px;display:flex;align-items:center;gap:2px;color:var(--text-dim)}
+/* the top-right info, level with the day number: the event dots (one per
+   extra event, a "+" past three). */
+.dsq .dinfo{position:absolute;top:4px;right:6px;height:calc(var(--fs-micro) * var(--lh-base));display:flex;align-items:center;gap:2px}
+.dsq .ddots{display:flex;align-items:center;gap:2px;color:var(--text-dim)}
 .dsq .ddots i{display:block;width:4px;height:4px;border-radius:var(--r-round);background:currentColor}
-.dsq .ddots b{font-size:8px;font-weight:var(--fw-medium);line-height:4px;margin-left:1px}
-.dsq .dtodo svg{width:12px;height:12px;stroke-width:2.5}
-.dsq.today .dtodo{color:var(--accent-text);opacity:.75}
+.dsq .ddots b{font-size:8px;font-weight:var(--fw-medium);line-height:4px}
 /* the day's single emoji, centred in the bottom two thirds -- no border
    ever says whose day it is; a day that's only the other person's uses
    the app's existing "grey" convention (same filter as .c-i.grey in the
    event rows) instead. */
-.dsq .emo{position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);font-size:21px;line-height:1}
+.dsq .emo{position:absolute;top:67%;left:50%;transform:translate(-50%,-50%);font-size:21px;line-height:1}
 .dsq .emo.grey{filter:grayscale(1);opacity:.45}
 /* weekend square: the accent fade (--accent-soft), same as Agenda's weekend
    day cards -- unconditional, but Clear/Open/today (declared after) still
    win, same priority as everywhere else this app colours a square. */
-.dsq.weekend{background:var(--accent-soft)}
+.dsq.weekend,.dsq.holiday-border{background:var(--accent-soft)}
 .dsq.today{background:var(--accent)}
 .dsq.today .num{color:var(--accent-text)}
 .dsq.today .ddots{color:var(--accent-text);opacity:.75}
-.dsq.clear{background:var(--free-tx)}
-.dsq.clear .num{color:var(--free-bg)}
-.dsq.clear .dtodo,.dsq.clear .ddots{color:var(--free-bg);opacity:.75}
-.dsq.open{border:2px solid var(--free-tx)}
-/* a weekday bank holiday: the same accent border as Agenda's day card (declared after Open, so it wins) */
-.dsq.holiday-border{border:2px solid var(--accent)}
 /* search */
 .hint{margin:0;color:var(--text-dim);font-size:var(--fs-meta)}
 .card{background:var(--panel);border-radius:var(--r-card);padding:var(--sp-3)}
@@ -590,7 +582,7 @@ a.ticket{color:inherit;text-decoration:none}
 /* ---- a small inline SVG checkbox glyph marks an event with open to-dos
    (never an emoji) ---- */
 .todo-ic{display:inline-flex;color:var(--text-dim);vertical-align:-2px}
-.todo-ic svg{width:13px;height:13px;stroke-width:2.5}
+.todo-ic svg{width:14px;height:14px;stroke-width:2}
 
 /* ================= The event page and form (round 2) =================
    After Google Calendar: a group per kind of information, a line icon on
@@ -700,3 +692,33 @@ a.ticket{color:inherit;text-decoration:none}
 .banner.undo{display:flex;align-items:center;justify-content:space-between;gap:var(--sp-3)}
 .banner.undo button{background:none;color:var(--bg);font-weight:600;min-height:36px}
 @media (min-width:900px){.catgrid{grid-template-columns:repeat(3,minmax(0,1fr))}}
+/* Day popup row (design review, 2026-10-11): emoji left, status top right, a
+   coloured edge for Booked only, then the best tier of links. */
+.dst{align-items:flex-start}
+.dem{flex:none;font-size:24px;line-height:1.2;display:flex;gap:2px}
+.dst .dline{color:var(--text-dim);font-size:var(--fs-ui)}
+.dsep{display:inline-block;margin:0 var(--sp-2)}
+/* the title block is a grid so the status (row 1) and the to-do count (row 2,
+   level with the time) stay right-aligned under each other, even when a long
+   title wraps */
+.dst .dmain{display:grid;grid-template-columns:minmax(0,1fr) auto;column-gap:var(--sp-3);row-gap:var(--sp-2)}
+.dst .dmain > h3{grid-column:1;grid-row:1}
+.dst .dmain > .dstat{grid-column:2;grid-row:1}
+.dst .dmain > .dline{grid-column:1;grid-row:2}
+.dst .dmain > .dcount{grid-column:2;grid-row:2}
+.dst .dmain > .dlinks{grid-column:1 / -1;grid-row:3}
+.dstat{display:flex;align-items:center;height:calc(var(--fs-title) * var(--lh-base));font-size:var(--fs-meta);font-weight:var(--fw-medium);color:var(--text-dim)}
+.dst.st-b .dstat{color:var(--accent-ink)}
+.dst.st-c h3{text-decoration:line-through;color:var(--text-dim)}
+.dlinks{margin-top:var(--sp-2);display:flex;flex-direction:column}
+.dlink{display:flex;align-items:center;gap:var(--sp-2);padding:var(--sp-2) 0;border-top:1px solid var(--rule);color:var(--text);text-decoration:none;font-size:var(--fs-ui)}
+.dlink .dlt{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.dlink .chev{width:18px;height:18px;margin:0;color:var(--text-dim)}
+.dmore{margin:0;padding:var(--sp-2) 0 0;border-top:1px solid var(--rule);font-size:var(--fs-meta);color:var(--text-dim)}
+/* the open-to-do count and box, right-aligned on the time's line */
+.dcount{display:inline-flex;align-items:center;gap:var(--sp-1);justify-self:end;font-size:var(--fs-ui);color:var(--text-dim)}
+.dcount svg{width:14px;height:14px;stroke-width:2}
+/* Today: a thin calendar outline like the search and "+" icons, the date inside
+   as plain text (no stroke), slightly larger so two digits stay readable */
+.ib .tdy{width:20px;height:20px}
+.ib .tdy text{fill:currentColor;stroke:none;font-family:inherit;font-weight:var(--fw-medium);text-anchor:middle}

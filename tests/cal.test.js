@@ -2,7 +2,7 @@ import { test, eq, ok } from "./run.js";
 import { indexByDay, isMidStay, stayRole, stayLabel, pickDayIcon, tappable, zoomWeekTarget, zoomMonthTarget, isAway, awayText,
   shouldLoadMore, nextCount, iconsOf, searchEvents, todaysCount, fullPastWeeks, fullPastMonths,
   backToTodayState, tripCityFor, defaultCity, hideCancelled,
-  hasOpenTodos, guestsExcludingViewer, statusGuestsLine } from "../js/cal-model.js";
+  hasOpenTodos, guestsExcludingViewer, statusGuestsLine, rowLinks, shownStatus, gridDots } from "../js/cal-model.js";
 
 const ev = (id, start, extra = {}) => ({ id, title: id, start, end: null, owner: "shared", status: "planned", activities: [], ...extra });
 const act = (type, icon) => ({ type, icon });
@@ -233,4 +233,35 @@ test("cal: hasOpenTodos", () => {
   eq(hasOpenTodos(ev("b", "2026-10-01", { checklist: [] })), false);
   eq(hasOpenTodos(ev("c", "2026-10-01", { checklist: [{ id: "1", text: "x", done: true }] })), false, "every item done");
   eq(hasOpenTodos(ev("d", "2026-10-01", { checklist: [{ id: "1", text: "x", done: true }, { id: "2", text: "y", done: false }] })), true);
+});
+
+test("cal: rowLinks shows only the best tier, 3 in full or 2 plus a count", () => {
+  const L = (label) => ({ label, url: "https://x.test/" + label });
+  const labels = (r) => r.shown.map((l) => l.label);
+  let r = rowLinks([L("Official website"), L("Hotel app"), L("Voucher")]);
+  eq(labels(r), ["Voucher"], "a ticket hides the app and the website"); eq(r.more, 2, "both counted");
+  r = rowLinks([L("Ticket A"), L("Ticket B"), L("Ticket C"), L("Hotel app")]);
+  eq(labels(r), ["Ticket A", "Ticket B", "Ticket C"], "3 tickets all show"); eq(r.more, 1);
+  r = rowLinks([L("Ticket A"), L("Ticket B"), L("Ticket C"), L("Ticket D"), L("Ticket E")]);
+  eq(labels(r), ["Ticket A", "Ticket B"], "4 or more: first 2"); eq(r.more, 3);
+  r = rowLinks([L("Official website"), L("Open the DICE app")]);
+  eq(labels(r), ["Open the DICE app"], "no ticket: the app wins"); eq(r.more, 1);
+  r = rowLinks([L("Official website")]); eq(r.more, 0, "only a website: nothing more");
+  eq(rowLinks([]).shown, []); eq(rowLinks(null).more, 0);
+});
+
+test("cal: shownStatus makes an event with a ticket link booked, except cancelled", () => {
+  const t = [{ label: "Ticket A", url: "https://x.test/a" }], w = [{ label: "Official website", url: "https://x.test/w" }];
+  eq(shownStatus({ status: "planned", links: t }), "booked", "a ticket books it");
+  eq(shownStatus({ status: "idea", links: t }), "booked");
+  eq(shownStatus({ status: "cancelled", links: t }), "cancelled", "cancelled stays cancelled");
+  eq(shownStatus({ status: "planned", links: w }), "planned", "a website alone does not");
+  eq(shownStatus({ status: "idea" }), "idea", "no links at all");
+});
+
+test("cal: gridDots fits the top edge: up to 3 dots, past that 2 and a plus", () => {
+  eq(gridDots(0), { dots: 0, plus: false }, "one event: nothing");
+  eq(gridDots(2), { dots: 2, plus: false });
+  eq(gridDots(3), { dots: 3, plus: false }, "three fit");
+  eq(gridDots(4), { dots: 2, plus: true }, "past three: two and a plus");
 });

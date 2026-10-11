@@ -16,9 +16,9 @@ import { status as syncStatus, checkToken } from "./sync.js";
 import { ICON } from "./chrome-icons.js";
 import { calendarHtml, afterCalendar, onScroll, backToToday, todaysCount } from "./calendar.js";
 import { refreshSheet, openLevel, registerLevel } from "./sheet.js";
-import { readPrefs, defaultsSummary, VIEW_NAMES, DETAIL_NAMES, blocksFreeTime, toggleBlocking, freeTimeSummary, toggleWeekdayHeader } from "./prefs.js";
+import { readPrefs, defaultsSummary, VIEW_NAMES, DETAIL_NAMES, toggleWeekdayHeader } from "./prefs.js";
 import { CATEGORIES, iconFor } from "./icons.js";
-import { resetCalendarDefaults } from "./calendar.js";
+import { resetCalendarDefaults, openArchive } from "./calendar.js";
 import { checkForUpdate, ensureVersionAsked, updateStatusLines, updateBusy, updateButtonText, updateReady } from "./updates.js";
 import { gateStep, gateHtml, bindGate } from "./gate.js";
 
@@ -117,7 +117,7 @@ function renderSettings() {
   return `<div class="fields">
     ${field("Theme", theme, "Light and dark follow the phone.")}
     ${opener("Calendar defaults", "set-defaults", defaultsSummary(prefs))}
-    ${opener("Free time", "set-freetime", freeTimeSummary(prefs))}
+    ${field("Archive", `<button id="openArchiveBtn">Open the archive</button>`, "Look back before this year, in Grid or Agenda.")}
     ${field("Sync", `<div class="sync-status"><p class="sync-line ${dot}"><i></i>${escapeHtml(syncLine)}</p>${when ? `<p class="sync-line muted">${escapeHtml(when)}</p>` : ""}</div>`
       + `<button id="syncNow"${s.token ? "" : " disabled"}>Sync now</button>`)}
     <div class="advanced-block">
@@ -162,24 +162,6 @@ registerLevel("set-defaults", {
     resetCalendarDefaults();
   },
 });
-registerLevel("set-freetime", {
-  title: () => "Free time",
-  body() {
-    const s = store.state.settings, p = readPrefs(s);
-    const rowsHtml = CATEGORIES.map((c) => {
-      const on = blocksFreeTime(p, c.type);
-      return `<div class="grid-r single"><span class="gl"><span class="gi">${escapeHtml(iconFor({ type: c.type }, { owner: s.me }, s.me))}</span>${escapeHtml(c.label)}</span>`
-        + `<button class="tick${on ? " on" : ""}" role="checkbox" aria-checked="${on}" aria-label="${escapeHtml(c.label)} blocks free time" data-tick-block="${escapeHtml(c.type)}">${on ? ICON.check : ""}</button></div>`;
-    }).join("");
-    return `<p class="fhint">Which of these would block you from planning a trip?</p><div class="grid">${rowsHtml}</div>`;
-  },
-  onAction(b) {
-    const t = b.dataset.tickBlock;
-    if (!t) return;
-    store.setSetting("blockingCategories", toggleBlocking(readPrefs(store.state.settings), t).blockingCategories);
-  },
-});
-
 /* F3: a today's-event-count badge on the Calendar nav icon, styled like the
    shopping list's item-count badge (household-look.md, "The nav count
    badge"): hidden entirely at zero rather than showing "0". */
@@ -218,13 +200,9 @@ export function render() {
     : current === "calendar" ? calendarHtml() : renderStub(current);
   main.classList.toggle("is-cal", current === "calendar");
   document.getElementById("nav").innerHTML = renderNav();
-  /* The round buttons: up (scroll to the top, revealing the controls), down
-     (jump to today, collapsing loaded-older data; the same icon mirrored in
-     CSS) and add. */
-  document.getElementById("fabs").innerHTML = current === "calendar"
-    ? `<button class="fab up" data-fab="up" aria-label="Scroll to top">${ICON.up}</button>`
-      + `<button class="fab down" data-fab="down" aria-label="Back to today">${ICON.up}</button>`
-      + `<button class="fab add" data-fab="add" aria-label="Add an event">${ICON.plus}</button>` : "";
+  /* No floating buttons any more: Today and "+" sit in the Calendar's own
+     control row (calendar.js controls()). */
+  document.getElementById("fabs").innerHTML = "";
   if (current === "calendar") { afterCalendar(main, before); firstDraw = false; }
   else onScroll();
   refreshSheet();
@@ -248,6 +226,9 @@ function bindView() {
 
   const sync = document.getElementById("syncNow");
   if (sync) sync.addEventListener("click", () => { if (actions.sync) actions.sync(); });
+
+  const arch = document.getElementById("openArchiveBtn");
+  if (arch) arch.addEventListener("click", () => openArchive());
 
   const adv = document.getElementById("advToggle");
   if (adv) adv.addEventListener("click", () => { advancedOpen = !advancedOpen; render(); });
