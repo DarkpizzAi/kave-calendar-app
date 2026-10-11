@@ -441,7 +441,7 @@ a.ticket{color:inherit;text-decoration:none}
 .daycard.open{border:2px solid var(--free-tx)}
 /* Text on a solid card (today, Clear) takes that card's own ink, never the page's --text:
    chartreuse and amber are light fills, and --text is near-white in dark mode. The to-do icon sets --text-dim itself, so it inherits the ink back here. */
-.daycard.today .todo-ic,.daycard.clear .todo-ic{color:inherit}
+.daycard.today .todo-ic,.daycard.clear .todo-ic{color:inherit;opacity:.75}
 /* "Check in" / "Check out" after a stay's title, quieter than it. A long title
    ellipsises on its own; the tag never shrinks, so it is always readable. */
 .c-t.has-tag{display:flex;min-width:0}
@@ -478,7 +478,7 @@ a.ticket{color:inherit;text-decoration:none}
 /* the day's event count, top right, in the date's own type */
 .dsq .dcount{position:absolute;top:4px;right:5px;font-size:var(--fs-micro);font-weight:var(--fw-medium);font-variant-numeric:tabular-nums;color:var(--text-dim)}
 .dsq .dtodo svg{width:12px;height:12px;stroke-width:2.5}
-.dsq.today .dtodo{color:var(--accent-text)}
+.dsq.today .dtodo{color:var(--accent-text);opacity:.75}
 /* the opening day of a real long weekend/opportunity (never a plain free
    weekend -- that's colour only), bottom-left so it never fights the
    centred emoji or the top corners' num/dtodo */
@@ -495,10 +495,10 @@ a.ticket{color:inherit;text-decoration:none}
 .dsq.weekend{background:var(--accent-soft)}
 .dsq.today{background:var(--accent)}
 .dsq.today .num{color:var(--accent-text)}
-.dsq.today .dcount{color:var(--accent-text)}
+.dsq.today .dcount{color:var(--accent-text);opacity:.75}
 .dsq.clear{background:var(--free-tx)}
 .dsq.clear .num{color:var(--free-bg)}
-.dsq.clear .dtodo,.dsq.clear .dcount{color:var(--free-bg)}
+.dsq.clear .dtodo,.dsq.clear .dcount{color:var(--free-bg);opacity:.75}
 .dsq.open{border:2px solid var(--free-tx)}
 /* a weekday bank holiday: the same accent border as Agenda's day card (declared after Open, so it wins) */
 .dsq.holiday-border{border:2px solid var(--accent)}
