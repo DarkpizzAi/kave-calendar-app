@@ -2,7 +2,7 @@ import { test, eq, ok } from "./run.js";
 import { isoWeek, monthOfWeek, firstWeekOf, loadRange, freeWeekendSaturday, weekendBlocks, classifyWeekend, longWeekends, dayFreeState, weekFreeNote, weekFreeDays } from "../js/views.js";
 import { applyDetail } from "../js/filter.js";
 import { CATEGORIES, iconFor } from "../js/icons.js";
-import { HOLIDAYS } from "../js/holidays.js";
+import { HOLIDAYS, STATUS, isProvisional } from "../js/holidays.js";
 
 const ev = (id, s, extra = {}) => ({ id, title: id, start: s, end: null, owner: "shared", activities: [], ...extra });
 const on = (events) => (d) => events.filter((e) => e.start <= d && d <= (e.end || e.start));
@@ -35,6 +35,14 @@ test("a free weekend shows on its Saturday, however far out, as long as it's sti
      "a free Saturday that has already passed doesn't show, even in the current month");
   eq(freeWeekendSaturday("2026-09-21", on([]), "2026-09-26", blocksAll), null,
      "today being the Saturday itself is enough to stop it showing");
+});
+
+/* ---- the holiday table itself ---- */
+test("holidays: every listed year has a status, and no holiday falls on a Sunday", () => {
+  const years = [...new Set(Object.keys(HOLIDAYS).map((d) => d.slice(0, 4)))];
+  eq(years.filter((y) => !STATUS[y]), []);
+  eq(Object.keys(HOLIDAYS).filter((d) => new Date(d + "T12:00:00Z").getUTCDay() === 0), []);
+  eq([isProvisional("2027-01-01"), isProvisional("2029-05-21")], [false, true]);
 });
 
 /* ---- long weekends from bank holidays ---- */
