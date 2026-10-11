@@ -257,6 +257,8 @@ test("cal: shownStatus makes an event with a ticket link booked, except cancelle
   eq(shownStatus({ status: "cancelled", links: t }), "cancelled", "cancelled stays cancelled");
   eq(shownStatus({ status: "planned", links: w }), "planned", "a website alone does not");
   eq(shownStatus({ status: "idea" }), "idea", "no links at all");
+  eq(shownStatus({ status: "done" }), "planned", "a stray stored done reads as planned: there is no done status");
+  eq(shownStatus({ status: "done", links: t }), "booked", "and a ticket still books it");
 });
 
 test("cal: gridDots fits the top edge: up to 3 dots, past that 2 and a plus", () => {

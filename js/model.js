@@ -6,8 +6,11 @@
 import { isValidDate, precision, compareDates } from "./dates.js";
 import { uid, safeUrl } from "./util.js";
 
-export const STATUSES = ["idea", "planned", "booked", "done", "cancelled"];
-export const STATUS_LABEL = { idea: "Idea", planned: "Planned", booked: "Booked", done: "Done", cancelled: "Cancelled" };
+/* There is no "done" status (Isa, 2026-10-11: a finished event is already past).
+   statusOf reads any status, one stored from before that included, as one of these. */
+export const STATUSES = ["idea", "planned", "booked", "cancelled"];
+export const STATUS_LABEL = { idea: "Idea", planned: "Planned", booked: "Booked", cancelled: "Cancelled" };
+export const statusOf = (e) => (STATUS_LABEL[e && e.status] ? e.status : "planned");
 export const PEOPLE = ["isa", "hugo"];
 export const OWNERS = ["isa", "hugo", "shared"];
 

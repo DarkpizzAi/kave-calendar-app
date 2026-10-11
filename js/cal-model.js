@@ -7,6 +7,7 @@ import { addDays, dayOfWeek, mondayOf, daysOf } from "./dates.js";
 import { firstWeekOf } from "./views.js";
 import { CATEGORIES, iconFor } from "./icons.js";
 import { applyDetail } from "./filter.js";
+import { statusOf } from "./model.js";
 
 const DOW = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
 
@@ -261,8 +262,9 @@ export function linkTier(l) {
    booked, unless it is cancelled. Display only, the stored status is never
    rewritten. */
 export function shownStatus(e) {
-  if (e.status === "cancelled") return e.status;
-  return (e.links || []).some((l) => l && l.url && linkTier(l) === 0) ? "booked" : e.status;
+  const s = statusOf(e);
+  if (s === "cancelled") return s;
+  return (e.links || []).some((l) => l && l.url && linkTier(l) === 0) ? "booked" : s;
 }
 /* A row shows only the best tier it has: all of it up to 3 links, or the
    first 2 when there are 4 or more. Everything else is counted in `more`. */

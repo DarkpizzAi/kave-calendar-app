@@ -7,7 +7,7 @@
 
 import { escapeHtml as esc, safeUrl, copyText } from "./util.js";
 import { todayKey } from "./dates.js";
-import { newEvent, STATUSES, STATUS_LABEL } from "./model.js";
+import { newEvent, STATUSES, STATUS_LABEL, statusOf } from "./model.js";
 import { CATEGORIES as MONEY, formatCents, visibleCosts } from "./money.js";
 import { CATEGORIES, GROUPS, iconFor, categoryOf, onlyIcon } from "./icons.js";
 import { readForm, costDefaults, canChangeCost, addTask, addCost, whenLine, mapsUrl, toDraft, costPayerText } from "./event-form.js";
@@ -148,9 +148,7 @@ function formPage(d) {
        than one repeated per row. */
     + group("clock", `<div class="dt-row"><div class="dt-col">${input("start", d.start, "Day", "date")}${input("startTime", d.startTime || "", "Start time", "time")}</div>`
       + `<span class="dt-to dim">to</span><div class="dt-col">${input("end", d.end || "", "End day", "date")}${input("endTime", d.endTime || "", "End time", "time")}</div></div>`
-      /* F47: "done" is not a useful status to pick by hand here; it stays a
-         real status (STATUS_LABEL, elsewhere) just not a choice in this form. */
-      + `<p class="fhint">The end day and the times are optional.</p>${choices("status", STATUSES.filter((s) => s !== "done").map((s) => [s, STATUS_LABEL[s]]), d.status)}`, "When")
+      + `<p class="fhint">The end day and the times are optional.</p>${choices("status", STATUSES.map((s) => [s, STATUS_LABEL[s]]), d.status)}`, "When")
     + group("tag", activityForm(d), "What")
     + group("pin", `${input("venue", d.venue, "Venue")}${input("city", d.city, "City")}`, "Where")
     + group("people", `${choices("owner", OWNERS, d.owner)}${input("guests", d.guests, "Guests, first names")}`, "Who")
@@ -316,7 +314,7 @@ export function initEvent(ctx) {
     /* F68 continued: the status pill moved into the sheet's own header,
        Spoon's recipe popup's own .detail-tags row under the name, instead
        of living as the page's first line. */
-    tags: (l) => { const e = find(l.id); return e ? `<span class="flag acc status-pill">${esc(STATUS_LABEL[e.status] || "")}</span>` : ""; },
+    tags: (l) => { const e = find(l.id); return e ? `<span class="flag acc status-pill">${esc(STATUS_LABEL[statusOf(e)])}</span>` : ""; },
     body: (l) => {
       /* the entry lines belong to one event: a different event starts them empty */
       if (l.id !== lastPage) { lastPage = l.id; pageCost = null; pageTask.text = ""; pageTask.for = "shared"; }
