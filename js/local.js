@@ -11,8 +11,10 @@ export function createLocal(storage) {
     try { const raw = storage.getItem(key); return raw ? JSON.parse(raw) : fallback; }
     catch { return fallback; }
   }
+  /* true when stored. A cache that fails to store only costs a re-download;
+     an edit that fails to store is lost, so enqueue says so (below). */
   function write(key, value) {
-    try { storage.setItem(key, JSON.stringify(value)); } catch { /* quota: this session still works */ }
+    try { storage.setItem(key, JSON.stringify(value)); return true; } catch { return false; }
   }
   return {
     getYear: (y) => read(yearKey(y), null),
@@ -21,7 +23,10 @@ export function createLocal(storage) {
       const q = read(Q, {});
       q[year] = q[year] || {};
       q[year][record.id] = record;
-      write(Q, q);
+      /* the phone's storage is shared with Spoon and the hub: when it is
+         full, the edit must fail out loud (the form shows the message)
+         rather than vanish */
+      if (!write(Q, q)) throw new Error("the phone's storage is full, so this edit was not kept");
     },
     pendingYears() {
       const q = read(Q, {});

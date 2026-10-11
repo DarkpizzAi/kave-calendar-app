@@ -19,11 +19,17 @@ const isConflict = (e) => e && (e.gh === "conflict" || (e.gh === "http" && e.sta
 export function createSync({ gh, local }) {
   let syncing = false;
   const lanes = { near: 0, far: 0 };
+  /* Bumped each time a flush writes a year. A load runs outside the sync
+     latch (calendar.js asks for years as it draws), so its GET can start
+     before a flush's PUT and land after it: that copy is older than the
+     cache and must not replace it. */
+  const writes = {};
 
   async function loadYear(y) {
-    const rec = local.getYear(y);
+    const rec = local.getYear(y), gen = writes[y] || 0;
     try {
       const r = await gh.getFile(pathFor(y), { etag: rec && rec.etag });
+      if ((writes[y] || 0) !== gen) return local.getYear(y).events;
       if (r.notModified) return rec.events;
       local.setYear(y, { events: r.json.events || [], sha: r.sha, etag: r.etag });
       return r.json.events || [];
@@ -47,6 +53,7 @@ export function createSync({ gh, local }) {
         const out = await gh.putFile(pathFor(y), { schema: 1, year: Number(y), events: merged }, sha,
           `compass: ${queued.length} event edit(s) in ${y} by ${store.state.settings.me || "?"}`);
         local.setYear(y, { events: merged, sha: out.sha, etag: null });
+        writes[y] = (writes[y] || 0) + 1;
         local.dequeue(y, queued);
         return;
       } catch (e) {
@@ -84,25 +91,23 @@ export function createSync({ gh, local }) {
     return running;
   }
 
+  /* Each year flushes and loads on its own: one failing file must not hold
+     back the others -- not the other uploads (a year move could leave the
+     new copy stranded), and not the downloads either (one year that keeps
+     conflicting would otherwise stop the other phone's edits arriving).
+     The first error is reported once everything has been tried. */
   async function syncOnce(years) {
-    try {
-      /* Each year flushes on its own: one failing file must not hold back
-         the others, or a year move could leave the new copy stranded. */
-      let firstError = null;
-      for (const y of local.pendingYears()) {
-        try { await flushYear(y); } catch (e) { firstError = firstError || e; }
-      }
-      if (firstError) throw firstError;
-      const thisYear = String(new Date().getFullYear());
-      for (const y of years) {
-        const lane = Number(y) >= Number(thisYear) ? "near" : "far";
-        lanes[lane] = Date.now();
-        await loadYear(y);
-      }
-      return { ok: true };
-    } catch (e) {
-      return { ok: false, error: e };
+    let firstError = null;
+    for (const y of local.pendingYears()) {
+      try { await flushYear(y); } catch (e) { firstError = firstError || e; }
     }
+    const thisYear = String(new Date().getFullYear());
+    for (const y of years) {
+      const lane = Number(y) >= Number(thisYear) ? "near" : "far";
+      lanes[lane] = Date.now();
+      try { await loadYear(y); } catch (e) { firstError = firstError || e; }
+    }
+    return firstError ? { ok: false, error: firstError } : { ok: true };
   }
 
   return { loadYear, flushYear, syncNow, syncing: () => syncing, lanes };

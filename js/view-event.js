@@ -7,11 +7,11 @@
 
 import { escapeHtml as esc, safeUrl, copyText } from "./util.js";
 import { todayKey } from "./dates.js";
-import { newEvent, STATUSES, STATUS_LABEL, statusOf } from "./model.js";
+import { newEvent, STATUSES, STATUS_LABEL } from "./model.js";
 import { CATEGORIES as MONEY, formatCents, visibleCosts } from "./money.js";
 import { CATEGORIES, GROUPS, iconFor, categoryOf, onlyIcon } from "./icons.js";
 import { readForm, costDefaults, canChangeCost, addTask, addCost, whenLine, mapsUrl, toDraft, costPayerText } from "./event-form.js";
-import { defaultCity } from "./cal-model.js";
+import { defaultCity, shownStatus, linkTier } from "./cal-model.js";
 import { registerLevel, openLevel, replaceTop, back, closeAll, topLevel } from "./sheet.js";
 import { store } from "./store.js";
 import { ICON } from "./chrome-icons.js";
@@ -23,6 +23,8 @@ const OWNERS = [["shared", "Both of us"], ["isa", "Isa"], ["hugo", "Hugo"]];
 const RUNG = { estimate: ["estimate", "Estimate", "An estimate"], recorded: ["recorded", "Recorded", "Recorded by hand"],
   confirmed: ["confirmed", "Email", "Confirmed by the booking email"], locked: ["locked", "Bank", "Locked by the bank extract"] };
 const name = (p) => ({ isa: "Isa", hugo: "Hugo", shared: "Both of us" }[p] || "");
+/* The word before each link, by the Day popup's own tiers (linkTier). */
+const LINK_WORD = ["Ticket", "App", "Website"];
 
 let data = null;
 let draft = null;          // the form's values while "edit" or "new" is open
@@ -91,7 +93,7 @@ function eventPage(e) {
   const where = place ? `<p>${esc(place)}</p>${maps && e.venue ? `<a class="maps" href="${esc(maps)}" target="_blank" rel="noopener noreferrer">Open in Maps</a>` : ""}` : "";
   const who = `<p>${esc(name(e.owner))}</p>${e.guests ? `<p class="dim">With ${esc(e.guests)}</p>` : ""}`;
   const links = [...(e.links || []).map((l) => { const u = safeUrl(l.url); return u
-      ? `<p class="ref"><span class="dim">App</span> <a class="ticket" href="${esc(u)}" target="_blank" rel="noopener noreferrer">${esc(l.label)}${ICON.ext}</a></p>` : ""; }),
+      ? `<p class="ref"><span class="dim">${LINK_WORD[linkTier(l)]}</span> <a class="ticket" href="${esc(u)}" target="_blank" rel="noopener noreferrer">${esc(l.label)}${ICON.ext}</a></p>` : ""; }),
     ...(e.bookingRefs || []).map((r) => `<p class="ref"><span class="dim">Booking</span> <span class="refv">${esc(r)}</span>`
       + `<button class="copy" data-act="copy" data-v="${esc(r)}" aria-label="Copy ${esc(r)}">${ICON.copy}<span class="cl">Copy</span></button></p>`)].join("");
   const todos = (e.checklist || []).map((c) => `<button class="todo${c.done ? " done" : ""}" data-act="tick" data-c="${esc(c.id)}" role="checkbox" aria-checked="${!!c.done}">`
@@ -182,6 +184,15 @@ function need(sel) {
 }
 
 function saveForm(l) {
+  /* A to-do or cost typed but never added is kept, not silently dropped. */
+  if (String(draft.newTodoText || "").trim()) {
+    draft.checklist = addTask(draft, draft.newTodoText, draft.newTodoAssignee).checklist;
+    draft.newTodoText = ""; draft.newTodoAssignee = null;
+  }
+  if (draft.newCost && String(draft.newCost.name || "").trim()) {
+    try { draft.costs = addCost(draft, draft.newCost, me(), new Date()).costs; draft.newCost = null; }
+    catch { need('[data-f="cost-amount"]'); banner("The new cost needs an amount."); return; }
+  }
   const { fields, errors } = readForm(draft);
   if (errors.length) { need(!fields.title ? '[data-f="title"]' : '[data-f="start"]'); banner(errors[0][0].toUpperCase() + errors[0].slice(1) + "."); return; }
   if (l.kind === "new") {
@@ -249,7 +260,7 @@ function onAction(b, l) {
     let gone;
     try { gone = data.remove(prev); } catch (err) { banner(String(err.message || err)); return; }
     draft = null; closeAll();
-    banner(`Deleted ${prev.title}.`, () => data.undoRemove(gone));
+    banner(`Deleted ${prev.title}.`, () => { try { data.undoRemove(gone); } catch (err) { banner(String(err.message || err)); } });
     return;
   }
   if (a === "copy") {
@@ -260,7 +271,8 @@ function onAction(b, l) {
   if (e) {
     if (a === "tick") save(e, { ...e, checklist: e.checklist.map((c) => (c.id === b.dataset.c ? { ...c, done: !c.done } : c)) });
     else if (pick === "task-for") pageTask.for = b.dataset.v;
-    else if (a === "addtask") { if (save(e, addTask(e, pageTask.text, pageTask.for))) { pageTask.text = ""; pageTask.for = "shared"; } }
+    /* an empty task is nothing to add: saving it would still commit */
+    else if (a === "addtask") { if (pageTask.text.trim() && save(e, addTask(e, pageTask.text, pageTask.for))) { pageTask.text = ""; pageTask.for = "shared"; } }
     else if (pick && pick.startsWith("cost-")) { pageCost = pageCost || { ...costDefaults(e, me()) }; pageCost[pick.slice(5)] = b.dataset.v; }
     else if (a === "addcost") {
       let next;
@@ -314,7 +326,8 @@ export function initEvent(ctx) {
     /* F68 continued: the status pill moved into the sheet's own header,
        Spoon's recipe popup's own .detail-tags row under the name, instead
        of living as the page's first line. */
-    tags: (l) => { const e = find(l.id); return e ? `<span class="flag acc status-pill">${esc(STATUS_LABEL[statusOf(e)])}</span>` : ""; },
+    /* shownStatus, like the Day popup: a ticket link reads as Booked */
+    tags: (l) => { const e = find(l.id); return e ? `<span class="flag acc status-pill">${esc(STATUS_LABEL[shownStatus(e)])}</span>` : ""; },
     body: (l) => {
       /* the entry lines belong to one event: a different event starts them empty */
       if (l.id !== lastPage) { lastPage = l.id; pageCost = null; pageTask.text = ""; pageTask.for = "shared"; }

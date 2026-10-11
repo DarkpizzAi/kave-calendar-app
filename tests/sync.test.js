@@ -51,6 +51,31 @@ test("a year move flushes both files; a failure keeps the queue (Review Focus 2)
   eq((await s.syncNow(["2026", "2027"])).ok, true);
   eq(local.pendingYears(), []);
 });
+test("review: a year that fails to upload still lets every year download", async () => {
+  const gh = fakeGh({ [pathFor("2027")]: file([ev("other-phone", "5")]) });
+  const local = createLocal(memStorage());
+  local.enqueue("2026", ev("a", "1"));
+  gh.putFile = async () => { const e = new Error("conflict"); e.gh = "conflict"; e.status = 409; throw e; };
+  const r = await createSync({ gh, local }).syncNow(["2027"]);
+  eq([r.ok, r.error.gh], [false, "conflict"], "the upload failure is still reported");
+  eq(local.getYear("2027").events.map((e) => e.id), ["other-phone"], "and the other year arrived anyway");
+  eq(local.pendingYears(), ["2026"], "the failed edit stays queued");
+});
+test("review: a download that started before a save's upload never overwrites it", async () => {
+  const gh = fakeGh({ [pathFor("2026")]: file([ev("a", "1")]) });
+  const local = createLocal(memStorage());
+  const s = createSync({ gh, local });
+  const realGet = gh.getFile;
+  let release;
+  const held = new Promise((res) => { release = res; });
+  gh.getFile = async (p, o) => { gh.getFile = realGet; const r = await realGet(p, o); await held; return r; };
+  const slow = s.loadYear("2026");          // reads the old file, then waits
+  local.enqueue("2026", ev("b", "2"));
+  await s.flushYear("2026");                // the save lands first
+  release();
+  await slow;
+  eq(local.getYear("2026").events.map((e) => e.id), ["a", "b"], "the cache still holds the save");
+});
 test("the syncing latch clears after a throw", async () => {
   const gh = fakeGh({});
   gh.getFile = async () => { throw new Error("boom"); };

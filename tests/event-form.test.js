@@ -84,6 +84,13 @@ test("F44: toDraft still carries over real lists and derived fields (refs, city)
   eq(d.city, "Barcelona");
   eq(d.links, [{ label: "RA", url: "https://ra.co/x" }]);
 });
+test("review: editing the draft never changes the event itself (Cancel must leave it as it was)", () => {
+  const e = base({ activities: [{ type: "eating", icon: "🍴" }], links: [{ label: "RA", url: "https://ra.co/x" }],
+    checklist: [{ id: "c1", text: "buy", done: false }], costs: [] });
+  const d = toDraft(e);
+  d.activities.push({ type: "drinks" }); d.links[0].label = "changed"; d.checklist[0].text = "edited"; d.costs.push({ id: "k" });
+  eq([e.activities.length, e.links[0].label, e.checklist[0].text, e.costs.length], [1, "RA", "buy", 0]);
+});
 
 test("F49: isMapsUrl recognises a Maps link typed into Venue, and rejects a plain place name", () => {
   ok(isMapsUrl("https://maps.google.com/?q=Razzmatazz"));

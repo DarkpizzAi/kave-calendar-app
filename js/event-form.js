@@ -94,11 +94,14 @@ export function mapsUrl(venue, city) {
 /* An event on disk may predate a list field (links, checklist, costs,
    activities). formPage maps over every one of them, and a throw there
    aborts the sheet's draw halfway (new title and bar, old body), so every
-   list field is defaulted here. */
+   list field is defaulted here. Every list comes from the copy, never the
+   event itself: the form edits these in place, and an original array here
+   would change the live event before Save (and keep the change on Cancel). */
 export function toDraft(e) {
-  return { ...JSON.parse(JSON.stringify(e)), refs: (e.bookingRefs || []).join(", "),
-    city: e.city ? e.city[0].toUpperCase() + e.city.slice(1) : "",
-    activities: e.activities || [], links: e.links || [], checklist: e.checklist || [], costs: e.costs || [],
+  const c = JSON.parse(JSON.stringify(e));
+  return { ...c, refs: (c.bookingRefs || []).join(", "),
+    city: c.city ? c.city[0].toUpperCase() + c.city.slice(1) : "",
+    activities: c.activities || [], links: c.links || [], checklist: c.checklist || [], costs: c.costs || [],
     newCost: null };
 }
 

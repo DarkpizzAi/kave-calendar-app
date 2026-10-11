@@ -1,4 +1,4 @@
-import { test, eq } from "./run.js";
+import { test, eq, throws } from "./run.js";
 import { memStorage } from "./helpers.js";
 import { createLocal } from "../js/local.js";
 
@@ -29,6 +29,12 @@ test("the queue survives a restart", () => {
   const s = memStorage();
   createLocal(s).enqueue("2027", ev("a", "1"));
   eq(createLocal(s).pendingYears(), ["2027"]);
+});
+test("review: a full storage fails the edit out loud; a full cache stays quiet", async () => {
+  const full = { getItem: () => null, setItem: () => { throw new Error("QuotaExceededError"); } };
+  const l = createLocal(full);
+  await throws(() => l.enqueue("2026", ev("a", "1")), "storage is full");
+  l.setYear("2026", { events: [], sha: null, etag: null });
 });
 test("corrupt storage starts empty instead of throwing", () => {
   const s = memStorage();
