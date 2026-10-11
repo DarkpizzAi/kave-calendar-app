@@ -13,7 +13,7 @@ import { loadRange, dayFreeState, weekFreeNote, weekFreeDays } from "./views.js"
 import { HOLIDAYS, holidayOn } from "./holidays.js";
 import { applyDetail } from "./filter.js";
 import { store } from "./store.js";
-import { indexByDay, zoomWeekTarget, zoomMonthTarget, AWAY,
+import { indexByDay, zoomWeekTarget, zoomMonthTarget, AWAY, isMidStay,
   shouldLoadMore, nextCount, iconsOf, searchEvents, shortDate, pastMonths, gesture, lastEventDay,
   fullPastWeeks, fullPastMonths, backToTodayState, todaysCount as cmTodaysCount, hideCancelled,
   hasLoadedOlder, hasOpenTodos } from "./cal-model.js";
@@ -161,7 +161,8 @@ function periodState(d, freeDays) {
    frame.thisYear (Archive, mostly). */
 const dayMonth = (d) => `${Number(d.slice(8))} ${MONTHS[Number(d.slice(5, 7)) - 1].slice(0, 3)}${d.slice(0, 4) !== frame.thisYear ? " " + d.slice(0, 4) : ""}`;
 function agendaDay(d, m, freeDays, note) {
-  const evs = frame.on(d);
+  /* An accommodation shows on check-in and check-out only (isMidStay). */
+  const evs = frame.on(d).filter((e) => !isMidStay(e, d));
   const weekend = dayOfWeek(d) >= 5 ? " weekend" : "";
   /* Monday is the first day of the week: it's the one day that keeps the
      wider between-weeks gap (.content's own flex gap); every other day

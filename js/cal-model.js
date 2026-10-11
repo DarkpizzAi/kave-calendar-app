@@ -17,14 +17,30 @@ export function shortDate(day, thisYear) {
   return `${DOW[dayOfWeek(day)]} ${Number(day.slice(8))}`;
 }
 
-/* day -> events on it, in start order; a span fills every day it covers. */
+/* Within one day: all-day and untimed first (a span's later days count as
+   all-day, its start time belongs to its first day only), then by start time.
+   Ties fall back to the earlier start, then the id, so the order is stable
+   instead of whatever the merge happened to leave. */
+const timeOn = (e, d) => (d === e.start && e.startTime ? e.startTime : "");
+const byDayOrder = (d) => (a, b) => {
+  const ta = timeOn(a, d), tb = timeOn(b, d);
+  if (ta !== tb) return ta < tb ? -1 : 1;
+  if (a.start !== b.start) return a.start < b.start ? -1 : 1;
+  return a.id < b.id ? -1 : a.id > b.id ? 1 : 0;
+};
+
+/* day -> events on it, in day order (see byDayOrder); a span fills every day
+   it covers. */
 export function indexByDay(events) {
   const idx = new Map();
-  const sorted = events.filter((e) => !e.deleted).sort((a, b) => (a.start < b.start ? -1 : a.start > b.start ? 1 : 0));
-  for (const e of sorted) for (const d of daysOf(e)) {
-    if (!idx.has(d)) idx.set(d, []);
-    idx.get(d).push(e);
+  for (const e of events) {
+    if (e.deleted) continue;
+    for (const d of daysOf(e)) {
+      if (!idx.has(d)) idx.set(d, []);
+      idx.get(d).push(e);
+    }
   }
+  for (const [d, list] of idx) list.sort(byDayOrder(d));
   return new Map([...idx.entries()].sort((a, b) => (a[0] < b[0] ? -1 : 1)));
 }
 
@@ -52,6 +68,11 @@ export const hideCancelled = (events, view) => (view === "grid" ? events.filter(
    before the start as one day, so a typo'd end (2099) stretches nothing
    (final review M1). */
 const lastDay = (e) => { const d = daysOf(e); return d.length ? d[d.length - 1] : e.start; };
+
+/* An accommodation stay shows on its first day (check-in) and its last
+   (check-out) only; the days in between are just the stay going on, so the
+   Agenda leaves them off. A one-night or one-day stay has no middle. */
+export const isMidStay = (e, d) => has(e, ["accommodation"]) && d > e.start && d < lastDay(e);
 export function lastEventDay(events) {
   return events.reduce((m, e) => { const l = lastDay(e); return l > m ? l : m; }, "");
 }

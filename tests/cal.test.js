@@ -1,5 +1,5 @@
 import { test, eq, ok } from "./run.js";
-import { indexByDay, tappable, zoomWeekTarget, zoomMonthTarget, isAway, awayText,
+import { indexByDay, isMidStay, tappable, zoomWeekTarget, zoomMonthTarget, isAway, awayText,
   shouldLoadMore, nextCount, iconsOf, searchEvents, todaysCount, fullPastWeeks, fullPastMonths,
   backToTodayState, tripCityFor, defaultCity, hideCancelled,
   hasOpenTodos, guestsExcludingViewer, statusGuestsLine } from "../js/cal-model.js";
@@ -16,6 +16,29 @@ test("cal: indexByDay spans multi-day events and skips deleted ones", () => {
   const idx = indexByDay([ev("trip", "2026-10-30", { end: "2026-11-01" }), ev("gone", "2026-10-30", { deleted: true })]);
   eq([...idx.keys()], ["2026-10-30", "2026-10-31", "2026-11-01"]);
   eq(idx.get("2026-10-31").map((e) => e.id), ["trip"]);
+});
+test("cal: a day lists all-day and untimed first, then by start time", () => {
+  const idx = indexByDay([
+    ev("train", "2026-10-16", { startTime: "19:33" }), ev("fisio", "2026-10-16", { startTime: "09:00" }),
+    ev("bday", "2026-10-16"), ev("hotel", "2026-10-15", { end: "2026-10-18", startTime: "19:00" }),
+  ]);
+  eq(idx.get("2026-10-16").map((e) => e.id), ["hotel", "bday", "fisio", "train"]);
+});
+test("cal: a span's start time belongs to its first day only", () => {
+  const idx = indexByDay([ev("late", "2026-10-16", { end: "2026-10-17", startTime: "23:00" }), ev("morning", "2026-10-17", { startTime: "08:00" })]);
+  eq(idx.get("2026-10-16").map((e) => e.id), ["late"]);
+  eq(idx.get("2026-10-17").map((e) => e.id), ["late", "morning"]);
+});
+test("cal: ties keep a stable order whatever order the events arrive in", () => {
+  const a = ev("a", "2026-10-16", { startTime: "10:00" }), b = ev("b", "2026-10-16", { startTime: "10:00" });
+  eq(indexByDay([b, a]).get("2026-10-16").map((e) => e.id), ["a", "b"]);
+});
+test("cal: an accommodation shows on check-in and check-out only", () => {
+  const stay = ev("stay", "2026-10-16", { end: "2026-10-18", activities: [act("accommodation", "🏨")] });
+  eq(["2026-10-16", "2026-10-17", "2026-10-18"].map((d) => isMidStay(stay, d)), [false, true, false]);
+  eq(isMidStay(ev("night", "2026-10-16", { end: "2026-10-17", activities: [act("accommodation", "🏨")] }), "2026-10-17"), false);
+  eq(isMidStay(ev("one", "2026-10-16", { activities: [act("accommodation", "🏨")] }), "2026-10-16"), false);
+  eq(isMidStay(ev("trip", "2026-10-16", { end: "2026-10-18", activities: [act("transport", "🚆")] }), "2026-10-17"), false);
 });
 test("cal: a day or week with nothing cannot be tapped", () => {
   eq([tappable([]), tappable([ev("a", "2026-10-01")])], [false, true]);
