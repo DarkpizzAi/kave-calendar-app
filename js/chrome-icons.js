@@ -13,8 +13,8 @@ export const ICON = {
   older: svg('<rect x="3" y="4" width="18" height="5" rx="1"/><path d="M5 9v9a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V9M10 13h4"/>'),
   check: svg('<path d="m5 12 5 5L20 7"/>'),
   /* F16: a tiny checkbox glyph marks an event with open to-dos in list rows,
-     never an emoji or a plain dot. An empty box: not ticked yet. */
-  checkbox: svg('<rect x="4" y="4" width="16" height="16" rx="4"/>'),
+     never an emoji or a plain dot. A bare tick: something still to tick off. */
+  checkbox: svg('<path d="m5 12 5 5L20 7"/>'),
   /* the event page: one line icon per group of information (round 2) */
   clock: svg('<circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/>'),
   pin: svg('<path d="M12 21s-7-6.2-7-12a7 7 0 0 1 14 0c0 5.8-7 12-7 12Z"/><circle cx="12" cy="9" r="2.5"/>'),
