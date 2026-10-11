@@ -286,15 +286,19 @@ function gridRows(key, n) {
   for (let i = 0; i < cells.length; i += 7) rows.push({ monday: addDays(start, i), days: cells.slice(i, i + 7) });
   return rows;
 }
+const MAX_DOTS = 4;
 /* One emoji per day: pickDayIcon (cal-model.js) chooses it by a fixed priority. */
 function gridIcon(d) {
   const evs = frame.on(d);
   const best = pickDayIcon(evs, d);
   if (!best) return "";
   const grey = best.e.owner !== frame.me && best.e.owner !== "shared";
-  /* the number of events that day, top right, from two up (one is the emoji itself) */
-  const count = evs.length > 1 ? `<span class="dcount" aria-label="${evs.length} events">${evs.length}</span>` : "";
-  return `<span class="emo${grey ? " grey" : ""}">${esc(iconFor(best.a, best.e, frame.me))}</span>${count}`;
+  /* one dot per event beyond the one the emoji stands for, bottom left; past
+     four dots a "+" says there are more (the day sheet has the full list) */
+  const extra = evs.length - 1;
+  const dots = extra > 0
+    ? `<span class="ddots" aria-label="${evs.length} events">${"<i></i>".repeat(Math.min(extra, MAX_DOTS))}${extra > MAX_DOTS ? "<b>+</b>" : ""}</span>` : "";
+  return `<span class="emo${grey ? " grey" : ""}">${esc(iconFor(best.a, best.e, frame.me))}</span>${dots}`;
 }
 function gridSquare(d, freeDays, note) {
   if (!d) return `<div class="dsq pad"></div>`;
@@ -306,14 +310,10 @@ function gridSquare(d, freeDays, note) {
   /* F16's own glyph, reused rather than re-derived: at least one event
      that day still has an unchecked to-do. */
   const todo = frame.on(d).some(hasOpenTodos) ? `<span class="dtodo" aria-label="Open to-dos">${ICON.checkbox}</span>` : "";
-  /* A plain free weekend is colour only (Clear/Open, above); only a real
-     long weekend or opportunity earns the 🔍, on the day its window opens
-     (kind: "long" -- weekFreeNote's plain-Saturday case never reaches
-     here). */
-  const glass = (note && note.kind === "long" && note.on === d) ? `<span class="note" aria-label="Long weekend">🔍</span>` : "";
+  /* The long-weekend 🔍 is Agenda's alone: a Grid square stays quiet. */
   const weekend = dayOfWeek(d) >= 5 ? " weekend" : "";
   const holBorder = holidayOn(d) && !weekend ? " holiday-border" : "";
-  return `<div class="dsq ${st}${weekend}${holBorder}" role="button" tabindex="0" data-act="day" data-d="${d}"><span class="num">${Number(d.slice(8))}</span>${todo}${glass}${gridIcon(d)}</div>`;
+  return `<div class="dsq ${st}${weekend}${holBorder}" role="button" tabindex="0" data-act="day" data-d="${d}"><span class="num">${Number(d.slice(8))}</span>${todo}${gridIcon(d)}</div>`;
 }
 function gridMonth(y, mo) {
   const key = ymOf(y, mo), n = daysIn(y, mo), now = key === frame.today.slice(0, 7);

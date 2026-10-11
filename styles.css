@@ -474,15 +474,13 @@ a.ticket{color:inherit;text-decoration:none}
 /* F16's checkbox glyph, top-right -- at least one event that day still has
    an unchecked to-do. A line icon, never an emoji, same as the sheet's own
    .todo-ic. */
-.dsq .dtodo{position:absolute;top:4px;left:50%;transform:translateX(-50%);display:flex;color:var(--text-dim)}
-/* the day's event count, top right, in the date's own type */
-.dsq .dcount{position:absolute;top:4px;right:5px;font-size:var(--fs-micro);font-weight:var(--fw-medium);font-variant-numeric:tabular-nums;color:var(--text-dim)}
+.dsq .dtodo{position:absolute;top:4px;right:5px;display:flex;color:var(--text-dim)}
+/* one dot per extra event that day, bottom left; a "+" past four */
+.dsq .ddots{position:absolute;bottom:5px;left:5px;display:flex;align-items:center;gap:2px;color:var(--text-dim)}
+.dsq .ddots i{display:block;width:4px;height:4px;border-radius:var(--r-round);background:currentColor}
+.dsq .ddots b{font-size:8px;font-weight:var(--fw-medium);line-height:4px;margin-left:1px}
 .dsq .dtodo svg{width:12px;height:12px;stroke-width:2.5}
 .dsq.today .dtodo{color:var(--accent-text);opacity:.75}
-/* the opening day of a real long weekend/opportunity (never a plain free
-   weekend -- that's colour only), bottom-left so it never fights the
-   centred emoji or the top corners' num/dtodo */
-.dsq .note{position:absolute;bottom:4px;left:5px;font-size:11px;line-height:1}
 /* the day's single emoji, centred in the bottom two thirds -- no border
    ever says whose day it is; a day that's only the other person's uses
    the app's existing "grey" convention (same filter as .c-i.grey in the
@@ -495,10 +493,10 @@ a.ticket{color:inherit;text-decoration:none}
 .dsq.weekend{background:var(--accent-soft)}
 .dsq.today{background:var(--accent)}
 .dsq.today .num{color:var(--accent-text)}
-.dsq.today .dcount{color:var(--accent-text);opacity:.75}
+.dsq.today .ddots{color:var(--accent-text);opacity:.75}
 .dsq.clear{background:var(--free-tx)}
 .dsq.clear .num{color:var(--free-bg)}
-.dsq.clear .dtodo,.dsq.clear .dcount{color:var(--free-bg);opacity:.75}
+.dsq.clear .dtodo,.dsq.clear .ddots{color:var(--free-bg);opacity:.75}
 .dsq.open{border:2px solid var(--free-tx)}
 /* a weekday bank holiday: the same accent border as Agenda's day card (declared after Open, so it wins) */
 .dsq.holiday-border{border:2px solid var(--accent)}
