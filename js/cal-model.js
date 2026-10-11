@@ -68,9 +68,11 @@ const lastDay = (e) => { const d = daysOf(e); return d.length ? d[d.length - 1] 
 
 /* Where a day sits in an accommodation stay: "in" (its first day, check-in,
    also a one-day stay), "out" (its last day, check-out), "mid" (the days
-   between), or null for anything that is not a stay. The Agenda shows a stay
-   on check-in and check-out only and names them; Grid keeps the stay's icon
-   on every day but ranks it first only on check-in. */
+   between), or null for anything that is not a stay. Agenda and Grid alike
+   show a stay on check-in and check-out only (calendar.js's visibleOn drops
+   the middle nights before either view draws a day; Isa, 2026-10-11: one
+   rule for both views). Agenda names the two days; the Day popup still
+   lists the stay on every night. */
 export function stayRole(e, d) {
   if (!has(e, ["accommodation"])) return null;
   if (d === e.start) return "in";
@@ -83,8 +85,10 @@ export const isMidStay = (e, d) => stayRole(e, d) === "mid";
    outranks even a flight or a check-in). Then away -- transport,
    accommodation, business trip -- then work, then every other category in
    the Settings catalogue order, "none" (Other) last. A stay's icon only
-   takes its place on check-in; on the middle days and check-out it ranks
-   below everything, so any other icon wins and it still shows alone. A day
+   takes its place on check-in; on check-out it ranks below everything, so
+   any other icon wins and it still shows alone. (Grid never passes a
+   middle night's stay in here -- see stayRole -- so on those nights the
+   stay shows nothing.) A day
    with several activities across several events shows only the one that
    ranks highest; ties keep whichever was found first. */
 export const DAY_PRIORITY = [...AWAY, "work", ...CATEGORIES.map((c) => c.type).filter((t) => !AWAY.includes(t) && t !== "work")];

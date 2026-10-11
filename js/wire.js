@@ -8,7 +8,6 @@
 
 import { store } from "./store.js";
 import { render } from "./render.js";
-import { syncColorScheme } from "./theme.js";
 
 export function wire() {
   store.subscribe(render);
@@ -24,8 +23,8 @@ export function wire() {
   window.addEventListener("resize", syncHeaderHeight);
   /* Rubik arriving changes the header height after first paint. */
   if (document.fonts && document.fonts.ready) document.fonts.ready.then(syncHeaderHeight);
-
-  window.addEventListener("online", syncColorScheme);
+  /* Light and dark changes are theme.js's own matchMedia listener
+     (initTheme), not anything here. */
 }
 
 /* A banner, not a toast: the household pattern for status that is not about
