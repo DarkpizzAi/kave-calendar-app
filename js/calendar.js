@@ -286,18 +286,20 @@ function gridRows(key, n) {
   for (let i = 0; i < cells.length; i += 7) rows.push({ monday: addDays(start, i), days: cells.slice(i, i + 7) });
   return rows;
 }
-const MAX_DOTS = 4;
+const MAX_DOTS = 3;
 /* One emoji per day: pickDayIcon (cal-model.js) chooses it by a fixed priority. */
 function gridIcon(d) {
   const evs = frame.on(d);
   const best = pickDayIcon(evs, d);
   if (!best) return "";
   const grey = best.e.owner !== frame.me && best.e.owner !== "shared";
-  /* one dot per event beyond the one the emoji stands for, bottom left; past
-     four dots a "+" says there are more (the day sheet has the full list) */
+  /* one dot per event beyond the one the emoji stands for, bottom left. A
+     square is about 43px wide on a phone and the to-do box takes the bottom
+     right, so room runs out at three: past that, two dots and a "+" say there
+     are more (the day sheet has the full list). */
   const extra = evs.length - 1;
   const dots = extra > 0
-    ? `<span class="ddots" aria-label="${evs.length} events">${"<i></i>".repeat(Math.min(extra, MAX_DOTS))}${extra > MAX_DOTS ? "<b>+</b>" : ""}</span>` : "";
+    ? `<span class="ddots" aria-label="${evs.length} events">${"<i></i>".repeat(extra > MAX_DOTS ? MAX_DOTS - 1 : extra)}${extra > MAX_DOTS ? "<b>+</b>" : ""}</span>` : "";
   return `<span class="emo${grey ? " grey" : ""}">${esc(iconFor(best.a, best.e, frame.me))}</span>${dots}`;
 }
 function gridSquare(d, freeDays, note) {
