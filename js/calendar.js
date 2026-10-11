@@ -169,11 +169,12 @@ function agendaDay(d, m, freeDays, note) {
   const weekStart = dayOfWeek(d) === 0 ? " week-start" : "";
   const dow = DOW[dayOfWeek(d)][0] + DOW[dayOfWeek(d)].slice(1).toLowerCase();
   const hol = holidayOn(d);
-  /* Every bank holiday is named in the card header, centred between the
+  /* A weekday bank holiday is named in the card header, centred between the
      weekday and the date, in the header's own type (ellipsised if too long).
-     Unconditional, not tied to S.freeOn: it is simply what the day is. The
-     provisional note lives in the day sheet. */
-  const holName = hol ? `<span class="cd-hol">${esc(hol)}</span>` : "";
+     Unconditional, not tied to S.freeOn: it is simply what the day is. A
+     weekend holiday has no name here (the weekend tint already marks it).
+     The provisional note lives in the day sheet. */
+  const holName = hol && !weekend ? `<span class="cd-hol">${esc(hol)}</span>` : "";
   const cd = `<div class="cd"><span class="cd-dow">${dow}</span>${holName}<span class="cd-date">${dayMonth(d)}</span></div>`;
   /* Every day card opens the day, empty or not -- matches Grid's own
      squares (gridSquare below), which have always worked this way. */
