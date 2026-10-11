@@ -13,7 +13,7 @@ import { loadRange, dayFreeState, weekFreeNote, weekFreeDays } from "./views.js"
 import { HOLIDAYS, holidayOn, isProvisional } from "./holidays.js";
 import { applyDetail } from "./filter.js";
 import { store } from "./store.js";
-import { indexByDay, zoomWeekTarget, zoomMonthTarget, isAway, awayText, AWAY,
+import { indexByDay, zoomWeekTarget, zoomMonthTarget, AWAY,
   shouldLoadMore, nextCount, iconsOf, searchEvents, shortDate, pastMonths, gesture, lastEventDay,
   fullPastWeeks, fullPastMonths, backToTodayState, todaysCount as cmTodaysCount, hideCancelled,
   hasLoadedOlder, hasOpenTodos } from "./cal-model.js";
@@ -102,9 +102,9 @@ function todayAnchor() {
 }
 
 /* ---- control row ----
-   F28: the view toggle, detail and search controls stop floating -- this
-   row scrolls away with the page again, same as section 3's original
-   wording. */
+   The view toggle, detail and search controls stay at the top while the
+   list scrolls (sticky, with a fade -- see .ctl in styles.css). F28 once
+   made this row scroll away; that was reversed for the fade design. */
 function controls() {
   const idx = VIEWS.indexOf(S.view), from = S.fromView == null ? idx : VIEWS.indexOf(S.fromView);
   /* F59: Spoon's .segment/.seg-thumb construction, copied verbatim
@@ -162,7 +162,6 @@ function periodState(d, freeDays) {
 const dayMonth = (d) => `${Number(d.slice(8))} ${MONTHS[Number(d.slice(5, 7)) - 1].slice(0, 3)}${d.slice(0, 4) !== frame.thisYear ? " " + d.slice(0, 4) : ""}`;
 function agendaDay(d, m, freeDays, note) {
   const evs = frame.on(d);
-  const away = evs.filter(isAway), rest = evs.filter((e) => !isAway(e));
   const weekend = dayOfWeek(d) >= 5 ? " weekend" : "";
   /* Monday is the first day of the week: it's the one day that keeps the
      wider between-weeks gap (.content's own flex gap); every other day
@@ -189,8 +188,7 @@ function agendaDay(d, m, freeDays, note) {
   const noteLine = (note && note.kind === "long" && note.on === d)
     ? `<li style="--n:1"><span class="c-i">🔍</span><span class="c-t">${esc(note.text)}</span></li>` : "";
   return `<div class="daycard ${periodState(d, freeDays)}${weekend}${weekStart}${holBorder}" data-week="${m}"${tap}>${cd}${holLine}`
-    + away.map((e) => `<span class="away${frame.grey.has(e.id) ? " grey" : ""}">${esc(icons(e)[0])} ${esc(awayText(e, frame.thisYear))}</span>`).join("")
-    + `<ul class="rows">${rest.map((e) => row(e, false, false)).join("")}${noteLine}</ul></div>`;
+    + `<ul class="rows">${evs.map((e) => row(e, false, false)).join("")}${noteLine}</ul></div>`;
 }
 /* Agenda's per-card height rule -- two independent groups per week
    (weekdays, weekend), not one across all seven:
@@ -227,7 +225,7 @@ function equalizeAgendaHeights(root) {
   });
   const oneLine = oneLineHeight(root);
   for (const els of groups.values()) {
-    if (els.some((el) => el.querySelector(".rows li, .away"))) els.forEach((el) => { el.style.minHeight = `${oneLine}px`; });
+    if (els.some((el) => el.querySelector(".rows li"))) els.forEach((el) => { el.style.minHeight = `${oneLine}px`; });
   }
 }
 /* A calendar week almost never fits neatly inside one month: this breaks

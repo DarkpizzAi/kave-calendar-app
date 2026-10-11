@@ -326,6 +326,13 @@ a.ticket{color:inherit;text-decoration:none}
 .slide-right{animation:sr var(--motion-base) var(--ease-drag);will-change:transform,opacity}
 @keyframes sl{from{transform:translateX(18%);opacity:0}}
 @keyframes sr{from{transform:translateX(-18%);opacity:0}}
+/* The control row stays put while the list scrolls under it: sticky, solid in the
+   page colour, with a short fade below so cards dissolve into it rather than being
+   cut by a line. .mn pads its top by --sp-4, so the row pulls itself up by that
+   much and pads itself back down: it sits flush at the top edge when stuck. Equal padding
+   above and below the buttons, so the gap to the panel edge matches the gap to the fade. */
+.ctl{position:sticky;top:calc(-1 * var(--sp-4));z-index:5;margin-top:calc(-1 * var(--sp-4));padding:var(--sp-4) 0;background:var(--surface)}
+.ctl::after{content:"";position:absolute;left:0;right:0;top:100%;height:var(--sp-4);background:linear-gradient(var(--surface),transparent);pointer-events:none}
 .ctl2{display:flex;gap:6px;align-items:center}
 .ctl.searching .ctl2{flex:1}
 /* F59: Spoon's real .segment/.seg-thumb/.segment button construction
@@ -412,8 +419,6 @@ a.ticket{color:inherit;text-decoration:none}
    (Clear/Open, today) applies -- those are declared after .weekend below,
    so they still win on a weekend day exactly as they do on a weekday. */
 .month{margin:var(--sp-3) 0 0;font-size:var(--fs-title-lg);font-weight:var(--fw-strong);letter-spacing:var(--tracking-heading);line-height:var(--lh-title)}
-.away{margin:0;display:grid;grid-template-columns:20px minmax(0,1fr);column-gap:var(--sp-2);font-size:var(--fs-meta);background:var(--surface-2);border-radius:var(--r-control);padding:var(--sp-1) var(--sp-2)}
-.away.grey{color:var(--text-dim)}
 /* A bank holiday, plain text, no icon -- there's no glyph for "the day
    itself is a holiday" the way an activity's own icon stands for that
    activity. Unconditional (not tied to S.freeOn): it's what the day is,
@@ -528,7 +533,9 @@ a.ticket{color:inherit;text-decoration:none}
      stops stretching and settles to the left instead -- reusing this
      existing wide-screen breakpoint (already used just below for .segment's
      own fixed width), not a second invented one. */
-  .ctl{flex-wrap:wrap;justify-content:flex-start;width:auto;max-width:518px}
+  /* Still wraps to two lines at 518px of content, but the sticky bar itself spans the
+     full width (so nothing shows beside it) and .mn pads by --sp-5 here, not --sp-4. */
+  .ctl{flex-wrap:wrap;justify-content:flex-start;width:auto;top:calc(-1 * var(--sp-5));margin-top:calc(-1 * var(--sp-5));padding:var(--sp-5) max(0px, calc(100% - 518px)) var(--sp-5) 0}
   /* Was 380px, sized for the three-option segment (F59); two options with
      the wider per-button padding above need less. */
   .ctl .segment{flex:none;width:260px}
