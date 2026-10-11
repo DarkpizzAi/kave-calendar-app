@@ -453,6 +453,8 @@ a.ticket{color:inherit;text-decoration:none}
    holiday by being one): an accent border, the same 2px weight as Open's
    free-tx border above so the two read as the same kind of mark. */
 .daycard.holiday-border{border:2px solid var(--accent)}
+/* the holiday's name in the header: the middle of three slots, shrinking and ellipsising before it can push the date */
+.cd-hol{flex:1;min-width:0;text-align:center;overflow:hidden;white-space:nowrap;text-overflow:ellipsis}
 /* grid: a real Monday-first month grid, blank pad cells outside the month.
    No card: just the squares, month to month, with no boxed container or
    border around the group. */
@@ -498,6 +500,8 @@ a.ticket{color:inherit;text-decoration:none}
 .dsq.clear .num{color:var(--free-bg)}
 .dsq.clear .dtodo{color:var(--free-bg)}
 .dsq.open{border:2px solid var(--free-tx)}
+/* a weekday bank holiday: the same accent border as Agenda's day card (declared after Open, so it wins) */
+.dsq.holiday-border{border:2px solid var(--accent)}
 /* search */
 .hint{margin:0;color:var(--text-dim);font-size:var(--fs-meta)}
 .card{background:var(--panel);border-radius:var(--r-card);padding:var(--sp-3)}

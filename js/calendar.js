@@ -168,16 +168,21 @@ function agendaDay(d, m, freeDays, note) {
      pulls in tighter, to the same-week spacing below. */
   const weekStart = dayOfWeek(d) === 0 ? " week-start" : "";
   const dow = DOW[dayOfWeek(d)][0] + DOW[dayOfWeek(d)].slice(1).toLowerCase();
-  const cd = `<div class="cd"><span class="cd-dow">${dow}</span><span class="cd-date">${dayMonth(d)}</span></div>`;
+  const hol = holidayOn(d);
+  /* A weekday bank holiday is named in the card header, centred between the
+     weekday and the date (ellipsised if it is too long); a weekend holiday
+     keeps its plain line below, since the header has no room to spare there
+     and the weekend tint already marks the day. */
+  const holName = hol && !weekend ? `<span class="cd-hol">${esc(hol)}</span>` : "";
+  const cd = `<div class="cd"><span class="cd-dow">${dow}</span>${holName}<span class="cd-date">${dayMonth(d)}</span></div>`;
   /* Every day card opens the day, empty or not -- matches Grid's own
      squares (gridSquare below), which have always worked this way. */
   const tap = ` role="button" tabindex="0" data-act="day" data-d="${d}"`;
-  /* Every bank holiday gets its own plain text line, no icon (there's no
+  /* A weekend bank holiday gets its own plain text line, no icon (there's no
      glyph that means "day off" the way an activity's own icon means that
      activity) -- unconditional, not tied to S.freeOn, since it's simply
-     what the day is, the same way an away pill is. */
-  const hol = holidayOn(d);
-  const holLine = hol ? `<p class="holiday">${esc(hol)}${isProvisional(d) ? " (provisional)" : ""}</p>` : "";
+     what the day is. Weekday ones are named in the header (holName). */
+  const holLine = hol && weekend ? `<p class="holiday">${esc(hol)}${isProvisional(d) ? " (provisional)" : ""}</p>` : "";
   /* A weekday holiday (never Sat/Sun, which already read as a holiday by
      being a weekend) gets an accent border, unconditional like the line
      above -- what the day is, not a free-time highlight. */
@@ -319,7 +324,8 @@ function gridSquare(d, freeDays, note) {
      here). */
   const glass = (note && note.kind === "long" && note.on === d) ? `<span class="note" aria-label="Long weekend">🔍</span>` : "";
   const weekend = dayOfWeek(d) >= 5 ? " weekend" : "";
-  return `<div class="dsq ${st}${weekend}" role="button" tabindex="0" data-act="day" data-d="${d}"><span class="num">${Number(d.slice(8))}</span>${todo}${glass}${gridIcon(d)}</div>`;
+  const holBorder = holidayOn(d) && !weekend ? " holiday-border" : "";
+  return `<div class="dsq ${st}${weekend}${holBorder}" role="button" tabindex="0" data-act="day" data-d="${d}"><span class="num">${Number(d.slice(8))}</span>${todo}${glass}${gridIcon(d)}</div>`;
 }
 function gridMonth(y, mo) {
   const key = ymOf(y, mo), n = daysIn(y, mo), now = key === frame.today.slice(0, 7);
