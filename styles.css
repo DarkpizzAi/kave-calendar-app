@@ -414,8 +414,8 @@ a.ticket{color:inherit;text-decoration:none}
 .flag.soft{background:var(--accent-soft);color:var(--text)}
 /* Agenda's card model: no week wrapper -- one card per day, straight in a
    run (Grid, below, draws its own separate month-grid card model). Black
-   (var(--panel)), same as Grid's own square; a weekend gets the branding's
-   own card grey (--surface-2) instead, always, unless a stronger state
+   (var(--panel)), same as Grid's own square; a weekend gets the accent's
+   own pale tint (--accent-soft, the accent fade) instead, always, unless a stronger state
    (Clear/Open, today) applies -- those are declared after .weekend below,
    so they still win on a weekend day exactly as they do on a weekday. */
 .month{margin:var(--sp-3) 0 0;font-size:var(--fs-title-lg);font-weight:var(--fw-strong);letter-spacing:var(--tracking-heading);line-height:var(--lh-title)}
@@ -438,7 +438,7 @@ a.ticket{color:inherit;text-decoration:none}
 /* Weekday top-left, day+month top-right, plain empty space between them
    (no rule, no dots) -- flex justify-content does the work. */
 .daycard > .cd{display:flex;justify-content:space-between;align-items:baseline;gap:6px;font-size:var(--fs-micro);font-weight:500;color:var(--text-dim);margin-bottom:2px}
-.daycard.weekend{background:var(--surface-2)}
+.daycard.weekend{background:var(--accent-soft)}
 .daycard.today{background:var(--accent)}
 .daycard.today > .cd{color:var(--accent-text)}
 .daycard.clear{background:var(--free-tx);color:var(--free-bg)}
@@ -482,10 +482,10 @@ a.ticket{color:inherit;text-decoration:none}
    emoji's own top-right corner, next to the single one the priority
    rule already chose */
 .dsq .more{position:absolute;top:calc(67% - 11px);left:calc(50% + 8px);width:6px;height:6px;border-radius:var(--r-round);background:var(--accent)}
-/* weekend square: the branding's own card grey, same as Agenda's weekend
+/* weekend square: the accent fade (--accent-soft), same as Agenda's weekend
    day cards -- unconditional, but Clear/Open/today (declared after) still
    win, same priority as everywhere else this app colours a square. */
-.dsq.weekend{background:var(--surface-2)}
+.dsq.weekend{background:var(--accent-soft)}
 .dsq.today{background:var(--accent)}
 .dsq.today .num{color:var(--accent-text)}
 .dsq.today .more{background:var(--accent-text)}
