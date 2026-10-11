@@ -1,7 +1,7 @@
 import { test, eq, ok } from "./run.js";
 import { isoWeek, monthOfWeek, firstWeekOf, loadRange, freeWeekendSaturday, weekendBlocks, classifyWeekend, longWeekends, dayFreeState, weekFreeNote, weekFreeDays } from "../js/views.js";
 import { applyDetail } from "../js/filter.js";
-import { CATEGORIES, iconFor } from "../js/icons.js";
+import { CATEGORIES, iconFor, onlyIcon, categoryOf } from "../js/icons.js";
 import { HOLIDAYS, STATUS, isProvisional } from "../js/holidays.js";
 
 const ev = (id, s, extra = {}) => ({ id, title: id, start: s, end: null, owner: "shared", activities: [], ...extra });
@@ -193,7 +193,29 @@ test("the catalogue from round 1b, and person icons follow the viewer", () => {
 test("the catalogue has a work event category (Isa, 2026-09-24)", () => {
   const work = CATEGORIES.find((c) => c.type === "work");
   ok(work, "work category");
-  eq([work.label, work.icons.map((i) => i.icon)], ["Work event", ["🏢"]]);
+  eq([work.label, work.icons.map((i) => i.icon)], ["Work event", ["💼"]]);
+});
+
+const iconsOf = (type) => categoryOf(type).icons.map((i) => i.icon);
+test("catalogue, Isa's review 2026-10-11: work and business trip are both the briefcase, a visitor is the house", () => {
+  eq([iconsOf("work"), iconsOf("business-trip"), iconsOf("visitor")], [["💼"], ["💼"], ["🏠"]]);
+});
+test("catalogue, Isa's review: tennis and padel share the tennis ball, no ping pong, no medal", () => {
+  const sport = iconsOf("sport");
+  eq([sport.includes("🎾"), sport.includes("🏓"), sport.includes("🏅")], [true, false, false]);
+});
+test("catalogue, Isa's review: the additions to Eating out and Paid activity, and a Health appointment", () => {
+  ok(["🥘", "🥐", "🍦"].every((i) => iconsOf("eating").includes(i)), "eating additions");
+  ok(["🧩", "💆"].every((i) => iconsOf("activity").includes(i)), "activity additions");
+  eq(iconsOf("health"), ["🩺", "🦷"]);
+  eq(categoryOf("health").label, "Health appointment");
+});
+test("a category with exactly one icon has nothing to pick: onlyIcon returns it, else null", () => {
+  eq([onlyIcon("work"), onlyIcon("visitor"), onlyIcon("cinema"), onlyIcon("none")], ["💼", "🏠", "🎬", "📌"]);
+  eq([onlyIcon("eating"), onlyIcon("health"), onlyIcon("nope")], [null, null, null]);
+});
+test("a retired icon on stored data falls back: an old Work building shows the briefcase", () => {
+  eq(iconFor({ type: "work", icon: "🏢" }, { owner: "isa" }, "isa"), "💼");
 });
 
 test("iconFor only ever returns a catalogue icon", () => {

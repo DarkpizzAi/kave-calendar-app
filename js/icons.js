@@ -20,25 +20,29 @@ export const CATEGORIES = [
   { type: "live-music", label: "Live music", group: "Nightlife & Social", icons: [{ icon: "🎶" }, { icon: "🎸", note: "rock" }, { icon: "🎻", note: "classical" }] },
   { type: "clubbing", label: "Clubbing", group: "Nightlife & Social", icons: [{ icon: "🪩" }, { icon: "dancing" }] },
   { type: "drinks", label: "Drinks", group: "Nightlife & Social", icons: [{ icon: "🍺" }, { icon: "🍷" }, { icon: "🥂" }, { icon: "🍹" }, { icon: "🍻", note: "pre-drinks" }] },
-  { type: "eating", label: "Eating out", group: "Nightlife & Social", icons: [{ icon: "🍴" }, { icon: "🍔" }, { icon: "🥩" }, { icon: "🍕" }, { icon: "🍝" }, { icon: "🍜" }, { icon: "🍙" }, { icon: "🍣" }, { icon: "🌮" }, { icon: "🥞", note: "brunch" }, { icon: "☕", note: "coffee" }] },
+  { type: "eating", label: "Eating out", group: "Nightlife & Social", icons: [{ icon: "🍴" }, { icon: "🍔" }, { icon: "🥩" }, { icon: "🍕" }, { icon: "🍝" }, { icon: "🍜" }, { icon: "🍙" }, { icon: "🍣" }, { icon: "🌮" }, { icon: "🥞", note: "brunch" }, { icon: "☕", note: "coffee" }, { icon: "🥘", note: "paella" }, { icon: "🥐", note: "croissant" }, { icon: "🍦", note: "ice cream" }] },
   { type: "birthday", label: "Birthday party", group: "Nightlife & Social", icons: [{ icon: "🎂" }] },
   { type: "cinema", label: "Cinema", group: "Entertainment & Leisure", icons: [{ icon: "🎬" }] },
-  { type: "activity", label: "Paid activity", group: "Entertainment & Leisure", icons: [{ icon: "🎟" }, { icon: "🏛", note: "museum" }, { icon: "🖼", note: "exhibition" }, { icon: "🏺", note: "pottery" }, { icon: "🎨", note: "workshop" }, { icon: "🎤", note: "karaoke" }, { icon: "🎭", note: "theatre" }, { icon: "🩰", note: "ballet" }, { icon: "🎳", note: "bowling" }, { icon: "🎢", note: "amusement park" }, { icon: "🧗", note: "climbing" }, { icon: "🧖", note: "spa" }] },
+  { type: "activity", label: "Paid activity", group: "Entertainment & Leisure", icons: [{ icon: "🎟" }, { icon: "🏛", note: "museum" }, { icon: "🖼", note: "exhibition" }, { icon: "🏺", note: "pottery" }, { icon: "🎨", note: "workshop" }, { icon: "🎤", note: "karaoke" }, { icon: "🎭", note: "theatre" }, { icon: "🩰", note: "ballet" }, { icon: "🎳", note: "bowling" }, { icon: "🎢", note: "amusement park" }, { icon: "🧗", note: "climbing" }, { icon: "🧖", note: "spa" }, { icon: "💆", note: "massage" }, { icon: "🧩", note: "escape room" }] },
   { type: "games", label: "Games", group: "Entertainment & Leisure", icons: [{ icon: "🎮", note: "videogames" }, { icon: "🎲", note: "board games" }] },
   { type: "park", label: "Park or hang out", group: "Outdoors", icons: [{ icon: "🌳" }, { icon: "🧺" }, { icon: "☀️" }] },
   { type: "beach", label: "Beach", group: "Outdoors", icons: [{ icon: "🏖" }] },
-  { type: "sport", label: "Sport or exercise", group: "Outdoors", icons: [{ icon: "weights" }, { icon: "running" }, { icon: "🏅", note: "a race" }, { icon: "🎾", note: "tennis" }, { icon: "🏓", note: "padel" }] },
+  { type: "sport", label: "Sport or exercise", group: "Outdoors", icons: [{ icon: "weights" }, { icon: "running" }, { icon: "🎾", note: "tennis or padel" }] },
   { type: "hike", label: "Hike", group: "Outdoors", icons: [{ icon: "🥾" }] },
   { type: "business-trip", label: "Business trip", group: "Travel & Work", icons: [{ icon: "💼" }] },
-  { type: "work", label: "Work event", group: "Travel & Work", icons: [{ icon: "🏢" }] },
-  { type: "visitor", label: "Visitor", group: "Travel & Work", icons: [{ icon: "🧳" }, { icon: "🏠", note: "staying with us" }] },
+  { type: "work", label: "Work event", group: "Travel & Work", icons: [{ icon: "💼" }] },
+  { type: "visitor", label: "Visitor", group: "Travel & Work", icons: [{ icon: "🏠" }] },
   { type: "transport", label: "Transport", group: "Travel & Work", icons: [{ icon: "✈️", note: "flight" }, { icon: "🛫", note: "outbound" }, { icon: "🛬", note: "return" }, { icon: "🚄", note: "train" }, { icon: "🚌", note: "bus" }, { icon: "🚗", note: "car" }, { icon: "🚢", note: "boat" }] },
   { type: "accommodation", label: "Accommodation", group: "Travel & Work", icons: [{ icon: "🏨" }, { icon: "🏡" }, { icon: "⛺" }] },
+  { type: "health", label: "Health appointment", group: "Other", icons: [{ icon: "🩺" }, { icon: "🦷", note: "dentist" }] },
   { type: "none", label: "Other", group: "Other", icons: [{ icon: "📌" }] },
 ];
 
 const BY_TYPE = new Map(CATEGORIES.map((c) => [c.type, c]));
 export const categoryOf = (type) => BY_TYPE.get(type) || BY_TYPE.get("none");
+/* A category with exactly one possible icon has nothing to choose: the event
+   form applies it straight away instead of asking. */
+export const onlyIcon = (type) => { const c = BY_TYPE.get(type); return c && c.icons.length === 1 ? c.icons[0].icon : null; };
 
 /* The emoji to draw for one activity of one event, for one viewer. Only
    ever a catalogue icon: a stored icon the catalogue does not list (a

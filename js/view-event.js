@@ -9,7 +9,7 @@ import { escapeHtml as esc, safeUrl, copyText } from "./util.js";
 import { todayKey } from "./dates.js";
 import { newEvent, STATUSES, STATUS_LABEL } from "./model.js";
 import { CATEGORIES as MONEY, formatCents, visibleCosts } from "./money.js";
-import { CATEGORIES, GROUPS, iconFor, categoryOf } from "./icons.js";
+import { CATEGORIES, GROUPS, iconFor, categoryOf, onlyIcon } from "./icons.js";
 import { readForm, costDefaults, canChangeCost, addTask, addCost, whenLine, mapsUrl, toDraft, costPayerText } from "./event-form.js";
 import { defaultCity } from "./cal-model.js";
 import { registerLevel, openLevel, replaceTop, back, closeAll, topLevel } from "./sheet.js";
@@ -280,7 +280,10 @@ function onAction(b, l) {
     else d[pick] = b.dataset.v;
   }
   else if (a === "addact") picker = "cat";
-  else if (a === "pickcat") picker = b.dataset.c;
+  else if (a === "pickcat") {
+    const only = onlyIcon(b.dataset.c);
+    if (only) d.activities.push({ type: b.dataset.c, icon: only }); else picker = b.dataset.c;
+  }
   else if (a === "pickicon") { d.activities.push({ type: picker, icon: categoryOf(picker).icons[Number(b.dataset.i)].icon }); picker = null; }
   else if (a === "rmact") d.activities.splice(Number(b.dataset.i), 1);
   else if (a === "addlink") d.links.push({ label: "", url: "" });
