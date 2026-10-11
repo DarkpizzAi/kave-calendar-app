@@ -1,5 +1,5 @@
 import { test, eq, ok } from "./run.js";
-import { indexByDay, isMidStay, stayRole, stayLabel, tappable, zoomWeekTarget, zoomMonthTarget, isAway, awayText,
+import { indexByDay, isMidStay, stayRole, stayLabel, pickDayIcon, tappable, zoomWeekTarget, zoomMonthTarget, isAway, awayText,
   shouldLoadMore, nextCount, iconsOf, searchEvents, todaysCount, fullPastWeeks, fullPastMonths,
   backToTodayState, tripCityFor, defaultCity, hideCancelled,
   hasOpenTodos, guestsExcludingViewer, statusGuestsLine } from "../js/cal-model.js";
@@ -47,6 +47,21 @@ test("cal: a stay is in on its first day, out on its last, mid between; only an 
   const one = ev("one", "2026-10-16", { activities: [act("accommodation", "🏨")] });
   eq([stayRole(one, "2026-10-16"), stayLabel(one, "2026-10-16")], ["in", ""]);
   eq(stayRole(ev("t", "2026-10-16", { end: "2026-10-18", activities: [act("transport", "🚆")] }), "2026-10-17"), null);
+});
+test("cal: the Grid emoji of a day: a visit's first day tops everything, then travel, then the rest", () => {
+  const pick = (evs, d) => { const b = pickDayIcon(evs, d); return b && b.e.id; };
+  const visit = ev("visit", "2026-10-28", { end: "2026-11-01", activities: [act("visitor", "🏠")] });
+  const flight = ev("flight", "2026-10-28", { activities: [act("transport", "✈️")] });
+  const stay = ev("stay", "2026-10-28", { end: "2026-10-30", activities: [act("accommodation", "🏨")] });
+  const dinner = ev("dinner", "2026-10-29", { activities: [act("eating", "🍴")] });
+  eq(pick([flight, stay, visit], "2026-10-28"), "visit");
+  eq(pick([stay, flight], "2026-10-28"), "flight");
+  eq(pick([stay, dinner], "2026-10-29"), "dinner");
+  eq(pick([stay], "2026-10-30"), "stay");
+  eq(pick([stay, ev("lunch", "2026-10-30", { activities: [act("eating", "🍴")] })], "2026-10-30"), "lunch");
+  eq(pick([visit, dinner], "2026-10-29"), "dinner");
+  eq(pick([ev("plain", "2026-10-29")], "2026-10-29"), "plain");
+  eq(pick([], "2026-10-29"), null);
 });
 test("cal: a day or week with nothing cannot be tapped", () => {
   eq([tappable([]), tappable([ev("a", "2026-10-01")])], [false, true]);

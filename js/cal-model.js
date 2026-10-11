@@ -5,7 +5,7 @@
 
 import { addDays, dayOfWeek, mondayOf, daysOf } from "./dates.js";
 import { firstWeekOf } from "./views.js";
-import { iconFor } from "./icons.js";
+import { CATEGORIES, iconFor } from "./icons.js";
 import { applyDetail } from "./filter.js";
 
 const DOW = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
@@ -80,6 +80,34 @@ export function stayRole(e, d) {
   return d === lastDay(e) ? "out" : "mid";
 }
 export const isMidStay = (e, d) => stayRole(e, d) === "mid";
+
+/* One emoji per day (Grid): the day's own most important activity, by a fixed
+   priority. The first day of a visit comes first of all (a visitor arriving
+   outranks even a flight or a check-in). Then away -- transport,
+   accommodation, business trip -- then work, then every other category in
+   the Settings catalogue order, "none" (Other) last. A stay's icon only
+   takes its place on check-in; on the middle days and check-out it ranks
+   below everything, so any other icon wins and it still shows alone. A day
+   with several activities across several events shows only the one that
+   ranks highest; ties keep whichever was found first. */
+export const DAY_PRIORITY = [...AWAY, "work", ...CATEGORIES.map((c) => c.type).filter((t) => !AWAY.includes(t) && t !== "work")];
+export const dayRank = (a, e, d) => {
+  if (a.type === "visitor" && d === e.start) return -1;
+  if (a.type === "accommodation" && stayRole(e, d) !== "in") return DAY_PRIORITY.length;
+  return DAY_PRIORITY.indexOf(a.type);
+};
+/* The {a, e} (activity, event) whose icon the day shows, or null. */
+export function pickDayIcon(evs, d) {
+  let best = null, bestRank = Infinity;
+  for (const e of evs) {
+    const acts = e.activities && e.activities.length ? e.activities : [{ type: "none" }];
+    for (const a of acts) {
+      const rank = dayRank(a, e, d);
+      if (rank < bestRank) { bestRank = rank; best = { a, e }; }
+    }
+  }
+  return best;
+}
 /* The words the Agenda adds to a stay's row; a one-day stay has no check-out
    to name, so it gets none. */
 export const stayLabel = (e, d) => {

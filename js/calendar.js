@@ -13,13 +13,13 @@ import { loadRange, dayFreeState, weekFreeNote, weekFreeDays } from "./views.js"
 import { HOLIDAYS, holidayOn } from "./holidays.js";
 import { applyDetail } from "./filter.js";
 import { store } from "./store.js";
-import { indexByDay, zoomWeekTarget, zoomMonthTarget, AWAY, isMidStay, stayLabel, stayRole,
+import { indexByDay, zoomWeekTarget, zoomMonthTarget, isMidStay, stayLabel, pickDayIcon,
   shouldLoadMore, nextCount, iconsOf, searchEvents, shortDate, pastMonths, gesture, lastEventDay,
   fullPastWeeks, fullPastMonths, backToTodayState, todaysCount as cmTodaysCount, hideCancelled,
   hasLoadedOlder, hasOpenTodos } from "./cal-model.js";
 import { openLevel, sheetOpen } from "./sheet.js";
 import { ICON } from "./chrome-icons.js";
-import { CATEGORIES, iconFor } from "./icons.js";
+import { iconFor } from "./icons.js";
 import { readPrefs, eventBlocksFreeTime } from "./prefs.js";
 
 const MONTHS = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
@@ -286,28 +286,15 @@ function gridRows(key, n) {
   for (let i = 0; i < cells.length; i += 7) rows.push({ monday: addDays(start, i), days: cells.slice(i, i + 7) });
   return rows;
 }
-/* One emoji per day: the day's own busiest activity, by a fixed priority
-   (away -- transport/accommodation/business-trip -- then work, then every
-   social category in the Settings catalogue order, "none" last). A day
-   with several activities across several events still shows only the one
-   that ranks highest; ties keep whichever was found first. */
-const DAY_PRIORITY = [...AWAY, "work", ...CATEGORIES.map((c) => c.type).filter((t) => !AWAY.includes(t) && t !== "work")];
+/* One emoji per day: pickDayIcon (cal-model.js) chooses it by a fixed priority. */
 function gridIcon(d) {
   const evs = frame.on(d);
-  let best = null, bestRank = Infinity;
-  for (const e of evs) {
-    const acts = e.activities && e.activities.length ? e.activities : [{ type: "none" }];
-    for (const a of acts) {
-      /* a stay's icon outranks everything on check-in only; on the middle
-         days and check-out any other icon wins (and it still shows alone). */
-      const rank = a.type === "accommodation" && stayRole(e, d) !== "in" ? DAY_PRIORITY.length : DAY_PRIORITY.indexOf(a.type);
-      if (rank < bestRank) { bestRank = rank; best = { a, e }; }
-    }
-  }
+  const best = pickDayIcon(evs, d);
   if (!best) return "";
   const grey = best.e.owner !== frame.me && best.e.owner !== "shared";
-  const more = evs.length > 1 ? `<span class="more"></span>` : "";
-  return `<span class="emo${grey ? " grey" : ""}">${esc(iconFor(best.a, best.e, frame.me))}</span>${more}`;
+  /* the number of events that day, top right, from two up (one is the emoji itself) */
+  const count = evs.length > 1 ? `<span class="dcount" aria-label="${evs.length} events">${evs.length}</span>` : "";
+  return `<span class="emo${grey ? " grey" : ""}">${esc(iconFor(best.a, best.e, frame.me))}</span>${count}`;
 }
 function gridSquare(d, freeDays, note) {
   if (!d) return `<div class="dsq pad"></div>`;
