@@ -432,7 +432,7 @@ a.ticket{color:inherit;text-decoration:none}
 .daycard:not(.week-start){margin-top:calc(4px - var(--sp-3))}
 /* Weekday top-left, day+month top-right, plain empty space between them
    (no rule, no dots) -- flex justify-content does the work. */
-.daycard > .cd{display:flex;justify-content:space-between;align-items:baseline;gap:6px;font-size:var(--fs-micro);font-weight:500;color:var(--text-dim);margin-bottom:6px}
+.daycard > .cd{display:flex;justify-content:space-between;align-items:baseline;gap:6px;font-size:var(--fs-micro);font-weight:500;color:var(--text-dim);margin-bottom:var(--sp-2)}
 .daycard.weekend{background:var(--accent-soft)}
 .daycard.today{background:var(--accent);color:var(--accent-text)}
 .daycard.today > .cd{color:var(--accent-text)}
