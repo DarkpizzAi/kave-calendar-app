@@ -7,7 +7,10 @@
 "use strict";
 
 export const VIEW_NAMES = [["grid", "Grid"], ["agenda", "Agenda"]];
-export const DETAIL_NAMES = [["full", "Full"], ["partial", "Partial"], ["minimal", "Minimal"]];
+/* Partial (the other person greyed) was retired on 2026-10-11, once grey
+   became every level's rule: a saved "partial" reads as Full, which now
+   looks exactly as Partial did. */
+export const DETAIL_NAMES = [["full", "Full"], ["minimal", "Minimal"]];
 const oneOf = (list, v, fallback) => (list.some(([k]) => k === v) ? v : fallback);
 const labelOf = (list, v) => list.find(([k]) => k === v)[1];
 

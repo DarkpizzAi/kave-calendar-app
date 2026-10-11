@@ -10,8 +10,11 @@ test("prefs: a stored hidden-categories list is ignored, so nothing can stay hid
   eq("hiddenCategories" in p, false);
 });
 test("prefs: the Calendar defaults summary", () => {
-  const p = readPrefs({ defaultView: "grid", defaultDetail: "partial" });
-  eq(defaultsSummary(p), "Grid, Partial");
+  const p = readPrefs({ defaultView: "agenda", defaultDetail: "minimal" });
+  eq(defaultsSummary(p), "Agenda, Minimal");
+});
+test("prefs: a saved Partial (retired 2026-10-11) reads as Full", () => {
+  eq(readPrefs({ defaultDetail: "partial" }).defaultDetail, "full");
 });
 test("prefs: stored junk falls back to defaults", () => {
   const p = readPrefs({ defaultView: "daily", defaultDetail: 3 });

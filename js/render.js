@@ -147,7 +147,7 @@ registerLevel("set-defaults", {
   body() {
     const p = readPrefs(store.state.settings);
     return `<div class="fields">${field("Default view", choices("pref-view", VIEW_NAMES, p.defaultView), "Where the Calendar opens.")}`
-      + field("Default detail level", choices("pref-detail", DETAIL_NAMES, p.defaultDetail), "Full: both of you. Partial: the other person greyed. Minimal: yours and shared only.")
+      + field("Default detail level", choices("pref-detail", DETAIL_NAMES, p.defaultDetail), "Full: both of you, the other person greyed. Minimal: yours and shared only.")
       + field("Weekday letters",
           `<button class="tick${p.showWeekdayHeader ? " on" : ""}" role="checkbox" aria-checked="${p.showWeekdayHeader}" aria-label="Show weekday letters in Grid" data-tick-weekday>${p.showWeekdayHeader ? ICON.check : ""}</button>`,
           "The M T W T F S S row above each month in Grid.")

@@ -145,7 +145,7 @@ test("M3: Back events are ignored one by one, never more than were caused", () =
 });
 
 /* ---- F3: today's-event-count badge, filtered by detail level ---- */
-test("cal: todaysCount is minimal-only-mine, both people at partial and full", () => {
+test("cal: todaysCount is minimal-only-mine, both people at full", () => {
   const evs = [
     ev("mine", "2026-09-25", { owner: "isa" }),
     ev("shared", "2026-09-25", { owner: "shared" }),
@@ -154,7 +154,6 @@ test("cal: todaysCount is minimal-only-mine, both people at partial and full", (
   ];
   const D = "2026-09-25";
   eq(todaysCount(evs, "isa", "minimal", D), 2, "only mine and shared");
-  eq(todaysCount(evs, "isa", "partial", D), 3, "both, greyed or not");
   eq(todaysCount(evs, "isa", "full", D), 3);
   eq(todaysCount([], "isa", "full", D), 0);
 });

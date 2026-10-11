@@ -31,8 +31,6 @@ test("detail levels: the other person is greyed at every level, minimal hides th
      [["m", false], ["o", false], ["t", true], ["trip", true]], "Agenda greys like Grid (Isa, 2026-10-11)");
   eq(applyDetail(list, "isa", "minimal").map((x) => [x.event.id, x.grey]),
      [["m", false], ["o", false], ["trip", true]]);
-  eq(applyDetail(list, "isa", "partial").map((x) => [x.event.id, x.grey]),
-     [["m", false], ["o", false], ["t", true], ["trip", true]]);
   eq(applyDetail(list, "isa", "minimal").map((x) => x.event.id), ["m", "o", "trip"],
      "hugo's non-away event is hidden; his trip survives");
 });

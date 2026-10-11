@@ -177,7 +177,7 @@ export function fullPastMonths(today, floorYear) {
 }
 
 /* F3: the Calendar nav icon's badge: what the views show on `day`. Minimal
-   shows only the viewer's own (and shared) events; Partial and Full show
+   shows only the viewer's own (and shared) events; Full shows
    both people's -- applyDetail's own rule, reused. A cancelled event and
    the middle nights of a stay are not counted: no view shows them on the
    day. */

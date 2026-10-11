@@ -298,8 +298,9 @@ function onAction(b, l) {
   else if (a === "rmact") d.activities.splice(Number(b.dataset.i), 1);
   else if (a === "addlink") d.links.push({ label: "", url: "" });
   else if (a === "addtodo") {
-    const text = String(d.newTodoText || "").trim();
-    if (text) d.checklist.push({ id: "ck_" + Date.now().toString(36), text, done: false, assignee: d.newTodoAssignee || null });
+    /* the same addTask as the page's "Add a task" (and Save's half-typed
+       to-do): one way to make a to-do, ids and all; empty text adds nothing */
+    d.checklist = addTask(d, d.newTodoText, d.newTodoAssignee).checklist;
     d.newTodoText = ""; d.newTodoAssignee = null;
   }
   else if (a === "rmcost") d.costs = d.costs.filter((k) => k.id !== b.dataset.k || !canChangeCost(k));
