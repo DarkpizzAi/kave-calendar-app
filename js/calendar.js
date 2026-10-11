@@ -88,7 +88,9 @@ function row(e, withDate, click, tag = "") {
   const ic = icons(e);
   return `<li class="${cls(e)}" style="--n:${ic.length}"${click ? ` data-act="event" data-id="${esc(e.id)}"` : ""}>`
     + (withDate ? `<span class="c-d">${esc(shortDate(e.start, frame.thisYear))}</span>` : "")
-    + `<span class="c-i">${ic.map(esc).join("")}</span><span class="c-t">${tag ? `<span class="c-tag">${esc(tag)} &middot; </span>` : ""}${esc(e.title)}</span>`
+    + `<span class="c-i">${ic.map(esc).join("")}</span>${tag
+      ? `<span class="c-t has-tag"><span class="c-name">${esc(e.title)}</span><span class="c-tag">&nbsp;&middot; ${esc(tag)}</span></span>`
+      : `<span class="c-t">${esc(e.title)}</span>`}`
     + (hasOpenTodos(e) ? `<span class="todo-ic" aria-label="Open to-dos">${ICON.checkbox}</span>` : "") + "</li>";
 }
 const list = (items, dated) => (items ? `<ul class="rows${dated ? " dated" : ""}">${items}</ul>` : "");

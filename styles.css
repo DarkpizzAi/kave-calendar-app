@@ -442,8 +442,11 @@ a.ticket{color:inherit;text-decoration:none}
 /* Text on a solid card (today, Clear) takes that card's own ink, never the page's --text:
    chartreuse and amber are light fills, and --text is near-white in dark mode. The to-do icon sets --text-dim itself, so it inherits the ink back here. */
 .daycard.today .todo-ic,.daycard.clear .todo-ic{color:inherit}
-/* "Check in" / "Check out" before a stay's title: quieter than the title */
-.c-tag{color:var(--text-dim)}
+/* "Check in" / "Check out" after a stay's title, quieter than it. A long title
+   ellipsises on its own; the tag never shrinks, so it is always readable. */
+.c-t.has-tag{display:flex;min-width:0}
+.c-name{min-width:0;overflow:hidden;white-space:nowrap;text-overflow:ellipsis}
+.c-tag{flex:none;white-space:nowrap;color:var(--text-dim)}
 .daycard.today .c-tag,.daycard.clear .c-tag{color:inherit;opacity:.75}
 
 /* A weekday bank holiday (never Sat/Sun -- a weekend already reads as a
