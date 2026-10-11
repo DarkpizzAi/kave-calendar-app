@@ -439,11 +439,16 @@ a.ticket{color:inherit;text-decoration:none}
    (no rule, no dots) -- flex justify-content does the work. */
 .daycard > .cd{display:flex;justify-content:space-between;align-items:baseline;gap:6px;font-size:var(--fs-micro);font-weight:500;color:var(--text-dim);margin-bottom:2px}
 .daycard.weekend{background:var(--accent-soft)}
-.daycard.today{background:var(--accent)}
+.daycard.today{background:var(--accent);color:var(--accent-text)}
 .daycard.today > .cd{color:var(--accent-text)}
 .daycard.clear{background:var(--free-tx);color:var(--free-bg)}
 .daycard.clear > .cd{color:var(--free-bg)}
 .daycard.open{border:2px solid var(--free-tx)}
+/* Text on a solid card (today, Clear) takes that card's own ink, never the page's --text:
+   chartreuse and amber are light fills, and --text is near-white in dark mode. The holiday
+   line and the to-do icon set --text-dim themselves, so they inherit it back here. */
+.daycard.today .holiday,.daycard.today .todo-ic,.daycard.clear .holiday,.daycard.clear .todo-ic{color:inherit}
+
 /* A weekday bank holiday (never Sat/Sun -- a weekend already reads as a
    holiday by being one): an accent border, the same 2px weight as Open's
    free-tx border above so the two read as the same kind of mark. */
@@ -491,6 +496,7 @@ a.ticket{color:inherit;text-decoration:none}
 .dsq.today .more{background:var(--accent-text)}
 .dsq.clear{background:var(--free-tx)}
 .dsq.clear .num{color:var(--free-bg)}
+.dsq.clear .dtodo{color:var(--free-bg)}
 .dsq.open{border:2px solid var(--free-tx)}
 /* search */
 .hint{margin:0;color:var(--text-dim);font-size:var(--fs-meta)}
