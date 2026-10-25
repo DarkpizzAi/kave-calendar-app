@@ -21,6 +21,7 @@ import { CATEGORIES, iconFor } from "./icons.js";
 import { resetCalendarDefaults, openArchive } from "./calendar.js";
 import { checkForUpdate, ensureVersionAsked, updateStatusLines, updateBusy, updateButtonText, updateReady } from "./updates.js";
 import { gateStep, gateHtml, bindGate } from "./gate.js";
+import { insightsHtml, bindInsights, newVisit } from "./view-insights.js";
 
 /* Sync of the events themselves, shown in Settings only (spec: the Calendar
    never shows sync state). Set by boot.js. */
@@ -49,6 +50,7 @@ export function setView(name) {
   if (!VIEWS[name]) return;
   if (name === current && name === "calendar") { backToToday(); return; }
   current = name;
+  if (name === "insights") newVisit(); // a different "Did you know" each visit
   /* Every tab switch lands at the top, filters visible. firstDraw is true
      only for the app's first render, so afterCalendar keeps this 0 rather
      than jumping to #today, which sits below the controls. */
@@ -64,8 +66,6 @@ function stub(title, line) {
 }
 
 const STUBS = {
-  insights: ["What needs doing, and what needs a decision.",
-    "Checklist items, trip warnings, and proposals from mail, bank lines and voice notes. Nothing is ever added automatically."],
   trips: ["The next departure, every trip, and the throwback.",
     "Phases, events, bookings and costs per trip. + creates a trip and can pull in existing events."],
   radar: ["What might happen, and what we are watching.",
@@ -196,7 +196,8 @@ export function render() {
   const before = { top: main.scrollTop, height: main.scrollHeight, first: firstDraw };
   document.getElementById("tabName").textContent = VIEWS[current];
   main.innerHTML = current === "settings" ? renderSettings()
-    : current === "calendar" ? calendarHtml() : renderStub(current);
+    : current === "calendar" ? calendarHtml()
+    : current === "insights" ? insightsHtml() : renderStub(current);
   main.classList.toggle("is-cal", current === "calendar");
   document.getElementById("nav").innerHTML = renderNav();
   /* No floating buttons any more (#fabs stays empty): Today and "+" sit in
@@ -205,6 +206,7 @@ export function render() {
   refreshSheet();
   refreshArchive();
   bindView();
+  if (current === "insights") bindInsights(main);
 }
 
 /* Re-bound on every render, because every render replaces these nodes. */
