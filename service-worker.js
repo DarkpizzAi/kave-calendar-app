@@ -11,7 +11,7 @@
    so the teardown has to live here to be able to break out of a stale shell.
 */
 
-const VERSION = "v1.68";
+const VERSION = "v1.69";
 const CACHE = `kave-compass-${VERSION}`;
 
 /* The phone's ticket files (CACHE_NAME in js/tickets.js). Not versioned: a
