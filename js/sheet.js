@@ -18,6 +18,7 @@ import { iconsOf, guestsExcludingViewer, rowLinks, shownStatus, gesture } from "
 import { frameNow, detailGrey, dayEvents } from "./calendar.js";
 import { ICON } from "./chrome-icons.js";
 import { STATUS_LABEL } from "./model.js";
+import { splitLinks, dayTicketLine } from "./tickets.js";
 
 const LONGDOW = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"];
 const MONTHS = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
@@ -80,8 +81,13 @@ function strip(e, f, d) {
   const open = (e.checklist || []).filter((c) => !c.done).length;
   const meta = [d === e.start ? e.startTime : "", guests].filter(Boolean).map(esc).join('<span class="dsep">·</span>');
   const count = open ? `<span class="dcount" role="img" aria-label="${open} open to-do${open > 1 ? "s" : ""}">${open}${ICON.checkbox}</span>` : "";
-  const { shown, more, tier } = rowLinks((e.links || []).filter((l) => safeUrl(l.url)));
-  const links = shown.map((l) => `<a class="dlink" href="${esc(safeUrl(l.url))}" target="_blank" rel="noopener noreferrer">`
+  /* A stored ticket opens the phone's copy: its lines replace the Drive
+     ticket link here (the event page keeps "Open in Drive"). */
+  const sp = splitLinks(e);
+  const rl = rowLinks(sp.links.filter((l) => safeUrl(l.url)));
+  const rest = sp.tickets.length && rl.tier > 0 ? { shown: [], more: rl.shown.length + rl.more, tier: 0 } : rl;
+  const { shown, more, tier } = rest;
+  const links = sp.tickets.map((t) => dayTicketLine(e, t)).join("") + shown.map((l) => `<a class="dlink" href="${esc(safeUrl(l.url))}" target="_blank" rel="noopener noreferrer">`
     + `<span aria-hidden="true">${LINK_GLYPH[tier]}</span><span class="dlt">${esc(l.label)}</span>${ICON.chev}</a>`).join("")
     + (more ? `<p class="dmore">+ ${more} more link${more > 1 ? "s" : ""}</p>` : "");
   const status = shownStatus(e);

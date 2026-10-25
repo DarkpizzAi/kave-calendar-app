@@ -56,6 +56,8 @@ const SHELL = [
   "js/cleanup.js",
   "js/prefs.js",
   "js/event-form.js",
+  "js/tickets.js",
+  "js/ticket-view.js",
   "js/view-event.js",
   "js/chrome-icons.js",
   "js/calendar.js",

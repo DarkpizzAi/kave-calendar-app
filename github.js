@@ -61,11 +61,11 @@ export const github = {
     return withRef ? `${base}?ref=${encodeURIComponent(c.branch)}` : base;
   }
 
-  async function request(method, url, body, etag) {
+  async function request(method, url, body, etag, accept) {
     if (!token) throw ghError("unauthorized", { message: "no token set" });
     const headers = {
       Authorization: "Bearer " + token,
-      Accept: "application/vnd.github+json",
+      Accept: accept || "application/vnd.github+json",
       "X-GitHub-Api-Version": "2022-11-28",
     };
     if (etag) headers["If-None-Match"] = etag;
@@ -121,6 +121,14 @@ export const github = {
       sha: body.sha,
       etag: res.headers.get("ETag") || null,
     };
+  };
+
+  // The file's bytes as a Blob (tickets: PDFs and images, not JSON). The raw
+  // media type makes the Contents API return the content itself; same
+  // errors as getFile.
+  github.getRaw = async (path) => {
+    const res = await request("GET", contentsUrl(path, true), null, null, "application/vnd.github.raw");
+    return res.blob();
   };
 
   // value is committed as JSON.stringify(value, null, 1) + "\n" (matches the

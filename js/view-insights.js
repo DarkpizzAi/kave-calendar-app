@@ -14,6 +14,7 @@ import { store } from "./store.js";
 import { github } from "../github.js";
 import { registerLevel, openLevel, replaceTop, topLevel } from "./sheet.js";
 import { ICON } from "./chrome-icons.js";
+import { ticketsOf, ticketButton } from "./tickets.js";
 import { TILES, yearCounts, history, comingUp, ticketWall, wallTakenOff, didYouKnow } from "./insights-data.js";
 import { QUEUE_PATH, LOG_PATH, answerKey, mergeOutbox, cleanupCounts, pruneIfFresh, compactStamp, flushOutbox } from "./cleanup.js";
 
@@ -183,11 +184,14 @@ export function bindInsights(main) {
 function histBody(l) {
   const years = history(ctx.data.events(), l.key, todayKey());
   if (!years.length) return '<p class="hint pad">Nothing here yet.</p>';
+  const evs = new Map(ctx.data.events().map((e) => [e.id, e]));
   const rows = years.map((y) => `<div class="year">${esc(y.year)} · ${y.count}</div>` + y.rows.map((r) => {
     const u = r.ticket ? safeUrl(r.ticket.url) : "";
-    /* a future ticket will open the copy on the phone (stage 4); until then
-       both open the Drive link */
-    const tk = u ? `<a class="hk" href="${esc(u)}" target="_blank" rel="noopener noreferrer" aria-label="Open the ticket">${r.ticket.when === "future" ? "🎟" : DRIVE_SVG}</a>` : "";
+    /* a future ticket opens the copy on the phone; a past one (or one the
+       phone has no copy of) opens the Drive link */
+    const ev = evs.get(r.id), mine = r.ticket && r.ticket.when === "future" && ev ? ticketsOf(ev) : [];
+    const tk = mine.length ? ticketButton(ev, mine[0], "hk", '<span aria-hidden="true">🎟</span>', "Open the ticket")
+      : u ? `<a class="hk" href="${esc(u)}" target="_blank" rel="noopener noreferrer" aria-label="Open the ticket">${r.ticket.when === "future" ? "🎟" : DRIVE_SVG}</a>` : "";
     return `<div class="c d" data-sact="event" data-id="${esc(r.id)}">${esc(fmt(r.date))}</div>`
       + `<div class="c t" data-sact="event" data-id="${esc(r.id)}" role="button" tabindex="0">${esc(r.title)}${r.place ? `<small>${esc(r.place)}</small>` : ""}</div>`
       + `<div class="c k">${tk}</div>`;
