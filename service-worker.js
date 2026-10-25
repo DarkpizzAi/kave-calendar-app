@@ -52,6 +52,7 @@ const SHELL = [
   "js/views.js",
   "js/data.js",
   "js/cal-model.js",
+  "js/insights-data.js",
   "js/prefs.js",
   "js/event-form.js",
   "js/view-event.js",
