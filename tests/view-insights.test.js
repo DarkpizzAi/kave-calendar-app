@@ -1,6 +1,6 @@
 import { test, eq, ok } from "./run.js";
 import { fakeGh } from "./helpers.js";
-import { answerKey, answerPath, mergeOutbox, queueLines, answeredKeys, cleanupCounts, pruneSent, flushOutbox, ANSWERS_DIR } from "../js/cleanup.js";
+import { answerKey, answerPath, mergeOutbox, queueLines, answeredKeys, cleanupCounts, pruneSent, pruneIfFresh, compactStamp, flushOutbox, ANSWERS_DIR } from "../js/cleanup.js";
 
 const ans = (card, line, value = "isa", at = "2026-10-25T10:00:00Z") => ({ card, line, action: "accepted", value, by: "isa", at });
 const note = (card, text, at = "2026-10-25T10:00:00Z") => ({ card, line: "all", action: "freetext", text, by: "hugo", at });
@@ -97,4 +97,26 @@ test("flushOutbox: one failing answer does not block the next", async () => {
   eq(out.outbox.map(answerKey), ["cu_a-going"]);
   eq(out.sent.map(answerKey), ["cu_b-going"]);
   ok(out.error === "notFound");
+});
+
+test("two free-text notes on one card keep distinct keys and paths", () => {
+  const n = (at) => ({ card: "cu_a", line: "all", stamp: compactStamp(at), action: "freetext", text: at, by: "isa", at });
+  const a = n("2026-10-25T21:33:01.123Z"), b = n("2026-10-25T21:40:09.000Z");
+  eq(compactStamp(a.at), "20261025T213301Z");
+  const box = mergeOutbox(mergeOutbox([], a), b);
+  eq(box.length, 2);
+  ok(answerPath(a) !== answerPath(b));
+  eq(answerPath(a), `${ANSWERS_DIR}/cu_a-all-20261025T213301Z.json`);
+});
+
+test("pruneIfFresh: a failed queue read keeps sent as it was", () => {
+  const now = Date.parse("2026-10-25T12:00:00Z");
+  const sent = [ans("cu_gone", "going")];
+  eq(pruneIfFresh(sent, null, false, now), sent);
+  eq(pruneIfFresh(sent, queue, true, now), []);
+});
+
+test("a malformed queue never throws", () => {
+  eq(queueLines({ cards: "oops" }), []);
+  eq(queueLines({ cards: {} }), []);
 });

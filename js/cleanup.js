@@ -16,8 +16,13 @@ export const ANSWERS_DIR = `${BASE}/cleanup-answers`;
 export const WINDOW_DAYS = 30;
 
 const clean = (s) => String(s == null ? "" : s).replace(/[^A-Za-z0-9_-]/g, "_");
-export const answerKey = (a) => `${a.card}-${a.line}`;
-export const answerPath = (a) => `${ANSWERS_DIR}/${clean(a.card)}-${clean(a.line)}.json`;
+/* A free-text note carries a stamp, so two notes on one card never share a
+   key or a file; the JSON keeps line "all". */
+const lineKey = (a) => (a.stamp ? `${a.line}-${a.stamp}` : a.line);
+export const answerKey = (a) => `${a.card}-${lineKey(a)}`;
+export const answerPath = (a) => `${ANSWERS_DIR}/${clean(a.card)}-${clean(lineKey(a))}.json`;
+/* "2026-10-25T21:33:01.123Z" -> "20261025T213301Z" */
+export const compactStamp = (iso) => String(iso).replace(/[-:]/g, "").replace(/\.\d+/, "");
 
 /* The same card and line answered twice keeps the newer answer. */
 export function mergeOutbox(outbox, answer) {
@@ -27,7 +32,7 @@ export function mergeOutbox(outbox, answer) {
 /* Every question the queue still holds: [{card, line}]. */
 export function queueLines(queue) {
   const out = [];
-  ((queue && queue.cards) || []).forEach((c) => (c.lines || []).forEach((l) => out.push({ card: c.id, line: l.key })));
+  (queue && Array.isArray(queue.cards) ? queue.cards : []).forEach((c) => (c.lines || []).forEach((l) => out.push({ card: c.id, line: l.key })));
   return out;
 }
 
@@ -67,6 +72,12 @@ export function cleanupCounts({ queue, outbox, sent, log }, today) {
 export function pruneSent(sent, queue, nowMs) {
   const inQueue = new Set(queueLines(queue).map((l) => `${l.card}-${l.line}`));
   return sent.filter((a) => (accepted(a) ? inQueue.has(answerKey(a)) : nowMs - Date.parse(a.at) < 86400000));
+}
+
+/* Prune only when the queue was read this sync; a failed read must not make
+   every written answer look applied. */
+export function pruneIfFresh(sent, queue, fresh, nowMs) {
+  return fresh ? pruneSent(sent, queue, nowMs) : sent;
 }
 
 /* Send the outbox. Each answer is created with sha null; if the file already

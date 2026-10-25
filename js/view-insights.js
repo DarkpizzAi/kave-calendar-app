@@ -15,7 +15,7 @@ import { github } from "../github.js";
 import { registerLevel, openLevel, replaceTop, topLevel } from "./sheet.js";
 import { ICON } from "./chrome-icons.js";
 import { TILES, yearCounts, history, comingUp, ticketWall, wallTakenOff, didYouKnow } from "./insights-data.js";
-import { QUEUE_PATH, LOG_PATH, answerKey, mergeOutbox, cleanupCounts, pruneSent, flushOutbox } from "./cleanup.js";
+import { QUEUE_PATH, LOG_PATH, answerKey, mergeOutbox, cleanupCounts, pruneIfFresh, compactStamp, flushOutbox } from "./cleanup.js";
 
 let ctx = null;            // { data, render, view, banner }
 const me = () => store.state.settings.me;
@@ -183,7 +183,7 @@ export function bindInsights(main) {
 function histBody(l) {
   const years = history(ctx.data.events(), l.key, todayKey());
   if (!years.length) return '<p class="hint pad">Nothing here yet.</p>';
-  const rows = years.map((y) => `<div class="year">${y.year} · ${y.count}</div>` + y.rows.map((r) => {
+  const rows = years.map((y) => `<div class="year">${esc(y.year)} · ${y.count}</div>` + y.rows.map((r) => {
     const u = r.ticket ? safeUrl(r.ticket.url) : "";
     /* a future ticket will open the copy on the phone (stage 4); until then
        both open the Drive link */
@@ -222,7 +222,7 @@ function wallBody() {
   const editStub = (w) => `<div class="tstub c-${esc(w.cat)}">`
     + `<button class="tx" data-ia="off" data-id="${esc(w.id)}" aria-label="Take ${esc(w.title)} off the wall">${ICON.x}</button>${stubInner(w)}</div>`;
   const groups = [...byYear.entries()].map(([y, list]) =>
-    `<div class="year">${y} · ${list.length}</div><div class="wall">${list.map(wallEdit ? editStub : stubLink).join("")}</div>`).join("")
+    `<div class="year">${esc(y)} · ${list.length}</div><div class="wall">${list.map(wallEdit ? editStub : stubLink).join("")}</div>`).join("")
     || '<p class="hint pad">No tickets here.</p>';
   const removed = wallEdit && off.length
     ? `<div class="removed"><div class="year">Taken off · ${off.length}</div><div class="wall">${off.map((w) =>
@@ -244,7 +244,7 @@ function cardHtml(c) {
   const lines = (c.lines || []).map((l) => {
     const a = given.get(`${c.id}-${l.key}`);
     if (a) return `<div class="cu-line done"><p class="cu-q">${esc(l.question)}</p><p class="cu-applying">Applying: ${esc(optLabel(l.key, a.value))}</p></div>`;
-    return `<div class="cu-line"><p class="cu-q">${esc(l.question)}</p><div class="choices">${(l.options || []).map((v) =>
+    return `<div class="cu-line"><p class="cu-q">${esc(l.question)}</p><div class="choices">${(Array.isArray(l.options) ? l.options : []).map((v) =>
       `<button class="${d.lines[l.key] === v ? "on" : ""}" data-ia="pick" data-card="${esc(c.id)}" data-line="${esc(l.key)}" data-v="${esc(v)}" aria-pressed="${d.lines[l.key] === v}">${esc(optLabel(l.key, v))}</button>`).join("")}</div></div>`;
   }).join("");
   return `<section class="cu-card" data-card="${esc(c.id)}"><h3 class="cu-name">${esc(c.summary || "Event")}</h3>${lines}`
@@ -254,7 +254,7 @@ function cardHtml(c) {
 }
 
 function cleanBody() {
-  const all = (CU.queue && CU.queue.cards) || [];
+  const all = CU.queue && Array.isArray(CU.queue.cards) ? CU.queue.cards : [];
   const cards = [...all.filter((c) => !skipped.includes(c.id)), ...all.filter((c) => skipped.includes(c.id))];
   const waiting = CU.outbox.length
     ? `<p class="hint">${CU.outbox.length} answer${CU.outbox.length === 1 ? "" : "s"} waiting to be sent. They go as soon as you are back online.</p>` : "";
@@ -270,7 +270,7 @@ function submitCard(card) {
   const at = new Date().toISOString();
   let box = CU.outbox;
   Object.entries(d.lines).forEach(([line, value]) => { box = mergeOutbox(box, { card, line, action: "accepted", value, by: who, at }); });
-  if (d.text.trim()) box = mergeOutbox(box, { card, line: "all", action: "freetext", text: d.text.trim(), by: who, at });
+  if (d.text.trim()) box = mergeOutbox(box, { card, line: "all", stamp: compactStamp(at), action: "freetext", text: d.text.trim(), by: who, at });
   CU.outbox = box;
   delete drafts[card];
   saveCleanup();
@@ -323,11 +323,12 @@ export async function syncCleanup() {
   if (syncing || !store.state.settings.token) return;
   syncing = true;
   try {
+    let queueFresh = false;
     for (const [path, field, empty] of [[QUEUE_PATH, "queue", { cards: [] }], [LOG_PATH, "log", { answers: [] }]]) {
-      try { CU[field] = (await github.getFile(path)).json; }
-      catch (e) { if (e.gh === "notFound") CU[field] = empty; }
+      try { CU[field] = (await github.getFile(path)).json; if (field === "queue") queueFresh = true; }
+      catch (e) { if (e.gh === "notFound") { CU[field] = empty; if (field === "queue") queueFresh = true; } }
     }
-    CU.sent = pruneSent(CU.sent, CU.queue, Date.now());
+    CU.sent = pruneIfFresh(CU.sent, CU.queue, queueFresh, Date.now());
     saveCleanup();
   } finally {
     syncing = false;
