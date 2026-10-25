@@ -175,15 +175,15 @@ test("didYouKnow: empty with fewer than 5 countable events", () => {
 test("didYouKnow: the three facts, picked by seed", () => {
   const e = busy();
   eq(didYouKnow(e, 2026, 0), "Your busiest month this year was July, with 4 events.");
-  eq(didYouKnow(e, 1), "Saturday is your favourite day to go out.");
-  eq(didYouKnow(e, 2), "Porto is the city you visited most outside Barcelona, with 2 events.");
-  eq(didYouKnow(e, 3), didYouKnow(e, 0));
+  eq(didYouKnow(e, 2026, 1), "Saturday is your favourite day to go out.");
+  eq(didYouKnow(e, 2026, 2), "Porto is the city you visited most outside Barcelona, with 2 events.");
+  eq(didYouKnow(e, 2026, 3), didYouKnow(e, 2026, 0));
 });
 
 test("didYouKnow: with no city outside Barcelona only two facts rotate", () => {
   const e = [1, 2, 3, 4, 5].map((i) => ev("eating", "2026-05-0" + i));
-  ok(didYouKnow(e, 0).startsWith("Your busiest month this year was May, with 5 events"));
-  eq(didYouKnow(e, 2), didYouKnow(e, 0));
+  ok(didYouKnow(e, 2026, 0).startsWith("Your busiest month this year was May, with 5 events"));
+  eq(didYouKnow(e, 2026, 2), didYouKnow(e, 2026, 0));
 });
 
 test("didYouKnow: only the asked year counts", () => {
