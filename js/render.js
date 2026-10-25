@@ -59,26 +59,10 @@ export function setView(name) {
   render();
 }
 
-/* A view that is honestly not built yet. Dashed, never a tidy empty state:
-   an empty state says "nothing here", and this has to say "not written yet",
-   which is the same signal Spoon's Plan tab uses. */
-function stub(title, line) {
-  return `<div class="stub"><b>${escapeHtml(title)}</b>${escapeHtml(line)}</div>`;
-}
-
-const STUBS = {
-  trips: ["The next departure, every trip, and the throwback.",
-    "Phases, events, bookings and costs per trip. + creates a trip and can pull in existing events."],
-  radar: ["What might happen, and what we are watching.",
-    "Ideas, and prices being watched. Tap an idea to make it an event or a trip."],
-};
-
-function renderStub(id) {
-  const [lede, line] = STUBS[id];
-  return `
-    <p class="lede">${escapeHtml(lede)}</p>
-    ${stub("Not built yet", line)}
-  `;
+/* A view that is honestly not built yet: its title (the header) and a
+   centred "Coming soon", nothing else. No lede, no dashed box. */
+function renderStub() {
+  return `<p class="soon">Coming soon</p>`;
 }
 
 /* Settings, laid out like Spoon's (spec section 3, Settings): no cards, a

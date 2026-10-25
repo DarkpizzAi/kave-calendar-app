@@ -62,17 +62,17 @@ main { padding: var(--sp-4); }
 .view-title { font-size: var(--fs-lede); margin-bottom: var(--sp-2); }
 .lede { color: var(--text-dim); font-size: var(--fs-ui); margin: 0 0 var(--sp-4); }
 
-/* "not built yet" is a dashed box, the same signal Spoon uses on its Plan
-   tab. It should look unfinished on purpose, never like an empty state. */
-.stub {
-  border: 1px dashed var(--rule-strong);
-  border-radius: var(--r-card);
-  padding: var(--sp-5) var(--sp-4);
+/* "not built yet": just the tab title and this line, centred in the view. */
+.soon {
+  margin: 0;
+  min-height: 60vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
   text-align: center;
   color: var(--text-dim);
   font-size: var(--fs-ui);
 }
-.stub b { display: block; color: var(--text); font-size: var(--fs-body); margin-bottom: var(--sp-1); }
 
 /* ---------- settings: laid out like Spoon's. No cards and no section
    headings: a bold label per field, its controls straight on the page. ---------- */
