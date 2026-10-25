@@ -154,13 +154,19 @@ function periodState(d) {
    the 1st of a new month. The year only joins in when the day isn't in
    frame.thisYear (Archive, mostly). */
 const dayMonth = (d) => `${Number(d.slice(8))} ${MONTHS[Number(d.slice(5, 7)) - 1].slice(0, 3)}${d.slice(0, 4) !== frame.thisYear ? " " + d.slice(0, 4) : ""}`;
-function agendaDay(d, m) {
+function agendaDay(d, m, joinUp, joinDown) {
   const evs = visibleOn(d);
   const weekend = dayOfWeek(d) >= 5 ? " weekend" : "";
   /* Monday is the first day of the week: it's the one day that keeps the
      wider between-weeks gap (.content's own flex gap); every other day
      pulls in tighter, to the same-week spacing below. */
-  const weekStart = dayOfWeek(d) === 0 ? " week-start" : "";
+  const weekStart = (dayOfWeek(d) === 0 ? " week-start" : "") + (dayOfWeek(d) === 6 ? " week-end" : "");
+  /* Option B corners (Isa, 25/10/2026): where two cards of one week meet,
+     the touching corners go square (the 4px gap stays). Decided by the
+     neighbours actually drawn (weekBlocks), not by the weekday: a lone day
+     of its week, the first/last day a month heading or today's trim cuts
+     off, keeps its round corners. */
+  const joins = (joinUp ? " join-up" : "") + (joinDown ? " join-down" : "");
   const dow = DOW[dayOfWeek(d)][0] + DOW[dayOfWeek(d)].slice(1).toLowerCase();
   const hol = holidayOn(d);
   /* A weekday bank holiday is named in the card header, centred between the
@@ -179,7 +185,7 @@ function agendaDay(d, m) {
   const holBorder = hol && !weekend ? " holiday-border" : "";
   /* The weekday sits outside the card, on the left (Isa, 2026-10-11): a row
      holds the label and the card, and carries the week spacing and data-week. */
-  return `<div class="dayrow${weekStart}" data-week="${m}"><span class="wdl${d === frame.today ? " today" : ""}">${dow}</span>`
+  return `<div class="dayrow${weekStart}${joins}" data-week="${m}"><span class="wdl${d === frame.today ? " today" : ""}">${dow}</span>`
     + `<div class="daycard ${periodState(d)}${weekend}${holBorder}"${tap}>${cd}`
     + `<ul class="rows">${evs.map((e) => row(e, false, false, stayLabel(e, d))).join("")}</ul></div></div>`;
 }
@@ -230,7 +236,8 @@ function equalizeAgendaHeights(root) {
    for the height rule's grouping) stays whole; only which heading a day
    falls under is per-day. */
 function weekBlocks(from, count) {
-  let out = "", cur = "";
+  const items = [];
+  let cur = "";
   for (let m = from, i = 0; i < count && m <= frame.range.max; i++, m = addDays(m, 7)) {
     /* Only the week underway trims to today -- Isa: Agenda opens on today
        at the top, but the Archive must still show real past weeks in full,
@@ -239,11 +246,18 @@ function weekBlocks(from, count) {
     const days = [0, 1, 2, 3, 4, 5, 6].map((k) => addDays(m, k)).filter((d) => m !== frame.thisMonday || d >= frame.today);
     for (const d of days) {
       const ym = d.slice(0, 7);
-      if (ym !== cur) { cur = ym; out += monthHead(`${ym}-01`); }
-      out += agendaDay(d, m);
+      const head = ym !== cur;
+      cur = ym;
+      items.push({ d, m, head });
     }
   }
-  return out;
+  /* a card joins the one above/below only when that one is the same week
+     and no month heading sits between them */
+  return items.map((it, i) => {
+    const up = i > 0 && !it.head && items[i - 1].m === it.m;
+    const down = i < items.length - 1 && !items[i + 1].head && items[i + 1].m === it.m;
+    return (it.head ? monthHead(`${it.d.slice(0, 7)}-01`) : "") + agendaDay(it.d, it.m, up, down);
+  }).join("");
 }
 const weeks = () => weekBlocks(frame.thisMonday, S.future.agenda);
 
@@ -272,7 +286,7 @@ function gridRows(key, n) {
 /* One emoji per day: pickDayIcon (cal-model.js) chooses it by a fixed priority. */
 function gridIcon(d) {
   const evs = visibleOn(d);
-  const best = pickDayIcon(evs, d);
+  const best = pickDayIcon(evs, d, { order: readPrefs(store.state.settings).gridOrder, me: frame.me });
   if (!best) return { emo: "", dots: "" };
   /* one dot per event beyond the one the emoji stands for, top right beside
      the day number; gridDots (cal-model.js, tested) says how many fit. The
@@ -303,8 +317,7 @@ function gridMonth(y, mo) {
   const rows = gridRows(key, n).map((r) => {
     return `<div class="grid7">${r.days.map((d) => gridSquare(d)).join("")}</div>`;
   }).join("");
-  const wdhead = readPrefs(store.state.settings).showWeekdayHeader
-    ? `<div class="wdhead">${DOW.map((w) => `<span>${w[0]}</span>`).join("")}</div>` : "";
+  const wdhead = `<div class="wdhead">${DOW.map((w) => `<span>${w[0]}</span>`).join("")}</div>`;
   return `<div class="gridCard${now ? " now" : ""}" data-month="${key}">${wdhead}<div class="monthgrid">${rows}</div></div>`;
 }
 function grid() {

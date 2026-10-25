@@ -8,13 +8,14 @@
 "use strict";
 
 import { initTheme } from "./theme.js";
-import { render, isCalendar, dataSync, actions } from "./render.js";
+import { render, isCalendar, dataSync, actions, currentView } from "./render.js";
 import { wire, showBanner } from "./wire.js";
 import { appData } from "./data.js";
 import { store } from "./store.js";
 import { initCalendar, closeMenus } from "./calendar.js";
 import { initSheet, back, sheetOpen, refreshSheet, setDayAdd } from "./sheet.js";
 import { initEvent, newEventForm } from "./view-event.js";
+import { initInsights, syncCleanup } from "./view-insights.js";
 
 initTheme();
 wire();
@@ -36,11 +37,14 @@ async function syncNow() {
           : kind === "rateLimited" ? "Sync failed: rate limited by GitHub. It retries on its own."
           : "Sync failed: " + ((r.error && r.error.message) || "unknown error") }, { at: Date.now() });
   render();
+  /* the clean-up queue, the log and the answer outbox ride on every sync */
+  syncCleanup().catch(() => { /* offline: the cache and the outbox stay as they are */ });
 }
 
 actions.sync = syncNow;
 initSheet();
 initEvent({ data, refresh: refreshSheet });
+initInsights({ data, render, view: currentView, banner: showBanner });
 setDayAdd(newEventForm); // F21: the day-level sheet's own "+"
 initCalendar({ data, render, isCalendar, sync: syncNow, add: newEventForm });
 render();

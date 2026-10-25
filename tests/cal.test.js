@@ -2,7 +2,7 @@ import { test, eq, ok } from "./run.js";
 import { indexByDay, eventsOn, isMidStay, stayRole, stayLabel, pickDayIcon, isAway,
   shouldLoadMore, nextCount, iconsOf, searchEvents, todaysCount, fullPastWeeks, fullPastMonths,
   tripCityFor, defaultCity, hideCancelled,
-  hasOpenTodos, guestsExcludingViewer, rowLinks, shownStatus, gridDots } from "../js/cal-model.js";
+  hasOpenTodos, guestsExcludingViewer, rowLinks, shownStatus, gridDots, DAY_PRIORITY } from "../js/cal-model.js";
 
 const ev = (id, start, extra = {}) => ({ id, title: id, start, end: null, owner: "shared", status: "planned", activities: [], ...extra });
 const act = (type, icon) => ({ type, icon });
@@ -62,6 +62,31 @@ test("cal: the Grid emoji of a day: a visit's first day tops everything, then tr
   eq(pick([visit, dinner], "2026-10-29"), "dinner");
   eq(pick([ev("plain", "2026-10-29")], "2026-10-29"), "plain");
   eq(pick([], "2026-10-29"), null);
+});
+test("cal: the Grid emoji order decides inside a group; mine and shared outrank the other person's", () => {
+  const pick = (evs, d, opts) => { const b = pickDayIcon(evs, d, opts); return b && b.e.id; };
+  const d = "2026-10-29";
+  const mineEat = ev("mineEat", d, { owner: "isa", activities: [act("eating", "🍴")] });
+  const hugoFlight = ev("hugoFlight", d, { owner: "hugo", activities: [act("transport", "✈️")] });
+  const hugoMusic = ev("hugoMusic", d, { owner: "hugo", activities: [act("live-music", "🎶")] });
+  const shared = ev("shared", d, { owner: "shared", activities: [act("drinks", "🍺")] });
+  const order = ["transport", "accommodation", "live-music", ...DAY_PRIORITY.filter((t) => !["transport", "accommodation", "live-music"].includes(t))];
+  eq(pick([hugoFlight, mineEat], d, { order, me: "isa" }), "mineEat", "my dinner beats Hugo's flight");
+  eq(pick([hugoFlight, hugoMusic], d, { order, me: "isa" }), "hugoFlight", "only his: his flight shows");
+  eq(pick([hugoFlight, hugoMusic], d, { order: ["live-music", ...order.filter((t) => t !== "live-music")], me: "isa" }), "hugoMusic", "my order decides inside his group");
+  eq(pick([hugoFlight, shared], d, { order, me: "isa" }), "shared", "shared counts as mine");
+  eq(pick([hugoFlight, mineEat], d, { order, me: "hugo" }), "hugoFlight", "Hugo's own grid is the other way round");
+  eq(pick([mineEat, hugoMusic], d, { order: [...DAY_PRIORITY].reverse(), me: "isa" }), "mineEat");
+});
+test("cal: the fixed rules hold inside each group whatever the order", () => {
+  const pick = (evs, d, opts) => { const b = pickDayIcon(evs, d, opts); return b && b.e.id; };
+  const bottom = ["none", ...DAY_PRIORITY.filter((t) => t !== "none")];
+  const visit = ev("visit", "2026-10-28", { end: "2026-11-01", owner: "isa", activities: [act("visitor", "🏠")] });
+  const flight = ev("flight", "2026-10-28", { owner: "isa", activities: [act("transport", "✈️")] });
+  eq(pick([flight, visit], "2026-10-28", { order: bottom, me: "isa" }), "visit", "arrival first");
+  const stay = ev("stay", "2026-10-28", { end: "2026-10-30", owner: "isa", activities: [act("accommodation", "🏨")] });
+  const lunch = ev("lunch", "2026-10-30", { owner: "isa", activities: [act("none", "📌")] });
+  eq(pick([stay, lunch], "2026-10-30", { order: ["accommodation", ...DAY_PRIORITY.filter((t) => t !== "accommodation")], me: "isa" }), "lunch", "check-out ranks below everything");
 });
 test("review: eventsOn gives one day's events in day order, spans and cancelled included, deleted not", () => {
   const evs = [ev("late", "2026-10-16", { startTime: "21:00" }), ev("trip", "2026-10-14", { end: "2026-10-18" }),

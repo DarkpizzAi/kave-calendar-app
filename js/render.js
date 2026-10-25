@@ -16,11 +16,13 @@ import { status as syncStatus, checkToken } from "./sync.js";
 import { ICON } from "./chrome-icons.js";
 import { calendarHtml, afterCalendar, backToToday, todaysCount, refreshArchive } from "./calendar.js";
 import { refreshSheet, openLevel, registerLevel } from "./sheet.js";
-import { readPrefs, defaultsSummary, VIEW_NAMES, DETAIL_NAMES, toggleWeekdayHeader } from "./prefs.js";
+import { readPrefs, defaultsSummary, VIEW_NAMES, DETAIL_NAMES } from "./prefs.js";
 import { CATEGORIES, iconFor } from "./icons.js";
+import { DAY_PRIORITY } from "./cal-model.js";
 import { resetCalendarDefaults, openArchive } from "./calendar.js";
 import { checkForUpdate, ensureVersionAsked, updateStatusLines, updateBusy, updateButtonText, updateReady } from "./updates.js";
 import { gateStep, gateHtml, bindGate } from "./gate.js";
+import { insightsHtml, bindInsights, newVisit } from "./view-insights.js";
 
 /* Sync of the events themselves, shown in Settings only (spec: the Calendar
    never shows sync state). Set by boot.js. */
@@ -49,6 +51,7 @@ export function setView(name) {
   if (!VIEWS[name]) return;
   if (name === current && name === "calendar") { backToToday(); return; }
   current = name;
+  if (name === "insights") newVisit(); // a different "Did you know" each visit
   /* Every tab switch lands at the top, filters visible. firstDraw is true
      only for the app's first render, so afterCalendar keeps this 0 rather
      than jumping to #today, which sits below the controls. */
@@ -64,8 +67,6 @@ function stub(title, line) {
 }
 
 const STUBS = {
-  insights: ["What needs doing, and what needs a decision.",
-    "Checklist items, trip warnings, and proposals from mail, bank lines and voice notes. Nothing is ever added automatically."],
   trips: ["The next departure, every trip, and the throwback.",
     "Phases, events, bookings and costs per trip. + creates a trip and can pull in existing events."],
   radar: ["What might happen, and what we are watching.",
@@ -148,20 +149,92 @@ registerLevel("set-defaults", {
     const p = readPrefs(store.state.settings);
     return `<div class="fields">${field("Default view", choices("pref-view", VIEW_NAMES, p.defaultView), "Where the Calendar opens.")}`
       + field("Default detail level", choices("pref-detail", DETAIL_NAMES, p.defaultDetail), "Full: both of you, the other person greyed. Minimal: yours and shared only.")
-      + field("Weekday letters",
-          `<button class="tick${p.showWeekdayHeader ? " on" : ""}" role="checkbox" aria-checked="${p.showWeekdayHeader}" aria-label="Show weekday letters in Grid" data-tick-weekday>${p.showWeekdayHeader ? ICON.check : ""}</button>`,
-          "The M T W T F S S row above each month in Grid.")
+      + opener("Grid emoji order", "set-order", orderSummary(p.gridOrder))
       + "</div>";
   },
   onAction(b) {
     const d = b.dataset;
-    if (d.tickWeekday != null) { store.setSetting("showWeekdayHeader", toggleWeekdayHeader(readPrefs(store.state.settings)).showWeekdayHeader); return; }
+    if (d.level) { openLevel({ kind: d.level }); return; }
     const pick = d.prefView != null ? ["defaultView", d.prefView] : d.prefDetail != null ? ["defaultDetail", d.prefDetail] : null;
     if (!pick || !PREF_KEYS.includes(pick[0])) return;
     store.setSetting(pick[0], pick[1]);
     resetCalendarDefaults();
   },
 });
+/* Grid emoji order (spec 7.4): the first five emoji of the viewer's order. */
+const orderEmoji = (type) => iconFor({ type }, { owner: store.state.settings.me || "isa" }, store.state.settings.me || "isa");
+const orderSummary = (order) => order.slice(0, 5).map(orderEmoji).join(" ") + " …";
+const sameOrder = (a, b) => a.length === b.length && a.every((t, i) => t === b[i]);
+const saveOrder = (order) => store.setSetting("gridOrder", sameOrder(order, DAY_PRIORITY) ? null : order);
+/* "Other" is the fixed last row: no handle, no buttons. */
+function orderRow(t, i, last) {
+  const label = escapeHtml(CATEGORIES.find((c) => c.type === t).label);
+  const fixed = t === "none";
+  return `<li class="og-row${fixed ? " fixed" : ""}" data-type="${escapeHtml(t)}"><span class="og-n">${i + 1}</span><span class="og-e">${escapeHtml(orderEmoji(t))}</span><span class="og-l">${label}</span>`
+    + (fixed ? "" : `<button class="og-mv" data-og-up="${escapeHtml(t)}" aria-label="Move ${label} up"${i === 0 ? " disabled" : ""}>${ICON.up}</button>`
+      + `<button class="og-mv down" data-og-down="${escapeHtml(t)}" aria-label="Move ${label} down"${i === last - 1 ? " disabled" : ""}>${ICON.up}</button>`
+      + `<span class="og-handle" data-og-drag aria-hidden="true">&#8801;</span>`) + `</li>`;
+}
+registerLevel("set-order", {
+  title: () => "Grid emoji order",
+  body() {
+    const order = readPrefs(store.state.settings).gridOrder;
+    return `<p class="fhint">When a day has several events, Grid shows the emoji highest in this list. Your own events (and shared ones) always come before the other person's. Drag the handle, or use the arrows.</p>`
+      + `<ul class="og-list" id="ogList">${order.map((t, i) => orderRow(t, i, order.length - 1)).join("")}</ul>`
+      + `<button class="og-reset" data-og-reset>Reset to default order</button>`
+      + `<p class="fhint">Always, whatever the order: a visitor's arrival day shows first; a hotel shows only on check-in day; Other is last.</p>`;
+  },
+  onAction(b) {
+    const order = [...readPrefs(store.state.settings).gridOrder];
+    if (b.dataset.ogReset != null) { saveOrder(DAY_PRIORITY); return; }
+    const up = b.dataset.ogUp, down = b.dataset.ogDown, t = up || down;
+    if (!t) return;
+    const i = order.indexOf(t), j = i + (up ? -1 : 1);
+    if (i < 0 || j < 0 || j >= order.length - 1) return; /* Other stays last */
+    [order[i], order[j]] = [order[j], order[i]];
+    saveOrder(order);
+    /* the sheet redraws after this handler: put the keyboard back on the moved row's button */
+    setTimeout(() => {
+      const again = document.querySelector(`[data-og-${up ? "up" : "down"}="${t}"]`);
+      if (again && !again.disabled) again.focus();
+    });
+  },
+});
+/* Dragging a row by its handle (pointer events, so mouse and touch alike).
+   The rows move in the DOM while the finger is down; the order is saved
+   once, on release (a save redraws the sheet, which would drop the drag). */
+let ogDrag = null;
+document.addEventListener("pointerdown", (e) => {
+  const h = e.target.closest && e.target.closest("[data-og-drag]");
+  if (!h) return;
+  const row = h.closest(".og-row");
+  ogDrag = { row, list: row.parentElement, id: e.pointerId, h };
+  row.classList.add("drag");
+  try { h.setPointerCapture(e.pointerId); } catch { /* not capturable */ }
+  e.preventDefault();
+});
+document.addEventListener("pointermove", (e) => {
+  if (!ogDrag || e.pointerId !== ogDrag.id) return;
+  for (const r of ogDrag.list.querySelectorAll(".og-row:not(.fixed)")) {
+    if (r === ogDrag.row) continue;
+    const box = r.getBoundingClientRect();
+    if (e.clientY < box.top || e.clientY > box.bottom) continue;
+    const before = r.compareDocumentPosition(ogDrag.row) & Node.DOCUMENT_POSITION_FOLLOWING; /* dragged row is after r */
+    ogDrag.list.insertBefore(ogDrag.row, before ? r : r.nextSibling);
+    break;
+  }
+});
+function endOrderDrag(e) {
+  if (!ogDrag || e.pointerId !== ogDrag.id) return;
+  const { list } = ogDrag;
+  ogDrag.row.classList.remove("drag");
+  ogDrag = null;
+  if (e.type === "pointercancel") { refreshSheet(); return; }
+  saveOrder([...list.querySelectorAll(".og-row")].map((r) => r.dataset.type));
+}
+document.addEventListener("pointerup", endOrderDrag);
+document.addEventListener("pointercancel", endOrderDrag);
+
 /* F3: a today's-event-count badge on the Calendar nav icon, styled like the
    shopping list's item-count badge (household-look.md, "The nav count
    badge"): hidden entirely at zero rather than showing "0". */
@@ -196,7 +269,8 @@ export function render() {
   const before = { top: main.scrollTop, height: main.scrollHeight, first: firstDraw };
   document.getElementById("tabName").textContent = VIEWS[current];
   main.innerHTML = current === "settings" ? renderSettings()
-    : current === "calendar" ? calendarHtml() : renderStub(current);
+    : current === "calendar" ? calendarHtml()
+    : current === "insights" ? insightsHtml() : renderStub(current);
   main.classList.toggle("is-cal", current === "calendar");
   document.getElementById("nav").innerHTML = renderNav();
   /* No floating buttons any more (#fabs stays empty): Today and "+" sit in
@@ -205,6 +279,7 @@ export function render() {
   refreshSheet();
   refreshArchive();
   bindView();
+  if (current === "insights") bindInsights(main);
 }
 
 /* Re-bound on every render, because every render replaces these nodes. */
