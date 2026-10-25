@@ -92,19 +92,28 @@ export const isMidStay = (e, d) => stayRole(e, d) === "mid";
    with several activities across several events shows only the one that
    ranks highest; ties keep whichever was found first. */
 export const DAY_PRIORITY = [...AWAY, "work", ...CATEGORIES.map((c) => c.type).filter((t) => !AWAY.includes(t) && t !== "work")];
-export const dayRank = (a, e, d) => {
+/* Rank inside one person's group: lower wins. `order` is the viewer's Grid
+   emoji order (Settings; defaults to DAY_PRIORITY). The two fixed rules sit
+   outside it: a visitor's arrival tops everything, a stay off its check-in
+   day ranks below everything. */
+export const dayRank = (a, e, d, order = DAY_PRIORITY) => {
   if (a.type === "visitor" && d === e.start) return -1;
-  if (a.type === "accommodation" && stayRole(e, d) !== "in") return DAY_PRIORITY.length;
-  return DAY_PRIORITY.indexOf(a.type);
+  if (a.type === "accommodation" && stayRole(e, d) !== "in") return order.length;
+  const i = order.indexOf(a.type);
+  return i < 0 ? order.indexOf("none") : i;
 };
-/* The {a, e} (activity, event) whose icon the day shows, or null. */
-export function pickDayIcon(evs, d) {
-  let best = null, bestRank = Infinity;
+/* The {a, e} (activity, event) whose icon the day shows, or null. In my Grid
+   (`me`), every emoji from my events (mine or shared) outranks every emoji
+   from the other person's; within each group the order decides. */
+export function pickDayIcon(evs, d, { order = DAY_PRIORITY, me = null } = {}) {
+  let best = null, bestKey = Infinity;
+  const span = order.length + 2;
   for (const e of evs) {
+    const theirs = me && e.owner !== me && e.owner !== "shared" ? 1 : 0;
     const acts = e.activities && e.activities.length ? e.activities : [{ type: "none" }];
     for (const a of acts) {
-      const rank = dayRank(a, e, d);
-      if (rank < bestRank) { bestRank = rank; best = { a, e }; }
+      const key = theirs * span * 2 + dayRank(a, e, d, order) + 1;
+      if (key < bestKey) { bestKey = key; best = { a, e }; }
     }
   }
   return best;

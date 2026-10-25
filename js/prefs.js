@@ -1,10 +1,12 @@
 /* Compass: the Calendar preferences in Settings (spec section 3, Settings).
-   Calendar defaults (view, detail level) and the weekday letters. Every
+   Calendar defaults (view, detail level) and the Grid emoji order. Every
    category always shows: the old per-view "hidden categories" setting was
    retired with its Settings screen, and a stored list is ignored so nothing
    can stay hidden with no way back. (Free-time blocking was retired too.)
    Pure: the store persists what these return. */
 "use strict";
+
+import { DAY_PRIORITY } from "./cal-model.js";
 
 export const VIEW_NAMES = [["grid", "Grid"], ["agenda", "Agenda"]];
 /* Partial (the other person greyed) was retired on 2026-10-11, once grey
@@ -27,12 +29,19 @@ export function readPrefs(settings) {
   return {
     defaultView: oneOf(VIEW_NAMES, migrateViewKey(s.defaultView), "grid"),
     defaultDetail: oneOf(DETAIL_NAMES, s.defaultDetail, "full"),
-    showWeekdayHeader: s.showWeekdayHeader !== false,
+    gridOrder: readGridOrder(s.gridOrder),
   };
 }
 
-export function toggleWeekdayHeader(prefs) {
-  return { ...prefs, showWeekdayHeader: !prefs.showWeekdayHeader };
+/* The Grid emoji order: the stored list kept as far as it is valid (known
+   types, once each), any category the list does not have inserted just above
+   Other, Other always last. Nothing stored (or junk) reads as the default,
+   DAY_PRIORITY. */
+export function readGridOrder(stored) {
+  const known = new Set(DAY_PRIORITY);
+  const kept = [];
+  for (const t of Array.isArray(stored) ? stored : []) if (known.has(t) && t !== "none" && !kept.includes(t)) kept.push(t);
+  return [...kept, ...DAY_PRIORITY.filter((t) => t !== "none" && !kept.includes(t)), "none"];
 }
 
 export const defaultsSummary = (p) =>
