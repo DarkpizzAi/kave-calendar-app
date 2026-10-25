@@ -27,7 +27,10 @@ function release() {
 async function keepAwake() {
   try {
     if (lock || !navigator.wakeLock || document.visibilityState !== "visible") return;
-    lock = await navigator.wakeLock.request("screen");
+    const got = await navigator.wakeLock.request("screen");
+    /* the viewer was closed while the request was pending: let it go at once */
+    if (!cur) { got.release(); return; }
+    lock = got;
     lock.addEventListener("release", () => { lock = null; });
   } catch { /* unsupported or refused: the screen may dim, the ticket still opens */ }
 }

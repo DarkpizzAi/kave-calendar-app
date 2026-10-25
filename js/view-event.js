@@ -96,9 +96,9 @@ function eventPage(e) {
   /* Stored tickets open the phone's copy; the Drive ticket link stays as
      "Open in Drive" (ticket-view.js catches the data-tk taps). */
   const sp = splitLinks(e);
-  const driveUrl = sp.drive ? safeUrl(sp.drive.url) : "";
+  const driveLines = sp.drives.map((l) => ({ l, u: safeUrl(l.url) })).filter((x) => x.u);
   const links = [...sp.tickets.map((t) => `<p class="ref"><span class="dim">Ticket</span> ${ticketButton(e, t, "ticket", esc(t.name || "Ticket"))}</p>`),
-    ...(driveUrl ? [`<p class="ref"><span class="dim">Drive</span> <a class="ticket" href="${esc(driveUrl)}" target="_blank" rel="noopener noreferrer">Open in Drive${ICON.ext}</a></p>`] : []),
+    ...driveLines.map((x) => `<p class="ref"><span class="dim">Drive</span> <a class="ticket" href="${esc(x.u)}" target="_blank" rel="noopener noreferrer">Open in Drive${driveLines.length > 1 ? `, ${esc(x.l.label)}` : ""}${ICON.ext}</a></p>`),
     ...sp.links.map((l) => { const u = safeUrl(l.url); return u
       ? `<p class="ref"><span class="dim">${LINK_WORD[linkTier(l)]}</span> <a class="ticket" href="${esc(u)}" target="_blank" rel="noopener noreferrer">${esc(l.label)}${ICON.ext}</a></p>` : ""; }),
     ...(e.bookingRefs || []).map((r) => `<p class="ref"><span class="dim">Booking</span> <span class="refv">${esc(r)}</span>`

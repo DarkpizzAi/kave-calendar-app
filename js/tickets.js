@@ -133,6 +133,12 @@ export async function readTicket(t, { gh, store }) {
       return new Blob([b], { type: typeOfKey(key) });
     } catch { return null; }
   };
+  /* a wallet pass has no pages: its original is the ticket, so it must be
+     on the phone for "opens" to be true */
+  if (t.pages === 0) {
+    const o = await grab(originalUrl(t));
+    return o ? { pages: [], original: o } : null;
+  }
   const pages = [];
   for (let p = 1; p <= t.pages; p++) {
     const b = await grab(ticketUrl(t.id, p));
@@ -154,12 +160,13 @@ export async function keepTickets(events, gh) {
 }
 
 /* The event's links, split for the screens: its stored tickets, and the
-   links left over (the Drive ticket link is dropped from `links` when a
-   phone copy exists, and handed back as `drive` for the event page). */
+   links left over (every Drive ticket link is dropped from `links` when a
+   phone copy exists, and handed back in `drives` for the event page). */
 export function splitLinks(e) {
   const tickets = ticketsOf(e);
-  const drive = tickets.length ? driveTicketLink(e) : null;
-  return { tickets, drive, links: (e.links || []).filter((l) => l !== drive) };
+  const isDrive = (l) => l && typeof l.label === "string" && l.label.startsWith("Ticket") && typeof l.url === "string" && l.url.startsWith(DRIVE);
+  const drives = tickets.length ? (e.links || []).filter(isDrive) : [];
+  return { tickets, drives, links: (e.links || []).filter((l) => !drives.includes(l)) };
 }
 
 /* A tappable line for one stored ticket; ticket-view.js catches the tap. */

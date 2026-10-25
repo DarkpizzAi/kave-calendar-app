@@ -95,7 +95,9 @@ test("readTicket: from the phone, else from the repo (and kept), else null", asy
   const g = gh([repoPath(ticketUrl(T2.id, 1))]);
   const r2 = await readTicket(T2, { gh: g, store: miss });
   eq([r2.pages.length, r2.original, miss.m.has(ticketUrl(T2.id, 1))], [1, null, true]);
-  ok(await readTicket({ ...T1, pages: 0 }, { gh: none, store: miss }), "a file with no pages still opens");
+  const pass = { ...T1, pages: 0, ext: "pkpass" };
+  eq(await readTicket(pass, { gh: none, store: miss }), null); // a pass not on the phone says so up front
+  ok(await readTicket(pass, { gh: gh([repoPath(originalUrl(pass))]), store: miss }), "a pass opens once its file is there");
 });
 
 test("fileNameOf drops punctuation and keeps the extension", () => {
@@ -106,9 +108,9 @@ test("fileNameOf drops punctuation and keeps the extension", () => {
 test("splitLinks hides the Drive link only when a phone copy exists", () => {
   const drive = { label: "Ticket, RA", url: "https://drive.google.com/file/d/1/view" }, site = { label: "Website", url: "https://x.example" };
   const a = splitLinks({ links: [drive, site], tickets: [T1] });
-  eq([a.tickets.length, a.drive === drive, a.links], [1, true, [site]]);
+  eq([a.tickets.length, a.drives, a.links], [1, [drive], [site]]);
   const b = splitLinks({ links: [drive, site] });
-  eq([b.tickets.length, b.drive, b.links.length], [0, null, 2]);
+  eq([b.tickets.length, b.drives, b.links.length], [0, [], 2]);
 });
 
 test("dayTicketLine escapes the seller name", () => {
@@ -127,4 +129,11 @@ test("a wallet pass (pages 0): original only, syncs, opens with no page images",
   eq([r.fetched, [...store.m.keys()]], [1, filesOf(P)]);
   const got = await readTicket(P, { gh: gh([]), store });
   eq([got.pages.length, !!got.original], [0, true]);
+});
+
+test("splitLinks, two tickets: every Drive ticket link is hidden and handed back", () => {
+  const d1 = { label: "Ticket, RA", url: "https://drive.google.com/file/d/1/view" }, d2 = { label: "Ticket, Ticketmaster", url: "https://drive.google.com/file/d/2/view" };
+  const site = { label: "Website", url: "https://x.example" };
+  const r = splitLinks({ links: [d1, site, d2], tickets: [T1, T2] });
+  eq([r.tickets.length, r.drives, r.links], [2, [d1, d2], [site]]);
 });

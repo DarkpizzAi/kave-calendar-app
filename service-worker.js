@@ -14,6 +14,11 @@
 const VERSION = "v1.68";
 const CACHE = `kave-compass-${VERSION}`;
 
+/* The phone's ticket files (CACHE_NAME in js/tickets.js). Not versioned: a
+   VERSION bump must never delete tickets the phone cannot re-download
+   without signal, so the cleanups below leave it alone. */
+const TICKET_CACHE = "compass-tickets";
+
 const IS_LOCAL_DEV = ["localhost", "127.0.0.1"].includes(self.location.hostname);
 
 if (IS_LOCAL_DEV) {
@@ -21,7 +26,7 @@ if (IS_LOCAL_DEV) {
   self.addEventListener("activate", (e) => {
     e.waitUntil(
       caches.keys()
-        .then((keys) => Promise.all(keys.map((k) => caches.delete(k))))
+        .then((keys) => Promise.all(keys.filter((k) => k !== TICKET_CACHE).map((k) => caches.delete(k))))
         .then(() => self.registration.unregister())
         .then(() => self.clients.matchAll({ type: "window" }))
         .then((cs) => cs.forEach((c) => c.navigate(c.url)))
@@ -115,7 +120,7 @@ self.addEventListener("activate", (e) => {
   e.waitUntil(
     self.clients.claim()
       .then(() => caches.keys())
-      .then((keys) => Promise.all(keys.filter((k) => k !== CACHE).map((k) => caches.delete(k))))
+      .then((keys) => Promise.all(keys.filter((k) => k !== CACHE && k !== TICKET_CACHE).map((k) => caches.delete(k))))
   );
 });
 
