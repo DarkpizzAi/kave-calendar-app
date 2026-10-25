@@ -15,6 +15,7 @@ import { defaultCity, shownStatus, linkTier } from "./cal-model.js";
 import { registerLevel, openLevel, replaceTop, back, closeAll, topLevel } from "./sheet.js";
 import { store } from "./store.js";
 import { ICON } from "./chrome-icons.js";
+import { splitLinks, ticketButton } from "./tickets.js";
 
 const MONEY_AZ = MONEY.map((c) => [c.slug, c.label]).sort((a, b) => a[1].localeCompare(b[1]));
 const MONEY_LABEL = Object.fromEntries(MONEY_AZ);
@@ -92,7 +93,13 @@ function eventPage(e) {
   const maps = mapsUrl(e.venue, e.city);
   const where = place ? `<p>${esc(place)}</p>${maps && e.venue ? `<a class="maps" href="${esc(maps)}" target="_blank" rel="noopener noreferrer">Open in Maps</a>` : ""}` : "";
   const who = `<p>${esc(name(e.owner))}</p>${e.guests ? `<p class="dim">With ${esc(e.guests)}</p>` : ""}`;
-  const links = [...(e.links || []).map((l) => { const u = safeUrl(l.url); return u
+  /* Stored tickets open the phone's copy; the Drive ticket link stays as
+     "Open in Drive" (ticket-view.js catches the data-tk taps). */
+  const sp = splitLinks(e);
+  const driveLines = sp.drives.map((l) => ({ l, u: safeUrl(l.url) })).filter((x) => x.u);
+  const links = [...sp.tickets.map((t) => `<p class="ref"><span class="dim">Ticket</span> ${ticketButton(e, t, "ticket", esc(t.name || "Ticket"))}</p>`),
+    ...driveLines.map((x) => `<p class="ref"><span class="dim">Drive</span> <a class="ticket" href="${esc(x.u)}" target="_blank" rel="noopener noreferrer">Open in Drive${driveLines.length > 1 ? `, ${esc(x.l.label)}` : ""}${ICON.ext}</a></p>`),
+    ...sp.links.map((l) => { const u = safeUrl(l.url); return u
       ? `<p class="ref"><span class="dim">${LINK_WORD[linkTier(l)]}</span> <a class="ticket" href="${esc(u)}" target="_blank" rel="noopener noreferrer">${esc(l.label)}${ICON.ext}</a></p>` : ""; }),
     ...(e.bookingRefs || []).map((r) => `<p class="ref"><span class="dim">Booking</span> <span class="refv">${esc(r)}</span>`
       + `<button class="copy" data-act="copy" data-v="${esc(r)}" aria-label="Copy ${esc(r)}">${ICON.copy}<span class="cl">Copy</span></button></p>`)].join("");

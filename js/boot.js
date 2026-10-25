@@ -16,6 +16,9 @@ import { initCalendar, closeMenus } from "./calendar.js";
 import { initSheet, back, sheetOpen, refreshSheet, setDayAdd } from "./sheet.js";
 import { initEvent, newEventForm } from "./view-event.js";
 import { initInsights, syncCleanup } from "./view-insights.js";
+import { initTicketView } from "./ticket-view.js";
+import { keepTickets } from "./tickets.js";
+import { github } from "../github.js";
 
 initTheme();
 wire();
@@ -38,6 +41,9 @@ async function syncNow() {
           : "Sync failed: " + ((r.error && r.error.message) || "unknown error") }, { at: Date.now() });
   render();
   /* the clean-up queue, the log and the answer outbox ride on every sync */
+  /* every future ticket on the phone: only after a good sync, so a failed one
+     can never look like "no future events" and empty the cache */
+  if (r.ok) keepTickets(data.events(), github, data.loadedYears()).catch(() => { /* offline or no cache: next sync */ });
   syncCleanup().catch(() => { /* offline: the cache and the outbox stay as they are */ });
 }
 
@@ -45,6 +51,7 @@ actions.sync = syncNow;
 initSheet();
 initEvent({ data, refresh: refreshSheet });
 initInsights({ data, render, view: currentView, banner: showBanner });
+initTicketView({ data, banner: showBanner });
 setDayAdd(newEventForm); // F21: the day-level sheet's own "+"
 initCalendar({ data, render, isCalendar, sync: syncNow, add: newEventForm });
 render();
