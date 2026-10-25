@@ -43,7 +43,7 @@ async function syncNow() {
   /* the clean-up queue, the log and the answer outbox ride on every sync */
   /* every future ticket on the phone: only after a good sync, so a failed one
      can never look like "no future events" and empty the cache */
-  if (r.ok) keepTickets(data.events(), github).catch(() => { /* offline or no cache: next sync */ });
+  if (r.ok) keepTickets(data.events(), github, data.loadedYears()).catch(() => { /* offline or no cache: next sync */ });
   syncCleanup().catch(() => { /* offline: the cache and the outbox stay as they are */ });
 }
 

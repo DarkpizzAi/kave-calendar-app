@@ -12,7 +12,7 @@
    pure and tested; Cache Storage and github.js are passed in. */
 "use strict";
 
-import { daysOf, todayKey } from "./dates.js";
+import { addDays, todayKey } from "./dates.js";
 import { escapeHtml as esc } from "./util.js";
 import { ICON } from "./chrome-icons.js";
 
@@ -24,7 +24,7 @@ const MAX_PAGES = 6;
 const DRIVE = "https://drive.google.com/";
 
 /* A wallet pass (.pkpass) is stored as the original only: no page images. */
-export const isPass = (t) => t.pages === 0;
+export const isPass = (t) => t.ext === "pkpass";
 export const PASS_NOTE = "This ticket is a wallet pass. Use Send a copy.";
 
 export const mimeOf = (ext) => MIME[ext] || "application/octet-stream";
@@ -55,14 +55,19 @@ export function filesOf(t) {
   return out;
 }
 
-export const lastDayOf = (e) => { const d = daysOf(e); return d.length ? d[d.length - 1] : e.start; };
+/* `end` when it is not before `start`, else `start`. No cap on the span. */
+export const lastDayOf = (e) => (e.end && e.end >= e.start ? e.end : e.start);
+
+/* The phone keeps a ticket one day past the last day: it can be behind
+   Barcelona time on the last day of a trip (the hub prunes on the same rule). */
+const graceDay = (today) => addDays(today, -1);
 
 /* Files the phone should hold: every ticket of every live event whose last
-   day is today or later. */
+   day is today or later (one grace day). */
 export function wantedKeys(events, today) {
   const out = new Set();
   (events || []).forEach((e) => {
-    if (!e || e.deleted || !e.start || lastDayOf(e) < today) return;
+    if (!e || e.deleted || !e.start || lastDayOf(e) < graceDay(today)) return;
     ticketsOf(e).forEach((t) => filesOf(t).forEach((k) => out.add(k)));
   });
   return out;
@@ -93,20 +98,72 @@ export async function openStore() {
 
 const typeOfKey = (key) => mimeOf(key.slice(key.lastIndexOf(".") + 1));
 
+/* Which ticket a cache key belongs to: tickets/<id>.<ext> or tickets/<id>-p<N>.png */
+const idOfKey = (key) => (/^tickets\/([0-9a-f]{16})[.-]/.exec(key) || [])[1] || "";
+
+/* Who owns a cached ticket: { [ticketId]: { eventId, year, lastDay } }. It
+   lives in localStorage (a few bytes per ticket; every access is guarded). */
+const MANIFEST_KEY = "compass-ticket-manifest";
+export const localManifest = {
+  load() { try { const m = JSON.parse(localStorage.getItem(MANIFEST_KEY) || "{}"); return m && typeof m === "object" && !Array.isArray(m) ? m : {}; } catch { return {}; } },
+  save(m) { try { localStorage.setItem(MANIFEST_KEY, JSON.stringify(m)); } catch { /* the next sync rebuilds it */ } },
+};
+
+/* Cache keys to delete. Never a ticket of an event whose year file is not
+   loaded (a sync loads this year and next, so a 2028 trip's ticket must
+   survive). A cached ticket goes only when no loaded event wants it AND its
+   owner (the manifest) sits in a loaded year and has passed (one grace day)
+   or no longer lists it. With no manifest record the owner is unknown, so
+   the file is kept. */
+export function keysToRemove(cached, events, loadedYears, manifest, today) {
+  const byId = new Map((events || []).filter((e) => e && e.id).map((e) => [e.id, e]));
+  const wanted = new Set();
+  (events || []).forEach((e) => {
+    if (!e || e.deleted || !e.start || lastDayOf(e) < graceDay(today)) return;
+    ticketsOf(e).forEach((t) => wanted.add(t.id));
+  });
+  const years = new Set((loadedYears || []).map(String));
+  return cached.filter((k) => {
+    const id = idOfKey(k);
+    if (!id || wanted.has(id)) return false;
+    const rec = manifest && manifest[id];
+    if (!rec || !years.has(String(rec.year))) return false;
+    const owner = byId.get(rec.eventId);
+    const lists = owner && !owner.deleted && ticketsOf(owner).some((t) => t.id === id);
+    return !lists || lastDayOf(owner) < graceDay(today);
+  });
+}
+
+/* Record the owner of every ticket on a loaded event. */
+function noteOwners(manifest, events) {
+  (events || []).forEach((e) => {
+    if (!e || e.deleted || !e.id || !e.start) return;
+    ticketsOf(e).forEach((t) => { manifest[t.id] = { eventId: e.id, year: String(e.start).slice(0, 4), lastDay: lastDayOf(e) }; });
+  });
+}
+
 /* Sync: download what is missing, delete what is not wanted. A network
    problem (offline, token, rate limit) stops the run quietly and the next
    sync carries on; a file the repo does not have yet is skipped. Call it
    only after a successful sync, so an empty event list can never be mistaken
    for "no future events" and empty the cache. */
-export async function syncTickets({ events, today = todayKey(), gh, store }) {
+export async function syncTickets({ events, today = todayKey(), gh, store, loadedYears = [], manifest = localManifest }) {
   const res = { fetched: 0, removed: 0, stopped: "" };
   if (!store) return res;
   let cached;
   try { cached = await store.keys(); } catch { return res; }
+  let known = {};
+  try { known = manifest.load() || {}; } catch { known = {}; }
+  noteOwners(known, events);
   const plan = planSync(wantedKeys(events, today), cached);
-  for (const key of plan.remove) {
-    try { await store.remove(key); res.removed++; } catch { /* next time */ }
+  const doomed = new Set(keysToRemove(plan.remove, events, loadedYears, known, today));
+  const gone = new Set();
+  for (const key of plan.remove.filter((k) => doomed.has(k))) {
+    try { await store.remove(key); res.removed++; gone.add(idOfKey(key)); } catch { /* next time */ }
   }
+  const left = new Set(cached.filter((k) => !doomed.has(k)).map(idOfKey));
+  gone.forEach((id) => { if (!left.has(id)) delete known[id]; });
+  try { manifest.save(known); } catch { /* guarded */ }
   for (const key of plan.fetch) {
     try {
       await store.put(key, await gh.getRaw(repoPath(key)), typeOfKey(key));
@@ -135,10 +192,11 @@ export async function readTicket(t, { gh, store }) {
   };
   /* a wallet pass has no pages: its original is the ticket, so it must be
      on the phone for "opens" to be true */
-  if (t.pages === 0) {
+  if (isPass(t)) {
     const o = await grab(originalUrl(t));
     return o ? { pages: [], original: o } : null;
   }
+  if (t.pages === 0) return null; // a non-pass with no page images is not on the phone
   const pages = [];
   for (let p = 1; p <= t.pages; p++) {
     const b = await grab(ticketUrl(t.id, p));
@@ -155,8 +213,17 @@ export async function readTicket(t, { gh, store }) {
 export const fileNameOf = (t) => `${String(t.name || "Ticket").replace(/[^\p{L}\p{N} _-]+/gu, "").trim() || "Ticket"}.${t.ext}`;
 
 /* One sync entry point for the app: open the phone's store and run it. */
-export async function keepTickets(events, gh) {
-  return syncTickets({ events, gh, store: await openStore() });
+let persisted = false;
+async function persistOnce() {
+  if (persisted) return;
+  persisted = true;
+  try { if (navigator.storage && navigator.storage.persist) await navigator.storage.persist(); } catch { /* the browser decides */ }
+}
+
+export async function keepTickets(events, gh, loadedYears = []) {
+  const res = await syncTickets({ events, gh, store: await openStore(), loadedYears });
+  if (!res.stopped) await persistOnce();
+  return res;
 }
 
 /* The event's links, split for the screens: its stored tickets, and the
