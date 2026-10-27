@@ -295,7 +295,14 @@ function bindView() {
    close goes through one function that sends history.back() once and ignores
    a second request until the pop lands (closeRequested). */
 let opener = null; // the control that opened the drawer or a page: closing hands focus back
+/* While a layer is open, everything behind it is inert: focus and the screen
+   reader stay inside. The drawer and the page sit outside .shell on purpose. */
+function syncInert() {
+  const shell = document.querySelector(".shell");
+  if (shell) shell.inert = drawerOpen || pages.length > 0;
+}
 function restoreFocus() {
+  syncInert(); // focus can only return to a control that is no longer inert
   const o = opener; opener = null;
   if (o && o.isConnected && o.offsetParent !== null) o.focus({ preventScroll: true });
 }
@@ -313,6 +320,7 @@ export function openDrawer() {
   const d = $("drawer"), scrim = $("drawerScrim");
   opener = document.activeElement;
   scrim.hidden = false; d.hidden = false;
+  syncInert();
   enterLayer(d, "drawer");
   try { history.pushState({ compassDrawer: true }, ""); drawerHist = true; } catch { drawerHist = false; }
   const first = d.querySelector(".m3-drawer__item");
@@ -324,6 +332,7 @@ function hideDrawer(keepOpener = false) {
   drawerCloseRequested = false;
   const d = $("drawer"), scrim = $("drawerScrim");
   const token = ++drawerToken;
+  syncInert();
   exitLayer(d, "drawer").then(() => {
     if (token !== drawerToken) return; // reopened meanwhile
     d.hidden = true; scrim.hidden = true;
@@ -386,6 +395,7 @@ export function openPage(name) {
     try { history.pushState({ compassPage: name }, ""); hist = true; } catch { hist = false; }
   }
   pages.push({ name, hist });
+  syncInert();
   pageCloseRequested = false;
   const host = $("page");
   drawPage(name, false);
@@ -397,6 +407,7 @@ function popPageNow() {
   const gone = pages.pop();
   pageCloseRequested = false;
   if (!gone) return;
+  syncInert();
   const host = $("page");
   if (!pages.length) {
     const token = ++hostToken;
@@ -431,6 +442,7 @@ function resetLayers() {
   if (drawerOpen) { drawerOpen = false; drawerHist = false; drawerCloseRequested = false; drawerToken++; $("drawer").hidden = true; $("drawerScrim").hidden = true; }
   if (pages.length) { pages = []; pageCloseRequested = false; hostToken++; $("page").hidden = true; }
   opener = null;
+  syncInert();
 }
 
 /* ---------- page actions (one delegated listener, bound once in wire.js) ---------- */
@@ -492,6 +504,7 @@ export function onPageChange(e) {
   /* the same value twice is one paste: a redraw can blur the field and
      fire change again while this render is still running */
   if (!v || v === store.state.settings.token) return;
+  input.value = ""; // the token is never left showing in the field (the gate does the same)
   store.setSetting("token", v);
   checkToken().then(render);
   if (actions.sync) actions.sync();
