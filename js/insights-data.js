@@ -3,6 +3,7 @@
    must go through safeUrl where they reach the page. */
 "use strict";
 import { daysOf, dayOfWeek, addDays } from "./dates.js";
+import { safeUrl } from "./util.js";
 
 const PLANE_ICONS = ["🛫", "✈️", "🛬"];
 
@@ -95,6 +96,15 @@ export function comingUp(events, today) {
   };
 }
 
+/* The hero: whichever of the next flight and the next stay comes first. A tie
+   goes to the transport. Neither gives null (a quiet empty state). */
+export function nextHero(cu) {
+  const f = cu && cu.flight, s = cu && cu.stay;
+  if (f && (!s || f.days <= s.days)) return { kind: "transport", id: f.id, days: f.days };
+  if (s) return { kind: "accommodation", id: s.id, days: s.days };
+  return null;
+}
+
 const WALL_KEYS = ["concerts", "culture", "club", "films"];
 const DRIVE = "https://drive.google.com/";
 
@@ -114,6 +124,10 @@ function wallList(events, today, me, wantHidden) {
 }
 export const ticketWall = (events, today, me) => wallList(events, today, me, false);
 export const wallTakenOff = (events, today, me) => wallList(events, today, me, true);
+
+/* Where a tap on a wall entry goes: its Google Drive file, in a new tab. Never
+   the in-app ticket viewer, which belongs to upcoming events. "" if unsafe. */
+export const wallTap = (w) => (w && typeof w.url === "string" && w.url.startsWith(DRIVE) ? safeUrl(w.url) : "");
 
 const plural = (n, w) => `${n} ${w}${n === 1 ? "" : "s"}`;
 function top(map) { // highest count; ties go to the first key in insertion order

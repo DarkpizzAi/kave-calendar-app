@@ -1,21 +1,30 @@
-/* Compass: the Insights tab (spec section 7, mockups v3 / ticket wall v2 /
-   numbers option E) and the sheets it opens: a category's history, the ticket
-   wall with Edit, and the clean-up cards.
+/* Kave Compass: the Insights tab, on Material 3 (spec section 7, mockup
+   "Insights" option B with D's number shapes), and the sheets it opens: a
+   category's history, the full ticket wall with Edit, and the clean-up cards.
+
+   Top to bottom: the hero (the next transport or accommodation, whichever
+   comes first), the year in numbers as emoji shapes, Did you know, the ticket
+   wall (four tickets and See all tickets) and the clean-up card.
 
    Decisions live in insights-data.js and cleanup.js (both tested); this file
    draws them. Every synced string goes through escapeHtml and every url
    through safeUrl. The tab redraws whole, like every other view, and binds
-   one listener on its own root each time. */
+   one listener on its own root each time. Nothing here draws a chart: the
+   shapes are plain boxes coloured by the kit's data tokens (kaveKey), so
+   there is nothing to resolve at draw time and a seed or scheme change
+   restyles them by itself. */
 "use strict";
 
 import { escapeHtml as esc, safeUrl } from "./util.js";
 import { todayKey, dayOfWeek } from "./dates.js";
 import { store } from "./store.js";
 import { github } from "../github.js";
-import { registerLevel, openLevel, replaceTop, topLevel } from "./sheet.js";
-import { ICON } from "./chrome-icons.js";
+import { registerLevel, openLevel, replaceTop, topLevel, sheetOpen } from "./sheet.js";
+import { ms } from "./chrome-icons.js";
 import { ticketsOf, ticketButton } from "./tickets.js";
-import { TILES, yearCounts, history, comingUp, ticketWall, wallTakenOff, didYouKnow } from "./insights-data.js";
+import { categoryGroup } from "./cal-model.js";
+import { kaveKey } from "../m3/kave-m3.js";
+import { TILES, yearCounts, history, comingUp, nextHero, ticketWall, wallTakenOff, wallTap, didYouKnow } from "./insights-data.js";
 import { QUEUE_PATH, LOG_PATH, answerKey, mergeOutbox, cleanupCounts, pruneIfFresh, compactStamp, flushOutbox } from "./cleanup.js";
 
 let ctx = null;            // { data, render, view, banner }
@@ -26,6 +35,8 @@ const DOW = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
 const fmt = (d) => `${Number(d.slice(8))} ${MON[Number(d.slice(5, 7)) - 1]}`;
 const inDays = (n) => (n <= 0 ? "today" : n === 1 ? "tomorrow" : `in ${n} days`);
 const TILE = Object.fromEntries(TILES.map((t) => [t.key, t]));
+/* a tile's colour is its catalogue group's data hue */
+const hue = (key) => kaveKey(categoryGroup((TILE[key] || { types: [] }).types[0]));
 
 /* The Google Drive mark: brand artwork, constant markup, never data. */
 const DRIVE_SVG = '<svg class="drive" viewBox="0 0 87.3 78" role="img" aria-label="Drive"><path d="M6.6 66.85l3.85 6.65c.8 1.4 1.95 2.5 3.3 3.3L27.5 53H0c0 1.55.4 3.1 1.2 4.5z" fill="#0066da"/><path d="M43.65 25L29.9 1.2c-1.35.8-2.5 1.9-3.3 3.3L1.2 48.5C.4 49.9 0 51.45 0 53h27.5z" fill="#00ac47"/><path d="M73.55 76.8c1.35-.8 2.5-1.9 3.3-3.3l1.6-2.75 7.65-13.25c.8-1.4 1.2-2.95 1.2-4.5H59.8l5.85 11.5z" fill="#ea4335"/><path d="M43.65 25L57.4 1.2C56.05.4 54.5 0 52.9 0H34.4c-1.6 0-3.15.45-4.5 1.2z" fill="#00832d"/><path d="M59.8 53H27.5L13.75 76.8c1.35.8 2.9 1.2 4.5 1.2h50.8c1.6 0 3.15-.45 4.5-1.2z" fill="#2684fc"/><path d="M73.4 26.5L60.7 4.5c-.8-1.4-1.95-2.5-3.3-3.3L43.65 25 59.8 53h27.45c0-1.55-.4-3.1-1.2-4.5z" fill="#ffba00"/></svg>';
@@ -38,6 +49,7 @@ export function newVisit() { seed++; }
 
 let wallFilter = "all", wallEdit = false;
 const WALL_PILLS = [["all", "All"], ["concerts", "🎶 Concerts"], ["culture", "🎭 Culture"], ["club", "🪩 Club"], ["films", "🎬 Cinema"]];
+const WALL_FIRST = 4;      // tickets on the tab; the rest are behind See all tickets
 
 /* Clean-up: what was last read from GitHub, plus the outbox, kept in
    localStorage so an answer given offline survives a closed app. */
@@ -92,62 +104,89 @@ async function loadOlder() {
 
 /* ---------------- the tab ---------------- */
 
-const section = (title, sub, body) =>
-  `<div class="tab-section"><div class="tab-section-head"><span class="tab-section-title">${esc(title)}</span>`
-  + `${sub ? `<span class="tab-section-sub">${esc(sub)}</span>` : ""}</div>${body}</div>`;
+const cardHead = (id, title, aside) =>
+  `<div class="m3-card__head"><h2 class="m3-title-m" id="${id}">${esc(title)}</h2><span class="m3-spacer"></span>${aside || ""}</div>`;
 
-function comingHtml(cu) {
-  const out = [];
-  if (cu.flight) {
-    const f = cu.flight;
-    const when = `${DOW[dayOfWeek(f.date)]} ${fmt(f.date)}${f.time ? `, ${f.time}` : ""}`;
-    out.push(`<button class="ins-card ins-tap" data-ins="event" data-id="${esc(f.id)}">`
-      + `<span class="ins-cardhead"><span>Next flight</span><span>${esc(inDays(f.days))}</span></span>`
-      + `<span class="ins-pass"><b>✈️ ${esc(f.title)}</b><span class="ins-meta">${esc(when)}</span></span></button>`);
+/* The hero: the next flight or the next stay, whichever comes first. */
+function heroHtml(cu) {
+  const h = nextHero(cu);
+  if (!h) {
+    return '<section class="ins-hero ins-hero--empty" aria-label="Next transport or accommodation">'
+      + `<span class="ins-hero__icon">${ms("event_upcoming")}</span>`
+      + '<p class="m3-title-m ins-hero__t">Nothing booked soon</p>'
+      + '<p class="m3-body-m ins-hero__m">The next flight or stay shows here once it is within a month.</p></section>';
   }
-  if (cu.stay) {
-    const s = cu.stay;
-    const name = [s.title, s.city].filter(Boolean).join(", ");
-    out.push(`<button class="ins-card ins-tap" data-ins="event" data-id="${esc(s.id)}">`
-      + `<span class="ins-cardhead"><span>Next stay</span><span>${esc(inDays(s.days))}</span></span>`
-      + `<span class="ins-pass"><b>🏨 ${esc(name)}</b><span class="ins-meta">${esc(fmt(s.start))} to ${esc(fmt(s.end))}, ${s.nights} night${s.nights === 1 ? "" : "s"}</span></span></button>`);
+  const f = cu.flight, s = cu.stay;
+  let emoji, label, title, meta;
+  if (h.kind === "transport") {
+    emoji = "✈️"; label = "Next transport"; title = f.title;
+    meta = `${DOW[dayOfWeek(f.date)]} ${fmt(f.date)}${f.time ? `, ${f.time}` : ""}`;
+  } else {
+    emoji = "🏨"; label = "Next accommodation"; title = [s.title, s.city].filter(Boolean).join(", ");
+    meta = `${fmt(s.start)} to ${fmt(s.end)}, ${s.nights} night${s.nights === 1 ? "" : "s"}`;
   }
-  return `<div class="ins-stack">${out.join("")}</div>`;
+  return `<section class="ins-hero" aria-label="${esc(label)}">`
+    + `<div class="ins-hero__kicker"><span class="m3-emoji" aria-hidden="true">${emoji}</span><span class="m3-title-s">${esc(label)}</span>`
+    + `<span class="m3-spacer"></span><span class="m3-label-l">${esc(inDays(h.days))}</span></div>`
+    + `<h2 class="m3-headline-m ins-hero__t">${esc(title)}</h2><p class="m3-body-m ins-hero__m">${esc(meta)}</p>`
+    + `<div class="ins-hero__acts"><button type="button" class="m3-btn ins-hero__open" data-ins="event" data-id="${esc(h.id)}">Open event</button></div></section>`;
 }
 
-/* Option E: first in the middle, second left, third right, then the rest. */
-function numbersHtml(counts) {
-  if (!counts.length) return '<div class="ins-card"><p class="hint">Nothing counted yet this year.</p></div>';
-  const slot = (c, cls) => (c
-    ? `<button class="pod-b ${cls}" data-ins="cat" data-key="${esc(c.key)}"><i>${esc(c.emoji)}</i><b>${c.count}</b><span>${esc(c.label.toLowerCase())}</span></button>`
-    : "<span></span>");
-  const rest = counts.slice(3).map((c) =>
-    `<button class="rest-i" data-ins="cat" data-key="${esc(c.key)}"><span>${esc(c.emoji)}</span><b>${c.count}</b><span class="rest-l">${esc(c.label.toLowerCase())}</span></button>`).join("");
-  return `<div class="ins-card"><div class="pod">${slot(counts[1], "p2")}${slot(counts[0], "p1")}${slot(counts[2], "p3")}</div>`
-    + (rest ? `<div class="rest">${rest}</div>` : "") + "</div>";
+/* Option D: each category as a shape of its own colour holding its emoji,
+   with the count under it. The shape alternates round, rounded and scallop. */
+function numbersHtml(counts, year) {
+  const history = counts.length
+    ? `<button type="button" class="m3-btn m3-btn--text" data-ins="cat" data-key="${esc(counts[0].key)}">History</button>` : "";
+  const body = counts.length
+    ? `<div class="ins-shapes">${counts.map((c, i) =>
+      `<button type="button" class="ins-shape" data-ins="cat" data-key="${esc(c.key)}" aria-label="${esc(`${c.label}, ${c.count}. Open its history`)}">`
+      + `<span class="ins-blob m3-emoji ${i % 2 ? "is-scallop" : i % 3 ? "is-soft" : "is-round"}" style="${kaveKey(categoryGroup((TILE[c.key] || { types: [] }).types[0]))}" aria-hidden="true">${esc(c.emoji)}</span>`
+      + `<span class="m3-headline-s m3-num">${c.count}</span><span class="m3-body-s m3-variant ins-shape__l">${esc(c.label.toLowerCase())}</span></button>`).join("")}</div>`
+    : '<p class="m3-body-m m3-variant">Nothing counted yet this year.</p>';
+  return `<section class="ins-card" aria-labelledby="insNumbers">${cardHead("insNumbers", `${year} in numbers`, history)}${body}</section>`;
 }
 
-/* A stub: the category emoji, the name, the date. No ticket icon. */
+function factHtml(fact) {
+  if (!fact) return "";
+  return '<section class="ins-fact" aria-labelledby="insFact">'
+    + `<div class="ins-fact__head">${ms("lightbulb", "m3-icon--fill")}<h2 class="m3-title-s" id="insFact">Did you know</h2></div>`
+    + `<p class="m3-body-l ins-fact__t">${esc(fact)}</p></section>`;
+}
+
+/* A ticket stub: the category emoji, the name, a perforation, the date. On the
+   wall it is a link to the Drive file (wallTap), in a new tab. */
 function stubInner(w) {
-  return `<span class="ic">${esc((TILE[w.cat] || {}).emoji || "")}</span><b>${esc(w.title)}</b><span>${esc(fmt(w.date))}</span>`;
+  return `<span class="m3-emoji tk-emo" aria-hidden="true">${esc((TILE[w.cat] || {}).emoji || "")}</span>`
+    + `<span class="m3-title-s tk-title">${esc(w.title)}</span><span class="tk-perf" aria-hidden="true"></span>`
+    + `<span class="m3-label-m tk-date">${esc(fmt(w.date))}</span>`;
 }
 function stubLink(w) {
-  const u = safeUrl(w.url);
-  const cls = `tstub c-${esc(w.cat)}`;
-  return u ? `<a class="${cls}" href="${esc(u)}" target="_blank" rel="noopener noreferrer">${stubInner(w)}</a>` : `<div class="${cls}">${stubInner(w)}</div>`;
+  const u = wallTap(w);
+  const cls = "ticket";
+  return u
+    ? `<a class="${cls}" style="${hue(w.cat)}" href="${esc(u)}" target="_blank" rel="noopener noreferrer" aria-label="${esc(`Open the ticket for ${w.title} in Google Drive`)}">${stubInner(w)}</a>`
+    : `<div class="${cls}" style="${hue(w.cat)}">${stubInner(w)}</div>`;
 }
 
-function wallHtml(wall) {
-  if (!wall.length) return '<div class="ins-card"><p class="hint">Tickets kept for past concerts, shows, club nights and films appear here.</p></div>';
-  return `<div class="ins-card"><div class="wall">${wall.slice(0, 6).map(stubLink).join("")}</div>`
-    + '<button class="reveal-btn" data-ins="wall-all">See all</button></div>';
+function wallHtml(wall, hasOff) {
+  const count = wall.length ? `<span class="m3-label-m m3-variant">${wall.length} ticket${wall.length === 1 ? "" : "s"}</span>` : "";
+  const body = wall.length
+    ? `<div class="ins-wall">${wall.slice(0, WALL_FIRST).map(stubLink).join("")}</div>`
+    : `<p class="m3-body-m m3-variant">${hasOff ? "Every ticket is taken off your wall. See all tickets to put some back."
+      : "Tickets kept for past concerts, shows, club nights and films appear here."}</p>`;
+  const more = wall.length || hasOff
+    ? `<button type="button" class="m3-btn m3-btn--tonal ins-wide" data-ins="wall-all">${ms("confirmation_number")}See all tickets</button>` : "";
+  return `<section class="ins-card" aria-labelledby="insWall">${cardHead("insWall", "Ticket wall", count)}${body}${more}</section>`;
 }
 
 function cleanupHtml() {
   const c = cleanupCounts({ queue: CU.queue, outbox: CU.outbox, sent: CU.sent, log: CU.log }, todayKey());
-  const kpi = (n, l) => `<div class="kpi"><b>${n}</b><span>${l}</span></div>`;
-  return `<div class="ins-card"><div class="kpis">${kpi(c.toAnswer, "to answer")}${kpi(c.applying, "applying")}${kpi(c.done, "done")}</div>`
-    + '<button class="primary wide" data-ins="cleanup">Clean up</button></div>';
+  const row = (icon, n, what) => `<div class="m3-list-item ins-row"><span class="m3-list-item__lead m3-list-item__lead--square">${ms(icon)}</span>`
+    + `<div class="m3-list-item__text m3-list-item__text--wrap"><div class="m3-body-l">${n} ${esc(what)}</div></div></div>`;
+  return '<section class="ins-card" aria-labelledby="insClean">'
+    + cardHead("insClean", "Calendar data clean-up", '<span class="m3-label-m m3-variant">Last 30 days</span>')
+    + `<div class="m3-list">${row("help", c.toAnswer, "to answer")}${row("autorenew", c.applying, "applying")}${row("check_circle", c.done, "done")}</div>`
+    + `<button type="button" class="m3-btn m3-btn--tonal ins-wide" data-ins="cleanup">${ms("auto_fix_high")}Clean up</button></section>`;
 }
 
 export function insightsHtml() {
@@ -156,14 +195,28 @@ export function insightsHtml() {
   const events = ctx.data.events(), today = todayKey(), who = me(), year = Number(today.slice(0, 4));
   const cu = comingUp(events, today);
   const fact = didYouKnow(events, year, seed);
-  return `<div class="ins">`
-    + (cu.flight || cu.stay ? section("Coming up", "", comingHtml(cu)) : "")
-    + section(`${year} in numbers`, "", numbersHtml(yearCounts(events, year)))
-    + section("Ticket wall", "", wallHtml(ticketWall(events, today, who)))
-    + (fact ? section("Did you know", "", `<div class="ins-card"><p class="fun">${esc(fact)}</p></div>`) : "")
-    + section("Calendar data clean-up", "Last 30 days", cleanupHtml())
-    + "</div>";
+  return '<div class="ins">' + heroHtml(cu)
+    + '<div class="ins-panes">'
+    + `<div class="ins-col ins-col--a">${numbersHtml(yearCounts(events, year), year)}${factHtml(fact)}</div>`
+    + `<div class="ins-col ins-col--b">${wallHtml(ticketWall(events, today, who), wallTakenOff(events, today, who).length > 0)}</div>`
+    + `<div class="ins-col ins-col--c">${cleanupHtml()}</div>`
+    + "</div></div>";
 }
+
+/* What opened a sheet, so focus can come back to it even though the tab is
+   drawn again on every sync (the sheet's own restore needs the very same node). */
+let openedBy = null;
+function refocus() {
+  const o = openedBy; openedBy = null;
+  if (!o || sheetOpen()) return;
+  const active = document.activeElement;
+  if (active && active !== document.body && active.isConnected) return;
+  const root = document.querySelector("#view .ins");
+  const sel = `[data-ins="${o.a}"]${o.key ? `[data-key="${CSS.escape(o.key)}"]` : ""}${o.id ? `[data-id="${CSS.escape(o.id)}"]` : ""}`;
+  const el = root && root.querySelector(sel);
+  if (el) { try { el.focus({ preventScroll: true }); } catch { /* gone */ } }
+}
+window.addEventListener("popstate", () => { if (openedBy) setTimeout(refocus, 60); });
 
 export function bindInsights(main) {
   const root = main.querySelector(".ins");
@@ -172,6 +225,7 @@ export function bindInsights(main) {
     const b = e.target.closest("[data-ins]");
     if (!b) return;
     const a = b.dataset.ins;
+    openedBy = { a, key: b.dataset.key || "", id: b.dataset.id || "" };
     if (a === "cat") openLevel({ kind: "ins-hist", key: b.dataset.key });
     else if (a === "event") openLevel({ kind: "event", id: b.dataset.id });
     else if (a === "wall-all") { wallFilter = "all"; wallEdit = false; openLevel({ kind: "ins-wall" }); }
@@ -183,22 +237,21 @@ export function bindInsights(main) {
 
 function histBody(l) {
   const years = history(ctx.data.events(), l.key, todayKey());
-  if (!years.length) return '<p class="hint pad">Nothing here yet.</p>';
+  if (!years.length) return '<div class="m3-empty-state"><p class="m3-title-m">Nothing here yet</p><p class="m3-body-m m3-variant">Events of this kind appear here as they happen.</p></div>';
   const evs = new Map(ctx.data.events().map((e) => [e.id, e]));
-  const rows = years.map((y) => `<div class="year">${esc(y.year)} · ${y.count}</div>` + y.rows.map((r) => {
+  const rows = years.map((y) => `<div class="m3-list-header m3-title-s">${esc(y.year)} · ${y.count}</div><div class="m3-list">` + y.rows.map((r) => {
     const u = r.ticket ? safeUrl(r.ticket.url) : "";
     /* a future ticket opens the copy on the phone; a past one (or one the
        phone has no copy of) opens the Drive link */
     const ev = evs.get(r.id), mine = r.ticket && r.ticket.when === "future" && ev ? ticketsOf(ev) : [];
-    const tk = mine.length ? ticketButton(ev, mine[0], "hk", '<span aria-hidden="true">🎟</span>', "Open the ticket")
-      : u ? `<a class="hk" href="${esc(u)}" target="_blank" rel="noopener noreferrer" aria-label="Open the ticket">${r.ticket.when === "future" ? "🎟" : DRIVE_SVG}</a>` : "";
-    return `<div class="c d" data-sact="event" data-id="${esc(r.id)}">${esc(fmt(r.date))}</div>`
-      + `<div class="c t" data-sact="event" data-id="${esc(r.id)}" role="button" tabindex="0">${esc(r.title)}${r.place ? `<small>${esc(r.place)}</small>` : ""}</div>`
-      + `<div class="c k">${tk}</div>`;
-  }).join("")).join("");
-  return `<p class="hint">Newest first. Tap a line to open the event.</p>`
-    + `<div class="legend"><span>🎟 on this phone</span><span>${DRIVE_SVG} in Drive</span></div>`
-    + `<div class="hist"><div class="c head">Date</div><div class="c head">Event</div><div class="c head k">Ticket</div>${rows}</div>`;
+    const tk = mine.length ? ticketButton(ev, mine[0], "m3-icon-btn", ms("confirmation_number"), "Open the ticket")
+      : u ? `<a class="m3-icon-btn" href="${esc(u)}" target="_blank" rel="noopener noreferrer" aria-label="Open the ticket in Drive">${r.ticket.when === "future" ? ms("confirmation_number") : DRIVE_SVG}</a>` : "";
+    return `<div class="m3-list-item"><button type="button" class="row-main" data-sact="event" data-id="${esc(r.id)}">`
+      + `<div class="m3-list-item__text m3-list-item__text--wrap"><div class="m3-body-l">${esc(r.title)}</div>`
+      + `<div class="m3-body-m m3-variant">${esc([fmt(r.date), r.place].filter(Boolean).join(" · "))}</div></div></button>`
+      + (tk ? `<span class="m3-list-item__trail">${tk}</span>` : "") + "</div>";
+  }).join("") + "</div>").join("");
+  return `<p class="m3-body-m m3-variant ins-hint">Newest first. Tap a line to open the event. ${ms("confirmation_number")} is on this phone, ${DRIVE_SVG} is in Drive.</p>${rows}`;
 }
 
 /* ---------------- sheet: the ticket wall, See all and Edit (spec 7.3) ---------------- */
@@ -214,26 +267,33 @@ function setHidden(id, hide) {
   catch (err) { ctx.banner(String(err.message || err)); }
 }
 
+/* In Edit a ticket is not a link: it carries its own button, a cross to take
+   it off the wall, or (greyed) a plus to put it back. */
+function editStub(w, off) {
+  const btn = off
+    ? `<button type="button" class="tk-x is-add" data-ia="on" data-id="${esc(w.id)}" aria-label="${esc(`Put ${w.title} back on the wall`)}">${ms("add")}</button>`
+    : `<button type="button" class="tk-x" data-ia="off" data-id="${esc(w.id)}" aria-label="${esc(`Take ${w.title} off the wall`)}">${ms("close")}</button>`;
+  return `<div class="ticket${off ? " is-off" : ""}" style="${hue(w.cat)}">${btn}${stubInner(w)}</div>`;
+}
+
 function wallBody() {
   const who = me(), today = todayKey(), events = ctx.data.events();
   const keep = (w) => wallFilter === "all" || w.cat === wallFilter;
-  const live = ticketWall(events, today, who).filter(keep);
-  const off = wallTakenOff(events, today, who).filter(keep);
-  const pills = `<div class="pills">${WALL_PILLS.map(([v, t]) =>
-    `<button class="pill${wallFilter === v ? " on" : ""}" data-ia="pill" data-v="${v}" aria-pressed="${wallFilter === v}">${esc(t)}</button>`).join("")}</div>`;
+  const live = ticketWall(events, today, who).filter(keep).map((w) => ({ w, off: false }));
+  const off = wallEdit ? wallTakenOff(events, today, who).filter(keep).map((w) => ({ w, off: true })) : [];
+  const all = [...live, ...off].sort((a, b) => (a.w.date < b.w.date ? 1 : a.w.date > b.w.date ? -1 : 0));
+  const chips = `<div class="m3-chips ins-filters" role="group" aria-label="Show">${WALL_PILLS.map(([v, t]) =>
+    `<button type="button" class="m3-chip${wallFilter === v ? " is-selected" : ""}" data-ia="pill" data-v="${v}" aria-pressed="${wallFilter === v}">${esc(t)}</button>`).join("")}</div>`;
   const byYear = new Map();
-  live.forEach((w) => { const y = w.date.slice(0, 4); if (!byYear.has(y)) byYear.set(y, []); byYear.get(y).push(w); });
-  const editStub = (w) => `<div class="tstub c-${esc(w.cat)}">`
-    + `<button class="tx" data-ia="off" data-id="${esc(w.id)}" aria-label="Take ${esc(w.title)} off the wall">${ICON.x}</button>${stubInner(w)}</div>`;
+  all.forEach((x) => { const y = x.w.date.slice(0, 4); if (!byYear.has(y)) byYear.set(y, []); byYear.get(y).push(x); });
   const groups = [...byYear.entries()].map(([y, list]) =>
-    `<div class="year">${esc(y)} · ${list.length}</div><div class="wall">${list.map(wallEdit ? editStub : stubLink).join("")}</div>`).join("")
-    || '<p class="hint pad">No tickets here.</p>';
-  const removed = wallEdit && off.length
-    ? `<div class="removed"><div class="year">Taken off · ${off.length}</div><div class="wall">${off.map((w) =>
-      `<div class="tstub c-${esc(w.cat)}"><button class="back" data-ia="on" data-id="${esc(w.id)}">Put back</button>${stubInner(w)}</div>`).join("")}</div></div>` : "";
-  const key = `<div class="key">${[["concerts", "concerts"], ["culture", "shows and culture"], ["club", "club nights"], ["films", "cinema"]].map(([k, t]) =>
-    `<span><span class="sw c-${k}"></span>${t}</span>`).join("")}</div>`;
-  return `<p class="hint">${wallEdit ? "Tap ✕ to take a stub off your wall. Its ticket stays in Drive." : "Tap a stub to open its ticket in Drive."}</p>${pills}${groups}${removed}${key}`;
+    `<div class="m3-list-header m3-title-s">${esc(y)} · ${list.length}</div><div class="ins-wall">${list.map((x) => (wallEdit ? editStub(x.w, x.off) : stubLink(x.w))).join("")}</div>`).join("")
+    || '<p class="m3-body-m m3-variant ins-hint">No tickets here.</p>';
+  const key = `<div class="ins-key">${[["concerts", "concerts"], ["culture", "shows and culture"], ["club", "club nights"], ["films", "cinema"]].map(([k, t]) =>
+    `<span class="m3-body-s"><span class="ins-sw" style="${hue(k)}"></span>${t}</span>`).join("")}</div>`;
+  const hint = wallEdit ? "Take a ticket off your wall with the cross, put it back with the plus. Its file stays in Drive."
+    : "Tap a ticket to open it in Google Drive.";
+  return `<p class="m3-body-m m3-variant ins-hint">${hint}</p>${chips}${groups}${key}`;
 }
 
 /* ---------------- sheet: the clean-up cards (spec 5) ---------------- */
@@ -247,22 +307,26 @@ function cardHtml(c) {
   const d = draftOf(c.id);
   const lines = (c.lines || []).map((l) => {
     const a = given.get(`${c.id}-${l.key}`);
-    if (a) return `<div class="cu-line done"><p class="cu-q">${esc(l.question)}</p><p class="cu-applying">Applying: ${esc(optLabel(l.key, a.value))}</p></div>`;
-    return `<div class="cu-line"><p class="cu-q">${esc(l.question)}</p><div class="choices">${(Array.isArray(l.options) ? l.options : []).map((v) =>
-      `<button class="${d.lines[l.key] === v ? "on" : ""}" data-ia="pick" data-card="${esc(c.id)}" data-line="${esc(l.key)}" data-v="${esc(v)}" aria-pressed="${d.lines[l.key] === v}">${esc(optLabel(l.key, v))}</button>`).join("")}</div></div>`;
+    if (a) return `<div class="cu-line"><p class="m3-body-l cu-q">${esc(l.question)}</p><p class="m3-body-m m3-variant cu-applying">${ms("autorenew")}Applying: ${esc(optLabel(l.key, a.value))}</p></div>`;
+    return `<div class="cu-line"><p class="m3-body-l cu-q">${esc(l.question)}</p><div class="m3-chips">${(Array.isArray(l.options) ? l.options : []).map((v) => {
+      const on = d.lines[l.key] === v;
+      return `<button type="button" class="m3-chip${on ? " m3-chip--leading is-selected" : ""}" data-ia="pick" data-card="${esc(c.id)}" data-line="${esc(l.key)}" data-v="${esc(v)}" aria-pressed="${on}">`
+        + `${on ? ms("check") : ""}${esc(optLabel(l.key, v))}</button>`;
+    }).join("")}</div></div>`;
   }).join("");
-  return `<section class="cu-card" data-card="${esc(c.id)}"><h3 class="cu-name">${esc(c.summary || "Event")}</h3>${lines}`
-    + `<input type="text" class="cu-text" data-f="cu-text" data-card="${esc(c.id)}" value="${esc(d.text)}" placeholder="Tell Claude something else" aria-label="Tell Claude something else" autocomplete="off">`
-    + `<div class="cu-foot"><button data-ia="skip" data-card="${esc(c.id)}">Skip</button>`
-    + `<button class="primary" data-ia="done" data-card="${esc(c.id)}"${hasDraft(c.id) ? "" : " disabled"}>Done</button></div></section>`;
+  return `<section class="m3-card m3-card--filled cu-card" data-card="${esc(c.id)}"><h3 class="m3-title-m cu-name">${esc(c.summary || "Event")}</h3>${lines}`
+    + `<label class="m3-field cu-field"><span class="m3-field__label">Tell Claude something else</span>`
+    + `<input class="m3-field__input cu-text" data-f="cu-text" data-card="${esc(c.id)}" value="${esc(d.text)}" autocomplete="off"></label>`
+    + `<div class="cu-foot"><button type="button" class="m3-btn m3-btn--text" data-ia="skip" data-card="${esc(c.id)}">Skip</button>`
+    + `<button type="button" class="m3-btn m3-btn--filled" data-ia="done" data-card="${esc(c.id)}"${hasDraft(c.id) ? "" : " disabled"}>Done</button></div></section>`;
 }
 
 function cleanBody() {
   const all = CU.queue && Array.isArray(CU.queue.cards) ? CU.queue.cards : [];
   const cards = [...all.filter((c) => !skipped.includes(c.id)), ...all.filter((c) => skipped.includes(c.id))];
   const waiting = CU.outbox.length
-    ? `<p class="hint">${CU.outbox.length} answer${CU.outbox.length === 1 ? "" : "s"} waiting to be sent. They go as soon as you are back online.</p>` : "";
-  if (!cards.length) return waiting + '<p class="hint pad">Nothing to clean up.</p>';
+    ? `<p class="m3-body-m m3-variant ins-hint">${CU.outbox.length} answer${CU.outbox.length === 1 ? "" : "s"} waiting to be sent. They go as soon as you are back online.</p>` : "";
+  if (!cards.length) return waiting + '<div class="m3-empty-state"><span class="m3-empty-state__icon">' + ms("task_alt") + '</span><p class="m3-title-m">Nothing to clean up</p></div>';
   return waiting + cards.map(cardHtml).join("");
 }
 
@@ -356,7 +420,7 @@ export function initInsights(c) {
   registerLevel("ins-wall", {
     title: () => "Ticket wall",
     body: wallBody,
-    bar: () => `<button class="act-btn${wallEdit ? " primary" : ""}" data-ia="edit">${wallEdit ? "Done" : "Edit"}</button>`,
+    bar: () => `<button type="button" class="m3-btn m3-btn--small ${wallEdit ? "m3-btn--filled" : "m3-btn--text"}" data-ia="edit">${wallEdit ? "Done" : "Edit"}</button>`,
     onAction: wallAction,
   });
   registerLevel("ins-clean", {

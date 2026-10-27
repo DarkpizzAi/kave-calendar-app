@@ -1,5 +1,5 @@
 import { test, eq, ok } from "./run.js";
-import { TILES, countable, yearCounts, history, comingUp, ticketWall, wallTakenOff, didYouKnow } from "../js/insights-data.js";
+import { TILES, countable, yearCounts, history, comingUp, nextHero, ticketWall, wallTakenOff, wallTap, didYouKnow } from "../js/insights-data.js";
 
 let n = 0;
 const ev = (type, start, o = {}) => ({
@@ -122,6 +122,17 @@ test("comingUp: cancelled, idea and non-plane transport are skipped", () => {
   eq(comingUp(events, "2026-10-25"), { flight: null, stay: null });
 });
 
+test("nextHero: whichever comes first, a tie goes to transport, neither gives null", () => {
+  const f = (days) => ({ id: "f1", title: "Fly", date: "x", time: "", days });
+  const s = (days) => ({ id: "s1", title: "Stay", city: "", start: "x", end: "x", nights: 1, days });
+  eq(nextHero({ flight: f(11), stay: s(11) }), { kind: "transport", id: "f1", days: 11 });
+  eq(nextHero({ flight: f(11), stay: s(3) }), { kind: "accommodation", id: "s1", days: 3 });
+  eq(nextHero({ flight: f(2), stay: s(3) }), { kind: "transport", id: "f1", days: 2 });
+  eq(nextHero({ flight: null, stay: s(5) }), { kind: "accommodation", id: "s1", days: 5 });
+  eq(nextHero({ flight: f(0), stay: null }), { kind: "transport", id: "f1", days: 0 });
+  eq(nextHero({ flight: null, stay: null }), null);
+});
+
 const concert = (start, o = {}) => ev("live-music", start, { title: o.title, extra: { links: [{ label: "Ticket", url: o.url || DRIVE }], ...(o.extra || {}) } });
 
 test("ticketWall: past, countable, Drive ticket, wall category, newest first", () => {
@@ -136,6 +147,19 @@ test("ticketWall: past, countable, Drive ticket, wall category, newest first", (
   const w = ticketWall(events, "2026-10-25", "isa");
   eq(w.map((x) => x.title), ["New", "Old"]);
   eq(w[0], { id: w[0].id, title: "New", date: "2026-09-01", cat: "concerts", url: DRIVE });
+});
+
+test("ticketWall: a future event with a Drive ticket is not on the wall, nor in the taken-off list", () => {
+  const future = concert("2026-12-01", { title: "Future" });
+  eq(ticketWall([future], "2026-10-25", "isa"), []);
+  eq(wallTakenOff([{ ...future, wallHiddenBy: ["isa"] }], "2026-10-25", "isa"), []);
+});
+
+test("wallTap: a wall entry's tap target is its Drive URL, never an in-app viewer", () => {
+  const w = ticketWall([concert("2026-03-01", { title: "Old" })], "2026-10-25", "isa")[0];
+  eq(wallTap(w), DRIVE);
+  eq(wallTap({ ...w, url: "javascript:alert(1)" }), "");
+  eq(wallTap({ ...w, url: "" }), "");
 });
 
 test("ticketWall: an event still running today is not past", () => {
