@@ -266,4 +266,93 @@ export function searchEvents(events, query) {
     .sort((a, b) => (a.start < b.start ? 1 : -1));
 }
 
+/* ---- the Interactive calendar: week strip, month and agenda (Task 3) ---- */
+
+/* every day from fromDay to toDay, inclusive; empty days are days too */
+export function agendaDays(fromDay, toDay) {
+  const out = [];
+  for (let d = fromDay; d <= toDay; d = addDays(d, 1)) out.push(d);
+  return out;
+}
+
+/* Monday to Sunday of the week holding `selected` */
+export function stripWeek(selected) {
+  const mon = mondayOf(selected);
+  return Array.from({ length: 7 }, (_, i) => addDays(mon, i));
+}
+
+/* "YYYY-MM" shifted by n months */
+export function addMonths(ym, n) {
+  const t = new Date(Date.UTC(Number(ym.slice(0, 4)), Number(ym.slice(5, 7)) - 1 + n, 1));
+  return t.toISOString().slice(0, 7);
+}
+
+/* The month grid for one "YYYY-MM": Monday first, whole weeks, five rows or
+   six as the month needs (never fewer than five). Days of the neighbouring months are there to
+   complete the rows (inMonth false). */
+export function monthCells(ym) {
+  const first = `${ym}-01`;
+  const start = addDays(first, -dayOfWeek(first));
+  const days = daysInMonth(ym);
+  const rows = Math.max(5, Math.ceil((dayOfWeek(first) + days) / 7)); /* five rows at least, so the month never jumps in height for February */
+  return Array.from({ length: rows * 7 }, (_, i) => {
+    const day = addDays(start, i);
+    return { day, inMonth: day.slice(0, 7) === ym };
+  });
+}
+const daysInMonth = (ym) => new Date(Date.UTC(Number(ym.slice(0, 4)), Number(ym.slice(5, 7)), 0)).getUTCDate();
+
+export const clampDay = (day, min, max) => (day < min ? min : day > max ? max : day);
+/* min and max may be days or months; a month is clamped as a month, so the
+   strip never opens on an empty one past either end */
+export function clampMonth(ym, min, max) {
+  const lo = min.slice(0, 7), hi = max.slice(0, 7), m = ym.slice(0, 7);
+  return m < lo ? lo : m > hi ? hi : m;
+}
+
+/* The day the agenda highlights while it scrolls: the first row sitting fully
+   below the strip with room to spare, so it is never half hidden under the
+   edge. `rows` are in order with `top` in the scroller's own coordinates,
+   `scrollTop` is the coordinate of the strip's lower edge, `gap` the room the
+   highlighted day is given below it. A row 8px short of the full gap still
+   counts, which is how a day the app itself scrolled to (exactly `gap` below
+   the edge, the caller allows 4px more) is always picked. */
+export function firstFullyVisible(rows, scrollTop, gap) {
+  const from = scrollTop + gap - 8;
+  for (const r of rows) if (r.top >= from) return r.day;
+  return null;
+}
+
+/* One finished drag on the strip: sideways moves a week (a month when open),
+   down opens the month, up closes it; the longer axis wins and anything under
+   40px is a tap. */
+export function stripGesture({ dx, dy }) {
+  if (Math.max(Math.abs(dx), Math.abs(dy)) < 40) return null;
+  if (Math.abs(dx) > Math.abs(dy)) return dx < 0 ? "next" : "prev";
+  return dy > 0 ? "open" : "close";
+}
+
+/* Spec section 2: the seven colour groups. A category is matched by its
+   stable id (icons.js); anything not listed, now or later, is Other. */
+export const GROUP_OF = {
+  eating: "food", drinks: "food",
+  "live-music": "nights", clubbing: "nights", birthday: "nights",
+  cinema: "culture", activity: "culture", games: "culture",
+  park: "outdoors", beach: "outdoors", sport: "outdoors", hike: "outdoors",
+  transport: "travel", accommodation: "travel", "business-trip": "travel",
+  work: "life", visitor: "life", health: "life",
+};
+export const categoryGroup = (type) => (Object.prototype.hasOwnProperty.call(GROUP_OF, type) ? GROUP_OF[type] : "other");
+
+/* The agenda row's second line: what the event is doing on that day. A stay
+   names its check-in and check-out; a time belongs to the event's first day;
+   everything else (no time, a span's later days) is all day. */
+export function rowMeta(e, d) {
+  const stay = stayLabel(e, d);
+  if (stay) return stay;
+  const t = timeOn(e, d);
+  if (!t) return "All day";
+  return e.endTime && (!e.end || e.end === e.start) ? `${t} to ${e.endTime}` : t;
+}
+
 export { addDays };

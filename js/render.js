@@ -22,7 +22,7 @@ import { escapeHtml, copyText, markJump } from "./util.js";
 import { PALETTES, SEED_HEX, toSeed, applyPalette, themeBootRan } from "./theme.js";
 import { status as syncStatus, checkToken } from "./sync.js";
 import { ms, ICON } from "./chrome-icons.js";
-import { calendarHtml, afterCalendar, backToToday, todaysCount, refreshArchive } from "./calendar.js";
+import { calendarHtml, afterCalendar, backToToday, todaysCount } from "./calendar.js";
 import { refreshSheet } from "./sheet.js";
 import { readPrefs, defaultsSummary, VIEW_NAMES, DETAIL_NAMES } from "./prefs.js";
 import { CATEGORIES, iconFor } from "./icons.js";
@@ -89,11 +89,8 @@ export function setView(name) {
   }
 }
 
-/* The search magnifier on every tab. Task 6 replaces this with the search page; until then it opens the Calendar's own search. */
-export function openSearch() {
-  const own = document.querySelector('#view [data-act="search"]');
-  if (own) own.click();
-}
+/* The search magnifier on every tab. Task 6 builds the search page; until then it does nothing (the Calendar's own search went with the old views). */
+export function openSearch() { /* placeholder for Task 6 */ }
 
 export function showTopBar() { const b = $("topBar"); if (b) b.classList.remove("is-hidden"); }
 export function hideTopBar() { const b = $("topBar"); if (b) b.classList.add("is-hidden"); }
@@ -162,7 +159,7 @@ const PREF_KEYS = ["defaultView", "defaultDetail"];
 function defaultsHtml() {
   const p = readPrefs(store.state.settings);
   return `<div class="page-col">`
-    + group("Default view", staticRow(choices("pref-view", VIEW_NAMES, p.defaultView) + hint("Where the Calendar opens.")))
+    + group("Default view", staticRow(choices("pref-view", VIEW_NAMES, p.defaultView) + hint("Whether the strip opens as one week or as the whole month.")))
     + group("Default detail level", staticRow(choices("pref-detail", DETAIL_NAMES, p.defaultDetail) + hint("Full: both of you, the other person greyed. Minimal: yours and shared only.")))
     + `</div>`;
 }
@@ -277,7 +274,6 @@ export function render() {
   $("railItems").innerHTML = navItems("rail");
   if (current === "calendar") { afterCalendar(main, before); firstDraw = false; }
   refreshSheet();
-  refreshArchive();
   refreshPage();
   bindView();
   if (current === "insights") bindInsights(main);
@@ -461,7 +457,7 @@ export function onPageClick(e) {
   if (d.me) { store.setSetting("me", d.me); again(); return; }
   if (d.palette) { applyPalette(d.palette); store.setSetting("palette", d.palette); again(); return; }
   const pick = d.prefView != null ? ["defaultView", d.prefView] : d.prefDetail != null ? ["defaultDetail", d.prefDetail] : null;
-  if (pick && PREF_KEYS.includes(pick[0])) { store.setSetting(pick[0], pick[1]); resetCalendarDefaults(); again(); return; }
+  if (pick && PREF_KEYS.includes(pick[0])) { resetCalendarDefaults(); store.setSetting(pick[0], pick[1]); again(); return; } /* reset first: the save redraws the Calendar */
   if (d.ogReset != null) { saveOrder(DAY_PRIORITY); return; }
   const up = d.ogUp, down = d.ogDown, t = up || down;
   if (t) {

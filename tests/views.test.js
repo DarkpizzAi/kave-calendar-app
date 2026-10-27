@@ -6,10 +6,6 @@ import { HOLIDAYS, STATUS, isProvisional } from "../js/holidays.js";
 
 const ev = (id, s, extra = {}) => ({ id, title: id, start: s, end: null, owner: "shared", activities: [], ...extra });
 
-test("load range: 1 January back, end of the year after next forward, or the last event", () => {
-  eq(loadRange("2026-09-24", "2026-12-12"), { min: "2026-01-01", max: "2028-12-31" });
-  eq(loadRange("2026-09-24", "2029-05-02"), { min: "2026-01-01", max: "2029-05-02" });
-});
 
 /* ---- the holiday table itself ---- */
 test("holidays: every listed year has a status, and no holiday falls on a Sunday", () => {
@@ -93,4 +89,12 @@ test("navigation: two tabs, Trips and Radar in the roadmap", async () => {
   eq(Object.keys(VIEWS), ["calendar", "insights"]);
   eq(ROADMAP.map((r) => r.key), ["calendar", "insights", "trips", "radar"]);
   eq(ROADMAP.map((r) => r.live), [true, true, false, false]);
+});
+
+/* ---- Task 3: the range is a year back to two years ahead ---- */
+test("range: a year back, two years ahead", () => {
+  eq(loadRange("2026-10-26"), { min: "2025-10-26", max: "2028-10-26" });
+});
+test("range: a 29 February today keeps a real day in the other years", () => {
+  eq(loadRange("2028-02-29"), { min: "2027-02-28", max: "2030-02-28" });
 });

@@ -1,548 +1,375 @@
-/* Compass: the Calendar tab (spec section 3).
+/* Compass: the Calendar tab, the Interactive design.
 
-   From the top: the control row, then the view, Grid (a month grid per
-   month) or Agenda (a card per day). A tap on a day or an event opens the
-   sheet. Decisions live in cal-model.js (tested); this file draws them and
-   handles the taps. Every synced string goes through escapeHtml, every url
-   through safeUrl. */
+   A strip card under the top bar holds one week (a letter and one emoji per
+   day) and opens into the month (day numbers and one emoji per day). Under it
+   runs the agenda: every day from a year back to two years ahead, empty days
+   as thin rows, so time passing is visible. The same day is highlighted in
+   the strip, the month and the agenda. A tap on a day glides the agenda to
+   it; scrolling the agenda moves the highlight and never closes the month.
+
+   Decisions live in cal-model.js (tested); this file draws them and handles
+   the gestures. Every synced string goes through escapeHtml. */
 "use strict";
 
-import { escapeHtml as esc, markJump } from "./util.js";
-import { addDays, dayOfWeek, mondayOf, todayKey } from "./dates.js";
+import { escapeHtml as esc, markJump, isJumping } from "./util.js";
+import { addDays, dayOfWeek, todayKey } from "./dates.js";
 import { loadRange } from "./views.js";
 import { holidayOn } from "./holidays.js";
 import { readPrefs } from "./prefs.js";
 import { applyDetail, isTheirs } from "./filter.js";
 import { store } from "./store.js";
-import { indexByDay, eventsOn, isMidStay, stayLabel, pickDayIcon,
-  shouldLoadMore, nextCount, iconsOf, searchEvents, shortDate, pastMonths, gesture, lastEventDay,
-  fullPastWeeks, fullPastMonths, todaysCount as cmTodaysCount, hideCancelled,
-  hasOpenTodos, gridDots } from "./cal-model.js";
-import { openLevel, sheetOpen } from "./sheet.js";
-import { ICON } from "./chrome-icons.js";
+import { indexByDay, eventsOn, pickDayIcon, iconsOf, todaysCount as cmTodaysCount, hasOpenTodos,
+  agendaDays, stripWeek, monthCells, firstFullyVisible, clampDay, clampMonth, addMonths,
+  categoryGroup, stripGesture, rowMeta } from "./cal-model.js";
+import { openLevel } from "./sheet.js";
+import { ms } from "./chrome-icons.js";
 import { iconFor } from "./icons.js";
+import { play, EASE, motionFactor } from "../m3/kave-m3.js";
 
 const MONTHS = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
-const DOW = ["MON", "TUE", "WED", "THU", "FRI", "SAT", "SUN"];
-export const VIEWS = ["grid", "agenda"];
+const LONGDOW = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"];
+const SHORTDOW = ["MON", "TUE", "WED", "THU", "FRI", "SAT", "SUN"];
+const LETTERS = ["M", "T", "W", "T", "F", "S", "S"];
+/* the room the highlighted day keeps below the strip */
+const GAP = 16;
 
-/* Transient UI state: not persisted, reset when the app opens. The defaults
-   come from Settings. The main view always opens on today and never holds
-   the past: that is the Archive's job. */
+/* Transient UI state: not persisted, reset when the app opens. `open` is null
+   until the first draw reads the Settings default (week or month). */
 const S = {
-  view: null, detail: null, fromView: null, slide: "",
-  future: { grid: 15, agenda: 10 },
-  searchOpen: false, query: "", qCaret: null,
-  scrollTo: null, pending: false,
-  /* older years, loaded on demand for search: the oldest year fetched from
-     kave-hub, and whether it has anything older still */
-  floor: null, exhausted: false,
+  open: null, sel: null, month: null, detail: null,
+  fx: 0,          // +1 / -1: the body slides in from that side after a swipe
+  fresh: true,    // the tab was not on screen before this draw
+  touched: false, // the reader has scrolled since the tab appeared
+  tick: 0,
 };
 
-/* ---- Archive: the popup opened from Settings. Unlike the
-   main view (always pinned to today), Archive shows only the past -- newest
-   at the bottom, oldest at the top -- with no future, no scroll-triggered
-   loading and no category/detail filtering (Isa: "all events, no filters").
-   It draws with the exact same gridMonth/weekBlocks machinery as the main
-   view (frame is swapped for the duration of the draw, see archiveFrame),
-   so grid and agenda look identical in and out of Archive. `hist` is true
-   while its history entry is on the stack, so phone Back closes it. */
-const AR = { open: false, view: null, floor: null, exhausted: false, loading: false, hist: false };
-
-let ctx = null;          // { data, render, isCalendar, sync }
+let ctx = null;          // { data, render, isCalendar, sync, add }
 let frame = null;        // what this draw is built from; rebuilt every draw
+
+const view = () => document.getElementById("view");
+const expanded = () => document.documentElement.dataset.size === "expanded";
+const stripEl = () => document.querySelector("#view [data-live]");
+const monthName = (ym) => MONTHS[Number(ym.slice(5, 7)) - 1];
+const monthTitle = (ym) => `${monthName(ym)} ${ym.slice(0, 4)}`;
+const longDay = (d) => `${LONGDOW[dayOfWeek(d)]} ${Number(d.slice(8))} ${monthName(d)}`;
+const who = (o) => (o === "isa" ? "Isa" : o === "hugo" ? "Hugo" : "Both of you");
 
 function prefs() {
   const s = store.state.settings, p = readPrefs(s);
-  if (!S.view) S.view = p.defaultView;
+  if (S.open === null) S.open = p.defaultView === "month";
   if (!S.detail) S.detail = p.defaultDetail;
-  return { me: s.me };
+  return { me: s.me, order: p.gridOrder };
 }
 
 function buildFrame() {
-  const { me } = prefs();
+  const { me, order } = prefs();
   const today = todayKey();
-  const thisYear = today.slice(0, 4);
-  /* every event at this detail level, cancelled included: what the Day
-     popup lists, whichever view it was opened from */
+  const range = loadRange(today);
+  /* every event at this detail level, cancelled included: the agenda keeps a
+     cancelled one (struck through), the strip and the month leave it out */
   const all = applyDetail(ctx.data.events(), me, S.detail).map((x) => x.event);
-  /* F35: Grid hides a cancelled event outright; Agenda keeps it (struck
-     through, cls() below). */
-  const events = hideCancelled(all, S.view);
-  const idx = indexByDay(events);
-  const last = lastEventDay(events);
-  if (!S.floor) S.floor = thisYear;
-  const range = loadRange(today, last, S.floor);
-  return { me, today, thisYear, all, events, idx, range,
+  const idx = indexByDay(all);
+  if (!S.sel) S.sel = today;
+  S.sel = clampDay(S.sel, range.min, range.max);
+  S.month = clampMonth(S.month || S.sel.slice(0, 7), range.min, range.max);
+  return { me, order, today, thisYear: today.slice(0, 4), all, idx, range,
     grey: (e) => isTheirs(e, me),
-    on: (d) => idx.get(d) || [],
-    thisMonday: mondayOf(today) };
+    on: (d) => idx.get(d) || [] };
 }
 
-/* ---- pieces ---- */
-const icons = (e) => iconsOf(e, frame.me);
-/* What a day shows in Agenda and Grid: an accommodation only on check-in and
-   check-out (isMidStay), so the two views agree. The day sheet lists the whole
-   stay on every day, and trip-city logic still counts it. */
-const visibleOn = (d) => frame.on(d).filter((e) => !isMidStay(e, d));
-/* F35: Agenda keeps a cancelled event visible, title struck through; Grid
-   never sees one here at all (hideCancelled in buildFrame). */
-const cls = (e) => `${frame.grey(e) ? "grey" : ""}${e.status === "idea" ? " idea" : ""}${e.status === "cancelled" ? " cancelled" : ""}`;
+/* ---- the strip ---- */
 
-function row(e, withDate, click, tag = "") {
-  const ic = icons(e);
-  return `<li class="${cls(e)}" style="--n:${ic.length}"${click ? ` data-act="event" data-id="${esc(e.id)}"` : ""}>`
-    + (withDate ? `<span class="c-d">${esc(shortDate(e.start))}</span>` : "")
-    + `<span class="c-i">${ic.map(esc).join("")}</span>${tag
-      ? `<span class="c-t has-tag"><span class="c-name">${esc(e.title)}</span><span class="c-tag">&nbsp;&middot; ${esc(tag)}</span></span>`
-      : `<span class="c-t">${esc(e.title)}</span>`}`
-    + (hasOpenTodos(e) ? `<span class="todo-ic" aria-label="Open to-dos">${ICON.checkbox}</span>` : "") + "</li>";
-}
-const list = (items, dated) => (items ? `<ul class="rows${dated ? " dated" : ""}">${items}</ul>` : "");
-export const rows = (evs, dated, click) => list(evs.map((e) => row(e, dated, click)).join(""), dated);
-
-/* ---- Today: a bare anchor at the top of the list, which Back to today and
-   the first draw scroll to. ---- */
-function todayAnchor() {
-  return `<span id="today" aria-hidden="true"></span>`;
+/* One emoji per day: the Grid emoji order's winner among the events on it (a
+   middle night of a stay included; a cancelled event is not shown). */
+function dayEmoji(d) {
+  const evs = frame.on(d).filter((e) => e.status !== "cancelled");
+  const best = pickDayIcon(evs, d, { order: frame.order, me: frame.me });
+  return best ? { emo: iconFor(best.a, best.e, frame.me), grey: frame.grey(best.e) } : null;
 }
 
-/* ---- control row ----
-   The view toggle, search, back-to-today and add controls stay at the top
-   while the list scrolls, as floating pills (see .ctl in styles.css). */
-function controls() {
-  const idx = VIEWS.indexOf(S.view), from = S.fromView == null ? idx : VIEWS.indexOf(S.fromView);
-  /* F59: Spoon's .segment/.seg-thumb construction, copied verbatim
-     (styles.css) -- .ind became .seg-thumb, .views became .segment. */
-  const views = `<div class="segment" role="tablist"><span class="seg-thumb" style="--i:${idx};--from:${from}"></span>`
-    + VIEWS.map((v) => `<button role="tab" aria-selected="${S.view === v}" data-act="view" data-v="${v}">${v[0].toUpperCase() + v.slice(1)}</button>`).join("") + "</div>";
-  /* After the toggle: search, back to today (a calendar page showing today's
-     date, like Google Calendar) and add, all grey. Detail level lives in
-     Settings, Calendar defaults; the archive in Settings too. */
-  const dayNum = Number((frame ? frame.today : todayKey()).slice(8));
-  const today = `<button class="ib today" data-act="today" aria-label="Back to today"><svg class="tdy" viewBox="0 0 24 24" aria-hidden="true"><rect x="4" y="5" width="16" height="16" rx="3"/><path d="M8 3v4M16 3v4"/><text x="12" y="${dayNum < 10 ? 17.4 : 16.9}" font-size="${dayNum < 10 ? 11 : 9.5}">${dayNum}</text></svg></button>`;
-  const add = `<button class="ib" data-act="addnew" aria-label="Add an event">${ICON.plus}</button>`;
-  const search = S.searchOpen
-    ? `<div class="sfield"><span class="si">${ICON.search}</span><input id="q" type="search" placeholder="Search every event" value="${esc(S.query)}" autocomplete="off"><button class="clr" data-act="closesearch" aria-label="Close search">${ICON.x}</button></div>`
-    : `<button class="ib" data-act="search" aria-label="Search">${ICON.search}</button>`;
-  return `<div class="ctl${S.searchOpen ? " searching" : ""}">${S.searchOpen ? "" : views}<div class="ctl2">${search}${S.searchOpen ? "" : today + add}</div></div>`;
+function dayBtn(d, kind, inMonth) {
+  const out = d < frame.range.min || d > frame.range.max;
+  const cls = ["lc-d", kind, d === frame.today ? "today" : "", d === S.sel ? "sel" : "", inMonth ? "" : "out", d < frame.today ? "past" : ""]
+    .filter(Boolean).join(" ");
+  const e = inMonth && !out ? dayEmoji(d) : null;
+  const names = frame.on(d).filter((x) => x.status !== "cancelled").map((x) => x.title).join(", ");
+  const label = `${longDay(d)}${d === frame.today ? ", today" : ""}${names ? ", " + names : ", nothing planned"}`;
+  const top = kind === "wc"
+    ? `<span class="wd m3-label-s">${LETTERS[dayOfWeek(d)]}</span>`
+    : `<span class="dn m3-label-l">${Number(d.slice(8))}</span>`;
+  return `<button type="button" class="${cls}" data-day="${d}" aria-label="${esc(label)}"${out ? " disabled" : ""}>${top}`
+    + `<span class="emos m3-emoji${e && e.grey ? " grey" : ""}" aria-hidden="true">${e ? esc(e.emo) : ""}</span></button>`;
 }
 
-/* ---- Agenda: a run of weeks ---- */
-/* the plain, non-sticky month heading, drawn once per month */
-const monthLabel = (d) => `${MONTHS[Number(d.slice(5, 7)) - 1]}${d.slice(0, 4) !== frame.thisYear ? " " + d.slice(0, 4) : ""}`;
-const monthHead = (d) => `<h3 class="month">${esc(monthLabel(d))}</h3>`;
-/* Agenda's card model: one card per day. Today is the one card whose FILL
-   turns solid accent. (Free-weekend and long-weekend highlighting was removed
-   on 2026-10-11: Grid reads clearly enough without it.) Grid, below, draws its
-   own month-grid card model with the same periodState. */
-function periodState(d) {
-  return d === frame.today ? "today" : "";
-}
-/* Agenda: one card per day, straight in a run -- no week-card wrapper
-   holding several of them (Isa: "no card containing all the individual day
-   cards"). Every day still shows, never skipped, never a "Nothing planned"
-   line -- an empty day is just a day card with nothing in it. Black
-   (var(--panel)), same as Grid's own square; a weekend gets the branding's
-   own card grey (--surface-2) instead, unconditionally -- today still wins
-   over it. data-week carries the week's Monday on every one of its days
-   (not a separate wrapper), so the height rule below can group a week. */
-/* Top-left the weekday, top-right the day and month, plain empty space
-   between the two (no rule, no dots); the month only shows here, not just
-   once per section, because a week now routinely breaks across two of
-   them (below) and a bare "28" right after a "30" reads as a typo, not
-   the 1st of a new month. The year only joins in when the day isn't in
-   frame.thisYear (Archive, mostly). */
-const dayMonth = (d) => `${Number(d.slice(8))} ${MONTHS[Number(d.slice(5, 7)) - 1].slice(0, 3)}${d.slice(0, 4) !== frame.thisYear ? " " + d.slice(0, 4) : ""}`;
-function agendaDay(d, m, joinUp, joinDown) {
-  const evs = visibleOn(d);
-  const weekend = dayOfWeek(d) >= 5 ? " weekend" : "";
-  /* Monday is the first day of the week: it's the one day that keeps the
-     wider between-weeks gap (.content's own flex gap); every other day
-     pulls in tighter, to the same-week spacing below. */
-  const weekStart = (dayOfWeek(d) === 0 ? " week-start" : "") + (dayOfWeek(d) === 6 ? " week-end" : "");
-  /* Option B corners (Isa, 25/10/2026): where two cards of one week meet,
-     the touching corners go square (the 4px gap stays). Decided by the
-     neighbours actually drawn (weekBlocks), not by the weekday: a lone day
-     of its week, the first/last day a month heading or today's trim cuts
-     off, keeps its round corners. */
-  const joins = (joinUp ? " join-up" : "") + (joinDown ? " join-down" : "");
-  const dow = DOW[dayOfWeek(d)][0] + DOW[dayOfWeek(d)].slice(1).toLowerCase();
-  const hol = holidayOn(d);
-  /* A weekday bank holiday is named in the card header, centred between the
-     weekday and the date, in the header's own type (ellipsised if too long).
-     Unconditional: it is simply what the day is. A
-     weekend holiday has no name here (the weekend tint already marks it).
-     The provisional note lives in the day sheet. */
-  const holName = hol && !weekend ? `<span class="cd-hol">${esc(hol)}</span>` : "";
-  const cd = `<div class="cd"><span class="cd-date">${dayMonth(d)}</span>${holName}</div>`;
-  /* Every day card opens the day, empty or not -- matches Grid's own
-     squares (gridSquare below), which have always worked this way. */
-  const tap = ` role="button" tabindex="0" data-act="day" data-d="${d}"`;
-  /* A weekday holiday (never Sat/Sun, which already read as a holiday by
-     being a weekend) gets an accent border, unconditional like the line
-     above -- what the day is, not a free-time highlight. */
-  const holBorder = hol && !weekend ? " holiday-border" : "";
-  /* The weekday sits outside the card, on the left (Isa, 2026-10-11): a row
-     holds the label and the card, and carries the week spacing and data-week. */
-  return `<div class="dayrow${weekStart}${joins}" data-week="${m}"><span class="wdl${d === frame.today ? " today" : ""}">${dow}</span>`
-    + `<div class="daycard ${periodState(d)}${weekend}${holBorder}"${tap}>${cd}`
-    + `<ul class="rows">${evs.map((e) => row(e, false, false, stayLabel(e, d))).join("")}</ul></div></div>`;
-}
-/* Agenda's per-card height rule -- two independent groups per week
-   (weekdays, weekend), not one across all seven:
-     - a card with content is at least one line tall, and taller still if
-       it has more than one line -- its own height, never matched up to a
-       busier sibling.
-     - a card with nothing on it is also one line tall, PROVIDED its group
-       (Mon-Fri, or Sat+Sun) has something somewhere that week -- otherwise
-       the whole group is thin, not even one line (an ordinary quiet week
-       stays quiet-looking).
-   "One line" isn't a card's own content, so it can't come from measuring
-   that card -- oneLineHeight renders a one-off, one-row reference card
-   (detached, same width as the real ones) once per draw and reuses the
-   number for every card that needs the floor. */
-function oneLineHeight(root) {
-  const probe = document.createElement("div");
-  probe.className = "daycard";
-  probe.style.cssText = "position:absolute;visibility:hidden;pointer-events:none";
-  probe.innerHTML = '<div class="cd"><span class="cd-date">1 Jan</span></div>'
-    + '<ul class="rows"><li data-act="event" style="--n:1"><span class="c-i">•</span><span class="c-t">x</span></li></ul>';
-  root.appendChild(probe);
-  const h = probe.getBoundingClientRect().height;
-  probe.remove();
-  return h;
-}
-function equalizeAgendaHeights(root) {
-  const cards = root.querySelectorAll(".dayrow[data-week] > .daycard");
-  cards.forEach((el) => { el.style.minHeight = ""; });
-  if (!cards.length) return;
-  const groups = new Map();
-  cards.forEach((el) => {
-    const key = `${el.parentElement.dataset.week}:${el.classList.contains("weekend") ? "we" : "wd"}`;
-    (groups.get(key) || groups.set(key, []).get(key)).push(el);
-  });
-  const oneLine = oneLineHeight(root);
-  for (const els of groups.values()) {
-    if (els.some((el) => el.querySelector(".rows li"))) els.forEach((el) => { el.style.minHeight = `${oneLine}px`; });
+function stripInner() {
+  const wide = expanded(), open = S.open || wide;
+  const label = monthTitle(open ? S.month : S.sel.slice(0, 7));
+  const title = wide
+    ? `<span class="lc-title"><span class="m3-title-m">${esc(label)}</span></span>`
+    : `<button type="button" class="lc-title" data-act="toggle" aria-expanded="${open}" aria-label="${esc(label)}, ${open ? "show one week" : "show the month"}"><span class="m3-title-m">${esc(label)}</span></button>`;
+  const head = `<div class="lc-head">${title}<span class="sp"></span>`
+    + `<button type="button" class="lc-title" data-act="today" aria-label="Back to today"><span class="m3-title-m">Today</span></button></div>`;
+  let body;
+  if (open) {
+    body = `<div class="lc-grid">${LETTERS.map((w) => `<span class="lc-wd m3-label-s">${w}</span>`).join("")}`
+      + `${monthCells(S.month).map((c) => dayBtn(c.day, "mc", c.inMonth)).join("")}</div>`;
+  } else {
+    body = `<div class="lc-week">${stripWeek(S.sel).map((d) => dayBtn(d, "wc", true)).join("")}</div>`;
   }
+  const handle = wide ? ""
+    : `<button type="button" class="lc-handle" data-act="toggle" aria-label="${open ? "Show one week" : "Show the month"}"><span></span></button>`;
+  return `<div class="lc-in">${head}${body}${handle}</div>`;
 }
-/* A calendar week almost never fits neatly inside one month: this breaks
-   it at the boundary instead of filing the whole week under whichever
-   month its Thursday happened to land in. cur tracks the last month
-   heading actually drawn, across every week in this run, so a month
-   heading appears exactly once, right before its first day, even when
-   that's day 3 of a week already under way. The week itself (data-week,
-   for the height rule's grouping) stays whole; only which heading a day
-   falls under is per-day. */
-function weekBlocks(from, count) {
-  const items = [];
-  let cur = "";
-  for (let m = from, i = 0; i < count && m <= frame.range.max; i++, m = addDays(m, 7)) {
-    /* Only the week underway trims to today -- Isa: Agenda opens on today
-       at the top, but the Archive must still show real past weeks in full,
-       not empty cards (m !== frame.thisMonday is always entirely in the
-       past or entirely in the future here, never split by today). */
-    const days = [0, 1, 2, 3, 4, 5, 6].map((k) => addDays(m, k)).filter((d) => m !== frame.thisMonday || d >= frame.today);
-    for (const d of days) {
-      const ym = d.slice(0, 7);
-      const head = ym !== cur;
-      cur = ym;
-      items.push({ d, m, head });
+
+/* Redraw the strip in place. When its height changes (the month opens or
+   closes, or a month needs a sixth row) the height animates, 400ms
+   emphasized; after a swipe the new week or month slides in. Reduced motion:
+   `play` does nothing, so the strip simply changes. */
+function redrawStrip() {
+  const t = stripEl();
+  if (!t) return;
+  const h0 = t.offsetHeight;
+  t.getAnimations().forEach((a) => a.cancel());
+  t.innerHTML = stripInner();
+  const h1 = t.offsetHeight, body = t.querySelector(".lc-week, .lc-grid");
+  if (h0 && Math.abs(h1 - h0) > 2) {
+    play(t, [{ height: `${h0}px` }, { height: `${h1}px` }], 400, EASE.emphasized);
+    if (body) play(body, [{ opacity: 0 }, { opacity: 1 }], 200, "linear", { delay: 100 });
+  } else if (S.fx && body) {
+    play(body, [{ opacity: 0, transform: `translateX(${S.fx * 56}px)` }, { opacity: 1, transform: "none" }], 300, EASE.decelerate);
+  }
+  S.fx = 0;
+}
+
+/* ---- the agenda ---- */
+const firstType = (e) => (e.activities && e.activities[0] && e.activities[0].type) || "none";
+
+function card(e, d) {
+  const theirs = frame.grey(e);
+  const group = theirs ? "other" : categoryGroup(firstType(e));
+  const cls = ["evc", "g-" + group, theirs ? "grey" : "", e.status === "idea" ? "idea" : "", e.status === "cancelled" ? "cancelled" : ""].filter(Boolean).join(" ");
+  const sub = [theirs ? who(e.owner) : "", rowMeta(e, d), e.venue || ""].filter(Boolean).map(esc).join(" · ");
+  const todo = hasOpenTodos(e) ? `<span class="evc-todo" role="img" aria-label="Open to-dos">${ms("checklist")}</span>` : "";
+  return `<button type="button" class="${cls}" data-act="event" data-id="${esc(e.id)}">`
+    + `<span class="evc-em m3-emoji" aria-hidden="true">${iconsOf(e, frame.me).map(esc).join("")}</span>`
+    + `<span class="evc-t"><span class="evc-name m3-body-l">${esc(e.title)}</span><span class="m3-body-s">${sub}</span></span>${todo}</button>`;
+}
+
+function agendaRow(d) {
+  const evs = frame.on(d), hol = holidayOn(d);
+  const cls = ["ag", d === frame.today ? "today" : "", d === S.sel ? "sel" : "", evs.length || hol ? "" : "empty", d < frame.today ? "past" : ""]
+    .filter(Boolean).join(" ");
+  const note = d === frame.today && !evs.length ? '<span class="ag-note m3-body-s">Nothing planned today</span>' : "";
+  const holiday = hol ? `<span class="ag-note m3-body-s">${esc(hol)}</span>` : "";
+  return `<div class="${cls}" data-row="${d}">`
+    + `<button type="button" class="ag-d" data-act="day" data-d="${d}" aria-label="Open ${esc(longDay(d))}"><span class="ag-lab m3-label-l">${SHORTDOW[dayOfWeek(d)]} ${Number(d.slice(8))}</span></button>`
+    + `<div class="ag-evs">${holiday}${evs.map((e) => card(e, d)).join("")}${note}</div></div>`;
+}
+
+function agendaHtml() {
+  const out = [];
+  let last = "";
+  for (const d of agendaDays(frame.range.min, frame.range.max)) {
+    const ym = d.slice(0, 7);
+    if (ym !== last) {
+      out.push(`<h2 class="mhead m3-title-m">${esc(monthName(d))}${d.slice(0, 4) !== frame.thisYear ? " " + d.slice(0, 4) : ""}</h2>`);
+      last = ym;
     }
+    out.push(agendaRow(d));
   }
-  /* a card joins the one above/below only when that one is the same week
-     and no month heading sits between them */
-  return items.map((it, i) => {
-    const up = i > 0 && !it.head && items[i - 1].m === it.m;
-    const down = i < items.length - 1 && !items[i + 1].head && items[i + 1].m === it.m;
-    return (it.head ? monthHead(`${it.d.slice(0, 7)}-01`) : "") + agendaDay(it.d, it.m, up, down);
-  }).join("");
-}
-const weeks = () => weekBlocks(frame.thisMonday, S.future.agenda);
-
-/* ---- Grid: a real Monday-first month grid, one card per month ---- */
-const ymOf = (y, mo) => `${y}-${String(mo + 1).padStart(2, "0")}`;
-const daysIn = (y, mo) => new Date(Date.UTC(y, mo + 1, 0)).getUTCDate();
-/* Every month gets its own big heading here (the "2026" year-big treatment,
-   not Agenda's smaller .month heading) -- same label text and same
-   year-suffix rule as Agenda's monthHead (monthLabel, shared), just drawn
-   once per month instead of once per year. */
-const gridMonthHead = (d) => `<p class="year-big">${esc(monthLabel(d))}</p>`;
-/* Lead-padded, Monday-first cells for one calendar month, chunked into
-   real weeks (each row's own Monday) -- padded only to
-   the next multiple of 7, never a whole extra blank row. */
-function gridRows(key, n) {
-  const lead = dayOfWeek(`${key}-01`);
-  const cells = [];
-  for (let i = 0; i < lead; i++) cells.push(null);
-  for (let dd = 1; dd <= n; dd++) cells.push(`${key}-${String(dd).padStart(2, "0")}`);
-  while (cells.length % 7 !== 0) cells.push(null);
-  const start = addDays(`${key}-01`, -lead);
-  const rows = [];
-  for (let i = 0; i < cells.length; i += 7) rows.push({ monday: addDays(start, i), days: cells.slice(i, i + 7) });
-  return rows;
-}
-/* One emoji per day: pickDayIcon (cal-model.js) chooses it by a fixed priority. */
-function gridIcon(d) {
-  const evs = visibleOn(d);
-  const best = pickDayIcon(evs, d, { order: readPrefs(store.state.settings).gridOrder, me: frame.me });
-  if (!best) return { emo: "", dots: "" };
-  /* one dot per event beyond the one the emoji stands for, top right beside
-     the day number; gridDots (cal-model.js, tested) says how many fit. The
-     day sheet has the full list. */
-  const g = gridDots(evs.length - 1);
-  const dots = g.dots || g.plus
-    ? `<span class="ddots" aria-label="${evs.length} events">${"<i></i>".repeat(g.dots)}${g.plus ? "<b>+</b>" : ""}</span>` : "";
-  return { emo: `<span class="emo${frame.grey(best.e) ? " grey" : ""}">${esc(iconFor(best.a, best.e, frame.me))}</span>`, dots };
-}
-function gridSquare(d) {
-  if (!d) return `<div class="dsq pad"></div>`;
-  const st = periodState(d);
-  /* Every Grid square opens the single day, empty or not (Agenda's day
-     cards work the same way, agendaDay above): it is also the entry point
-     for the day-swipe browser in sheet.js, which needs to be able to land
-     on a day with nothing on it. */
-  const weekend = dayOfWeek(d) >= 5 ? " weekend" : "";
-  const holBorder = holidayOn(d) && !weekend ? " holiday-border" : "";
-  /* All the info sits on the top edge: the day number left, the event dots
-     right; the emoji alone takes the lower part. The open-to-do tick is the
-     day sheet's, not Grid's. */
-  const { emo, dots } = gridIcon(d);
-  const info = dots ? `<span class="dinfo">${dots}</span>` : "";
-  return `<div class="dsq ${st}${weekend}${holBorder}" role="button" tabindex="0" data-act="day" data-d="${d}"><span class="num">${Number(d.slice(8))}</span>${info}${emo}</div>`;
-}
-function gridMonth(y, mo) {
-  const key = ymOf(y, mo), n = daysIn(y, mo), now = key === frame.today.slice(0, 7);
-  const rows = gridRows(key, n).map((r) => {
-    return `<div class="grid7">${r.days.map((d) => gridSquare(d)).join("")}</div>`;
-  }).join("");
-  const wdhead = `<div class="wdhead">${DOW.map((w) => `<span>${w[0]}</span>`).join("")}</div>`;
-  return `<div class="gridCard${now ? " now" : ""}" data-month="${key}">${wdhead}<div class="monthgrid">${rows}</div></div>`;
-}
-function grid() {
-  const y0 = Number(frame.thisYear), m0 = Number(frame.today.slice(5, 7)) - 1;
-  let out = "";
-  for (let y = y0, mo = m0, n = 0; ymOf(y, mo) + "-01" <= frame.range.max && n < S.future.grid; n++) {
-    out += gridMonthHead(ymOf(y, mo) + "-01") + gridMonth(y, mo);
-    if (++mo === 12) { mo = 0; y++; }
-  }
-  return out;
-}
-function yearlyCap() {
-  const [y, m] = frame.range.max.split("-").map(Number), [y0, m0] = frame.today.split("-").map(Number);
-  return (y - y0) * 12 + (m - m0) + 1;
-}
-const weeksCap = () => Math.round((Date.parse(frame.range.max) - Date.parse(frame.thisMonday)) / 6048e5) + 1;
-
-/* Search looks through every event loaded -- any detail level, any view,
-   cancelled ones included (struck through) -- as its field promises. */
-function searchResults() {
-  if (!S.query.trim()) return '<p class="hint">Type a name, a place or a guest.</p>';
-  const hits = searchEvents(ctx.data.events(), S.query);
-  return `<p class="hint">${hits.length} result${hits.length === 1 ? "" : "s"}</p>${hits.length ? `<div class="card">${rows(hits, true, true)}</div>` : ""}`;
+  return out.join("");
 }
 
-/* The years a draw touches: they load on demand, once each. Asked after the
+/* The years the range touches load on demand, once each. Asked after the
    draw, never during it: ensureYear notifies (and so redraws) before its
-   first await, which from here would start a second draw inside this one. */
+   first await, which from here would start a second draw inside this one.
+   Offline, the cache is what shows and nothing is asked for. */
 const asked = new Set();
 function ensureYears() {
-  const want = new Set([frame.thisYear, String(Number(frame.thisYear) + 1)]);
-  if (S.view === "grid") for (let i = 0; i < S.future.grid; i += 12) want.add(String(Number(frame.thisYear) + 1 + i / 12));
-  else want.add(addDays(frame.thisMonday, 7 * S.future[S.view]).slice(0, 4));
-  for (const y of want) if (!asked.has(y) && y <= frame.range.max.slice(0, 4)) {
-    asked.add(y);
-    Promise.resolve().then(() => ctx.data.ensureYear(y))
+  if (navigator.onLine === false) return;
+  for (let y = Number(frame.range.min.slice(0, 4)); y <= Number(frame.range.max.slice(0, 4)); y++) {
+    const key = String(y);
+    if (asked.has(key)) continue;
+    asked.add(key);
+    Promise.resolve().then(() => ctx.data.ensureYear(key))
       .catch(() => { /* offline or no token: the cache is shown; Settings says why */ });
   }
 }
 
-/* ---- the tab: the control row (it scrolls with the page), then the view,
-   from today on. The swipe animation moves only .content, never the
-   controls. ---- */
-/* F34: the swipe animation now applies only to .content (the list), not
-   the whole .page -- the controls stay put; only the view toggle's own
-   .seg-thumb (its own transform/animation, untouched) visibly slides to its
-   new position. */
+/* ---- the tab ---- */
 export function calendarHtml() {
+  S.fresh = !document.querySelector("#view .cal");
   frame = buildFrame();
   ensureYears();
-  if (S.searchOpen) return `<div class="page">${controls()}<div id="sres">${searchResults()}</div></div>`;
-  const v = S.view === "grid" ? grid() : weeks();
-  return `<div class="page">${controls()}<div class="content ${S.slide}">${todayAnchor()}${v}</div></div>`;
+  return `<div class="cal"><div class="lc" data-live>${stripInner()}</div><div class="cal-agenda">${agendaHtml()}</div></div>`;
 }
 
-/* After the tab's HTML is in place: scroll, focus, clear one-shot state. */
+/* After the tab's HTML is in place: a tab that was not on screen opens on the
+   selected day; a redraw for new data keeps where the reader was. */
 export function afterCalendar(mn, before) {
-  if (S.view === "agenda" && !S.searchOpen) equalizeAgendaHeights(mn);
-  if (S.scrollTo) { const t = mn.querySelector(S.scrollTo); if (t) t.scrollIntoView({ block: "start" }); }
-  else if (before.first) { const t = mn.querySelector("#today"); if (t) t.scrollIntoView({ block: "start" }); }
-  else mn.scrollTop = before.top;
-  const q = mn.querySelector("#q");
-  if (q) {
-    /* Typing redraws the results only, never the field: a rebuilt field
-       loses the cursor (it jumped to the end) and breaks a phone's
-       predictive and dictated input mid-word. A full redraw (new data)
-       puts the cursor back where it was. */
-    const at = S.qCaret == null ? q.value.length : Math.min(S.qCaret, q.value.length);
-    q.focus(); q.setSelectionRange(at, at);
-    q.addEventListener("input", () => {
-      S.query = q.value; S.qCaret = q.selectionStart;
-      const r = mn.querySelector("#sres");
-      if (r) r.innerHTML = searchResults();
-    });
+  if (S.fresh) {
+    S.touched = false;
+    goTo(S.sel, false);
+    /* the fonts change row heights a little once they arrive */
+    if (document.fonts && document.fonts.ready) document.fonts.ready.then(() => { if (!S.touched && ctx.isCalendar()) goTo(S.sel, false); });
+  } else {
+    mn.scrollTop = before.top;
+    markJump(400); // the redraw's scroll event may land after render()'s own mark
   }
-  S.slide = ""; S.fromView = null; S.scrollTo = null;
 }
 
-/* Only a real scroll event calls this, never a draw. */
-function loadMore(mn) {
+/* ---- scrolling ---- */
+const showBar = () => { const b = document.getElementById("topBar"); if (b) b.classList.remove("is-hidden"); };
+
+/* The scroller's coordinate of the strip's lower edge: the top bar, plus the
+   strip when it sits above the agenda (not in the side pane). `final` asks for
+   the geometry once an opening or closing strip has finished moving, with the
+   bar shown, which is where a programmatic scroll ends up. */
+function edgeY(final) {
+  const bar = document.getElementById("topBar"), t = stripEl();
+  const shown = final || (bar && !bar.classList.contains("is-hidden"));
+  const barH = shown && bar ? bar.offsetHeight : 0;
+  if (expanded() || !t) return barH;
+  const inner = t.firstElementChild;
+  return barH + (final && inner ? inner.offsetHeight : t.offsetHeight);
+}
+
+/* the row's top in the scroller's own coordinates */
+function rowTop(row) {
+  const mn = view();
+  return row.getBoundingClientRect().top - mn.getBoundingClientRect().top + mn.scrollTop;
+}
+
+/* Scroll so the day sits GAP below the strip. Always marked as a jump, so the
+   top bar neither hides for it nor stays hidden after it. `smooth` glides
+   (unless the phone asks for reduced motion). */
+function goTo(d, smooth) {
+  const mn = view(), row = mn && mn.querySelector(`[data-row="${d}"]`);
+  if (!row) return;
+  const glide = smooth && motionFactor() > 0;
+  /* a strip still moving to its new height has pushed the row by the
+     difference; take it back off */
+  const t = stripEl(), inner = t && t.firstElementChild;
+  const moving = !expanded() && t && inner ? t.offsetHeight - inner.offsetHeight : 0;
+  const top = Math.max(0, rowTop(row) - moving - edgeY(true) - GAP);
+  const ms = glide ? Math.min(600, 250 + Math.abs(top - mn.scrollTop) / 20) : 0;
+  /* marked after the measuring: a big layout can take longer than the mark */
+  markJump(ms + 400);
+  showBar();
+  glideTo(mn, top, ms);
+}
+
+/* The agenda glides to a day: emphasized easing, 250 to 600ms by distance. Our
+   own loop rather than the browser's smooth scroll, so the duration is known
+   (the jump mark covers it) and a hidden page still lands: a timer snaps to the
+   end. Any touch, wheel or press on the list stops it. ms 0 is a jump. */
+let glideId = 0, glideEnd = 0;
+function stopGlide() { cancelAnimationFrame(glideId); clearTimeout(glideEnd); glideId = glideEnd = 0; }
+const bezier = (x1, y1, x2, y2) => (x) => {
+  const at = (a, b, c, t) => ((1 - t) ** 3) * 0 + 3 * ((1 - t) ** 2) * t * a + 3 * (1 - t) * t * t * b + t ** 3 * c;
+  let t = x;
+  for (let i = 0; i < 8; i++) {
+    const err = at(x1, x2, 1, t) - x, d = (at(x1, x2, 1, t + 1e-4) - at(x1, x2, 1, t - 1e-4)) / 2e-4;
+    if (!d) break;
+    t = Math.min(1, Math.max(0, t - err / d));
+  }
+  return at(y1, y2, 1, t);
+};
+const emphasized = bezier(0.2, 0, 0, 1);
+function glideTo(mn, top, ms) {
+  stopGlide();
+  if (!ms || !motionFactor()) { mn.scrollTop = top; return; }
+  const from = mn.scrollTop, t0 = performance.now();
+  const step = (now) => {
+    const p = Math.min(1, (now - t0) / ms);
+    mn.scrollTop = from + (top - from) * emphasized(p);
+    glideId = p < 1 ? requestAnimationFrame(step) : 0;
+  };
+  glideId = requestAnimationFrame(step);
+  glideEnd = setTimeout(() => { stopGlide(); mn.scrollTop = top; }, ms + 100);
+}
+
+function markSel() {
+  const mn = view();
+  if (!mn) return;
+  mn.querySelectorAll(".ag.sel").forEach((r) => r.classList.remove("sel"));
+  const row = mn.querySelector(`[data-row="${S.sel}"]`);
+  if (row) row.classList.add("sel");
+}
+
+/* The reader scrolls the agenda: the highlight follows, the month stays as
+   it is (open or closed). A scroll the app caused is not the reader's. */
+function onScroll() {
+  if (!ctx.isCalendar() || !frame) return;
+  if (isJumping()) return;
+  S.touched = true;
+  if (S.tick) return;
+  S.tick = setTimeout(() => {
+    S.tick = 0;
+    const mn = view(), agenda = mn && mn.querySelector(".cal-agenda");
+    if (!agenda) return;
+    const base = agenda.getBoundingClientRect().top - mn.getBoundingClientRect().top + mn.scrollTop;
+    const rows = [...agenda.querySelectorAll("[data-row]")].map((r) => ({ day: r.dataset.row, top: base + r.offsetTop }));
+    /* a day the app scrolled to sits exactly GAP below the edge; allow 4px more */
+    const cur = firstFullyVisible(rows, mn.scrollTop + edgeY(false), GAP + 4);
+    if (cur && cur !== S.sel) {
+      S.sel = cur;
+      if (!S.open || expanded()) S.month = cur.slice(0, 7);
+      markSel();
+      redrawStrip();
+    }
+  }, 16);
+}
+
+/* ---- taps ---- */
+function pickDay(d) {
+  S.sel = clampDay(d, frame.range.min, frame.range.max);
+  S.month = S.sel.slice(0, 7);
+  if (!expanded()) S.open = false;
+  markSel();
+  redrawStrip();
+  goTo(S.sel, true);
+}
+
+/* Back to today: select it and glide there. */
+export function backToToday() {
   if (!frame) return;
-  const cap = S.view === "grid" ? yearlyCap() : weeksCap();
-  if (!shouldLoadMore(mn, { count: S.future[S.view], cap, pending: S.pending, searching: S.searchOpen })) return;
-  S.future[S.view] = nextCount(S.future[S.view], S.view === "grid" ? 6 : 8, cap);
-  S.pending = true;
-  setTimeout(() => { S.pending = false; ctx.render(); }, 0);
+  S.sel = clampDay(todayKey(), frame.range.min, frame.range.max);
+  S.month = S.sel.slice(0, 7);
+  markSel();
+  redrawStrip();
+  goTo(S.sel, true);
 }
 
-/* ---- older years on demand, for Search. kave-hub is asked for the year
-   before the oldest one loaded; an empty or missing year means there is
-   nothing older. ---- */
-let olderInFlight = null;
-function loadOlder() {
-  /* a tap while another load runs waits for it instead of being lost (M4) */
-  if (olderInFlight) return olderInFlight;
-  olderInFlight = loadOlderOnce().finally(() => { olderInFlight = null; });
-  return olderInFlight;
-}
-async function loadOlderOnce() {
-  if (S.exhausted) return false;
-  const y = String(Number(S.floor) - 1);
-  try {
-    await ctx.data.ensureYear(y);
-    if (ctx.data.events().some((e) => e.start.startsWith(y))) S.floor = y; else S.exhausted = true;
-    return !S.exhausted;
-  } catch {
-    /* offline or no token: a year already cached still shows; otherwise
-       try again on the next tap */
-    if (ctx.data.events().some((e) => e.start.startsWith(y))) { S.floor = y; return true; }
-    return false;
-  }
-}
-async function loadAllOlder() {
-  for (let i = 0; i < 15 && !S.exhausted; i++) if (!(await loadOlder())) break;
-  if (S.searchOpen) ctx.render();
-}
-/* ---- Archive: the popup Settings opens. The main view always
-   opens on today and never grows into the past; Archive shows only the past,
-   oldest at the top, from 1 January of this year, one more January per
-   "Load more". It keeps its own floor/exhausted (S.floor/S.exhausted track
-   how far back Search has fetched). All events, no detail filtering.
+/* The sheet never opens over the menu drawer or a page: while one is up the
+   whole shell is inert and nothing here reacts. */
+const layerUp = () => { const s = document.querySelector(".shell"); return !!(s && s.inert); };
 
-   It draws with the same gridMonth/weekBlocks the main view uses, against
-   a swapped-in frame, so both look identical. */
-function archiveFrame() {
-  const today = todayKey(), thisYear = today.slice(0, 4), me = store.state.settings.me;
-  const events = hideCancelled(ctx.data.events(), AR.view);
-  const idx = indexByDay(events);
-  return { me, today, thisYear, events, idx, grey: (e) => isTheirs(e, me), on: (d) => idx.get(d) || [],
-    thisMonday: mondayOf(today), range: { max: today } };
-}
-function archiveBody() {
-  const saved = frame;
-  frame = archiveFrame();
-  const html = AR.view === "grid"
-    ? pastMonths(frame.today, AR.floor, fullPastMonths(frame.today, AR.floor))
-      .map((ym) => gridMonthHead(ym + "-01") + gridMonth(Number(ym.slice(0, 4)), Number(ym.slice(5, 7)) - 1)).join("")
-    : weekBlocks(mondayOf(`${AR.floor}-01-01`), fullPastWeeks(frame.thisMonday, AR.floor));
-  frame = saved;
-  return html;
-}
-function archiveHtml() {
-  const body = archiveBody() || '<p class="hint">Nothing archived yet.</p>';
-  const more = AR.exhausted ? "" : `<button class="archive-more" data-act="archivemore"${AR.loading ? " disabled" : ""}>${AR.loading ? "Loading…" : "Load more"}</button>`;
-  return '<div class="shade" data-act="archiveclose"></div>'
-    + '<section class="sheet in archive" role="dialog" aria-modal="true" aria-labelledby="archtitle">'
-    + '<header class="sbar" data-act="archiveclose"><span class="grab" aria-hidden="true"></span>'
-    + '<div class="stitle-wrap"><h2 class="stitle" id="archtitle">Archive</h2></div></header>'
-    + `<div class="sstage"><div class="sbody archive-body">${more}${body}</div></div></section>`;
-}
-/* keep: "bottom" (first open: the newest past at the bottom), "anchor"
-   (older content added above: stay on what was in view), "place" (a redraw
-   for new data: stay exactly where the reader was) */
-function renderArchive(keep = "bottom") {
-  const root = document.getElementById("archiveRoot");
-  if (!root) return;
-  if (!AR.open) { root.innerHTML = ""; return; }
-  const old = root.querySelector(".archive-body");
-  const before = old ? { top: old.scrollTop, height: old.scrollHeight } : null;
-  root.innerHTML = archiveHtml();
-  const fresh = root.querySelector(".archive-body");
-  if (fresh && AR.view === "agenda") equalizeAgendaHeights(fresh);
-  if (fresh) fresh.scrollTop = !before || keep === "bottom" ? fresh.scrollHeight
-    : keep === "anchor" ? before.top + (fresh.scrollHeight - before.height) : before.top;
-}
-/* render() calls this after every draw: a sync landing while the Archive is
-   open shows in it. */
-export function refreshArchive() { if (AR.open) renderArchive("place"); }
-export function openArchive() {
-  if (!frame) return;
-  Object.assign(AR, { open: true, view: S.view, floor: frame.thisYear, exhausted: false, loading: false, hist: false });
-  try { history.pushState({ compassArchive: true }, ""); AR.hist = true; } catch { /* sandboxed host */ }
-  renderArchive();
-}
-/* Close by going back through the Archive's own history entry, so phone
-   Back and the close tap leave the same history; popstate does the close. */
-function closeArchive() {
-  if (AR.hist) { try { history.back(); return; } catch { /* fall through */ } }
-  AR.open = false; AR.hist = false; renderArchive();
-}
-async function loadMoreArchive() {
-  if (AR.loading || AR.exhausted) return;
-  AR.loading = true;
-  renderArchive("place");
-  const y = String(Number(AR.floor) - 1);
-  try {
-    await ctx.data.ensureYear(y);
-    if (ctx.data.events().some((e) => e.start.startsWith(y))) AR.floor = y; else AR.exhausted = true;
-  } catch {
-    if (ctx.data.events().some((e) => e.start.startsWith(y))) AR.floor = y;
-  } finally {
-    AR.loading = false;
-    renderArchive("anchor");
-  }
-}
-function archiveClick(e) {
-  const b = e.target.closest("[data-act]");
+function onClick(e) {
+  if (!ctx.isCalendar() || !frame || layerUp()) return;
+  const b = e.target.closest("#view [data-day], #view [data-act]");
   if (!b) return;
-  const a = b.dataset.act;
-  if (a === "archiveclose") closeArchive();
-  else if (a === "archivemore") loadMoreArchive();
-  /* archive: the Day popup lists every event, like the Archive itself */
-  else if (a === "day") openLevel({ kind: "day", d: b.dataset.d, archive: true });
-  else return;
+  if (b.dataset.day) pickDay(b.dataset.day);
+  else {
+    const a = b.dataset.act;
+    if (a === "toggle") { S.open = !S.open; S.month = S.sel.slice(0, 7); redrawStrip(); }
+    else if (a === "today") backToToday();
+    else if (a === "day") openLevel({ kind: "day", d: b.dataset.d });
+    else if (a === "event") { e.stopPropagation(); openLevel({ kind: "event", id: b.dataset.id }); }
+    else return;
+  }
   e.preventDefault();
 }
 
-function setView(v) {
-  if (v === S.view) return;
-  S.slide = VIEWS.indexOf(v) > VIEWS.indexOf(S.view) ? "slide-left" : "slide-right";
-  S.fromView = S.view; S.view = v;
-  ctx.render();
-}
-
-/* One day's events for the Day popup: every event on the day at this
-   detail level, cancelled included, whichever view it was opened from; from
-   the Archive, every event with no detail filtering (as the Archive). */
+/* One day's events for the Day popup: every event on the day at this detail
+   level, cancelled included; from the Archive, every event with no filtering. */
 export function dayEvents(d, archive) {
   if (archive) return eventsOn(ctx.data.events(), d);
   return frame ? eventsOn(frame.all, d) : [];
 }
 
-/* F3: the nav icon's badge. Independent of whatever view is drawn (the
-   badge shows even before the Calendar has been opened this session), so it
-   reads straight from the data instance rather than the last-built frame. */
+/* The nav icon's badge. Independent of whatever is drawn (the badge shows
+   even before the Calendar has been opened this session). */
 export function todaysCount() {
   if (!ctx || !store.state.settings.me) return 0;
   const detail = S.detail || readPrefs(store.state.settings).defaultDetail;
@@ -550,94 +377,85 @@ export function todaysCount() {
   return cmTodaysCount(eventsOn(ctx.data.events(), today), store.state.settings.me, detail, today);
 }
 
-function onClick(e) {
-  if (!ctx.isCalendar()) return;
-  const b = e.target.closest("[data-act]");
-  if (!b || !b.closest("#view")) {
-    return;
-  }
-  const a = b.dataset.act;
-  if (a === "view") setView(b.dataset.v);
-  else if (a === "today") backToToday();
-  else if (a === "addnew") ctx.add();
-  else if (a === "search") { S.searchOpen = true; S.qCaret = null; ctx.render(); loadAllOlder(); }
-  else if (a === "closesearch") { S.searchOpen = false; S.query = ""; ctx.render(); }
-  else if (a === "day") openLevel({ kind: "day", d: b.dataset.d });
-  else if (a === "event") { e.stopPropagation(); openLevel({ kind: "event", id: b.dataset.id }); }
-  else return;
-  e.preventDefault();
-}
-
-/* Back to today: the list opens on today, so this is a scroll to it. */
-export function backToToday() {
-  const t = document.getElementById("today");
-  markJump();
-  if (t) t.scrollIntoView({ block: "start", behavior: matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth" });
-}
-
 /* Things the sheet needs to draw its levels, from the same frame. */
 export const frameNow = () => frame;
 export const detailGrey = (e) => !!frame && frame.grey(e);
 
 /* Settings changed a default: the Calendar opens on it next time it draws. */
-export function resetCalendarDefaults() { S.view = null; S.detail = null; }
+export function resetCalendarDefaults() { S.open = null; S.detail = null; }
 
-export function closeMenus() {
-  if (AR.open) { closeArchive(); return true; }
-  if (S.searchOpen) { S.searchOpen = false; S.query = ""; ctx.render(); return true; }
-  return false;
+/* The open month is a state of the strip, not a layer: nothing to close. */
+export function closeMenus() { return false; }
+
+/* ---- gestures on the strip ---- */
+function stripGestures(mn) {
+  let g = null, swiped = false;
+  const body = () => mn.querySelector("[data-live] .lc-week, [data-live] .lc-grid");
+  const spring = () => {
+    const b = body();
+    if (!b || !b.style.transform) return;
+    const tr = b.style.transform;
+    b.style.transform = "";
+    play(b, [{ transform: tr }, { transform: "none" }], 250, EASE.decelerate);
+  };
+  mn.addEventListener("pointerdown", (e) => {
+    g = !layerUp() && ctx.isCalendar() && e.button <= 0 && e.target.closest("[data-live]") ? { x: e.clientX, y: e.clientY, id: e.pointerId } : null;
+  });
+  /* the week or month follows the finger sideways */
+  document.addEventListener("pointermove", (e) => {
+    if (!g || e.pointerId !== g.id) return;
+    const dx = e.clientX - g.x, dy = e.clientY - g.y, b = body();
+    if (b && Math.abs(dx) > Math.abs(dy) && Math.abs(dx) > 6) b.style.transform = `translateX(${dx * 0.6}px)`;
+  });
+  document.addEventListener("pointercancel", (e) => { if (g && e.pointerId === g.id) { g = null; spring(); } });
+  document.addEventListener("pointerup", (e) => {
+    if (!g || e.pointerId !== g.id) return;
+    const dx = e.clientX - g.x, dy = e.clientY - g.y;
+    g = null;
+    spring();
+    const act = stripGesture({ dx, dy });
+    if (!act || !frame) return;
+    /* a swipe ends on a day; that is not a tap (cleared after 60ms) */
+    swiped = true;
+    setTimeout(() => { swiped = false; }, 60);
+    const open = S.open || expanded(), s = act === "next" ? 1 : -1;
+    if (act === "next" || act === "prev") {
+      /* at either end of the range nothing moves: no empty month, no week
+         past the last day (the finger's own spring-back is all that shows) */
+      if (open) {
+        const m = clampMonth(addMonths(S.month, s), frame.range.min, frame.range.max);
+        if (m === S.month) return;
+        S.month = m;
+      } else {
+        const d = clampDay(addDays(S.sel, 7 * s), frame.range.min, frame.range.max);
+        if (d === S.sel) return;
+        S.sel = d;
+        S.month = d.slice(0, 7);
+        markSel();
+        goTo(S.sel, true);
+      }
+      S.fx = s;
+    } else if (!expanded()) {
+      S.open = act === "open";
+      S.month = S.sel.slice(0, 7);
+    } else return;
+    redrawStrip();
+  });
+  mn.addEventListener("click", (e) => { if (swiped) { swiped = false; e.stopPropagation(); e.preventDefault(); } }, true);
 }
 
 /* Registered once: the list node (#view) and the document persist. */
 export function initCalendar(c) {
   ctx = c;
-  const mn = document.getElementById("view");
-  mn.addEventListener("scroll", () => { if (ctx.isCalendar()) loadMore(mn); }, { passive: true });
+  const mn = view();
+  mn.addEventListener("scroll", onScroll, { passive: true });
+  for (const ev of ["wheel", "touchstart", "pointerdown"]) mn.addEventListener(ev, stopGlide, { passive: true });
   document.addEventListener("click", onClick);
-  const ar = document.getElementById("archiveRoot");
-  if (ar) ar.addEventListener("click", archiveClick);
-  /* The Archive's history entry: landing anywhere below it (phone Back,
-     browser Back, or closeArchive's own history.back) closes it. A sheet
-     level opened over the Archive sits above it, so Back closes that
-     first. */
-  window.addEventListener("popstate", () => {
-    if (!AR.open || !AR.hist) return;
-    const st = history.state;
-    if (st && (st.compassArchive || st.compassLevel)) return;
-    AR.open = false; AR.hist = false; renderArchive();
+  stripGestures(mn);
+  /* the window crossed a size class: the strip is a pane or a card now */
+  let size = document.documentElement.dataset.size;
+  window.addEventListener("resize", () => {
+    const now = document.documentElement.dataset.size;
+    if (now !== size) { size = now; if (ctx.isCalendar()) ctx.render(); }
   });
-
-  /* Gestures: swipe the list sideways to change view; pull down at the top
-     (or wheel up) to sync. */
-  /* Mouse and pen use pointer events. A finger uses touch events: when a
-     touch starts to scroll, the browser cancels the pointer and never sends
-     pointerup, so a pull would never register on a phone (final review I6). */
-  let g = null;
-  const start = (x, y) => { g = ctx.isCalendar() && !sheetOpen() ? { x, y, top: mn.scrollTop <= 0 } : null; };
-  const end = (x, y) => {
-    if (!g) return;
-    const act = gesture({ dx: x - g.x, dy: y - g.y, top: g.top, searching: S.searchOpen });
-    g = null;
-    if (act === "next" || act === "prev") {
-      const i = VIEWS.indexOf(S.view) + (act === "next" ? 1 : -1);
-      if (i >= 0 && i < VIEWS.length) { swallowClick(); setView(VIEWS[i]); }
-    } else if (act === "pull") {
-      ctx.sync();
-    }
-  };
-  mn.addEventListener("pointerdown", (e) => { if (e.pointerType !== "touch") start(e.clientX, e.clientY); });
-  document.addEventListener("pointerup", (e) => { if (e.pointerType !== "touch") end(e.clientX, e.clientY); });
-  mn.addEventListener("touchstart", (e) => { if (e.touches.length === 1) start(e.touches[0].clientX, e.touches[0].clientY); }, { passive: true });
-  mn.addEventListener("touchend", (e) => { const t = e.changedTouches[0]; if (t) end(t.clientX, t.clientY); }, { passive: true });
-  /* a wheel "pull" (desktop) obeys the same top rule */
-  mn.addEventListener("wheel", (e) => {
-    if (ctx.isCalendar() && mn.scrollTop <= 0 && e.deltaY < -30 && !S.searchOpen) ctx.sync();
-  }, { passive: true });
-}
-
-/* A swipe ends in a click on whatever was under the finger: eat that one. */
-function swallowClick() {
-  const eat = (e) => { e.stopPropagation(); e.preventDefault(); };
-  document.addEventListener("click", eat, { capture: true, once: true });
-  setTimeout(() => document.removeEventListener("click", eat, { capture: true }), 400);
 }

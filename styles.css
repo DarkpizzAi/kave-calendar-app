@@ -97,3 +97,95 @@ body.gated .app-header, body.gated .app-nav-bar, body.gated .app-rail, body.gate
    (calendar, Insights, day sheet), until Tasks 3 to 5 swap them for Material
    Symbols; the shell itself uses the font. */
 .shell svg { width: 18px; height: 18px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+
+/* ---------- Calendar: the week strip that opens into the month, over the agenda ----------
+   One scroller (#view). The strip is sticky inside it and sits under the top
+   bar; when the bar scrolls away the strip slides up with it. The agenda is
+   one row per day. Colour is tokens only: the selected day is the secondary
+   container, an event takes its category group's container. */
+#view.is-cal { overflow-anchor: none; padding-bottom: 112px; }
+.cal { position: relative; }
+.lc {
+  position: sticky; top: 0; z-index: 1; overflow: hidden;
+  margin: 0 -16px; border-radius: 0 0 24px 24px;
+  background: var(--md-sys-color-surface-container-low); color: var(--md-sys-color-on-surface);
+  touch-action: none; user-select: none; -webkit-user-select: none;
+  transition: top 250ms cubic-bezier(.2, 0, 0, 1), padding-top 250ms cubic-bezier(.2, 0, 0, 1);
+}
+.lc-in { padding: 0 16px 4px; }
+/* sticky offsets count from the scroller's content box, which starts below the
+   room kept for the bar: 0 sits right under the bar, minus the bar's height
+   sits at the very top, which is where it slides to when the bar scrolls away */
+.app-col:has(.app-header.is-hidden) .lc { top: calc(var(--header-h, 64px) * -1); padding-top: env(safe-area-inset-top, 0px); }
+[data-size="medium"] .lc { margin: 0 -24px; }
+[data-size="medium"] .lc-in { padding: 0 24px 4px; }
+
+.lc-head { display: flex; align-items: center; height: 48px; }
+.lc-head .sp { flex: 1; }
+.lc-title { display: flex; align-items: center; height: 40px; padding: 0 12px; border-radius: 20px; margin-left: -4px; }
+.lc-head > .lc-title:last-child { margin-left: 0; margin-right: -4px; }
+span.lc-title { padding-left: 8px; }
+.lc-title:hover, .lc-d:hover, .lc-handle:hover, .ag-d:hover { box-shadow: inset 0 0 0 100vmax color-mix(in srgb, currentColor 8%, transparent); }
+.lc-week, .lc-grid { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 4px; }
+.lc-wd { text-align: center; color: var(--md-sys-color-on-surface-variant); padding: 0 0 4px; }
+.lc-d { display: flex; flex-direction: column; align-items: center; gap: 4px; padding: 6px 0 10px; border-radius: 12px; min-width: 0; }
+.lc-d:disabled { cursor: default; pointer-events: none; }
+.lc-d:disabled .wd, .lc-d:disabled .dn { opacity: .35; }
+.lc-d.wc { gap: 6px; padding: 10px 0 12px; }
+.lc-d.mc { gap: 2px; padding: 4px 0 8px; min-height: 64px; }
+.lc-d .wd { height: 20px; display: grid; place-items: center; color: var(--md-sys-color-on-surface-variant); }
+.lc-d .dn { height: 32px; display: grid; place-items: center; font-variant-numeric: tabular-nums; }
+.lc-d .emos { height: 20px; font-size: 15px; display: flex; align-items: center; justify-content: center; white-space: nowrap; }
+.lc-d .emos.grey, .evc.grey .evc-em { filter: grayscale(1); opacity: .6; }
+.lc-d.out { opacity: .35; }
+.lc-d.past:not(.today):not(.sel) .emos { opacity: .8; }
+.lc-d.sel { background: var(--md-sys-color-secondary-container); color: var(--md-sys-color-on-secondary-container); }
+.lc-d.sel .wd, .lc-d.sel .dn { color: inherit; }
+.lc-d.today .wd, .lc-d.today .dn { color: var(--kave-today); font-weight: 700; }
+.lc-handle { display: flex; justify-content: center; align-items: center; width: 100%; height: 20px; border-radius: 10px; }
+.lc-handle span { width: 32px; height: 4px; border-radius: 2px; background: var(--md-sys-color-on-surface-variant); opacity: .4; }
+[data-size="expanded"] .lc-d.mc { min-height: 72px; }
+[data-size="expanded"] .lc-d .emos { font-size: 18px; height: 22px; }
+
+.cal-agenda { position: relative; padding-top: 16px; max-width: 720px; margin: 0 auto; width: 100%; }
+.mhead { padding: 16px 0 4px; margin: 0; }
+.ag { display: flex; align-items: flex-start; gap: 8px; padding: 8px; border-radius: 12px; min-width: 0; }
+.ag.empty { padding: 2px 8px; }
+.ag.past { opacity: .8; }
+.ag.sel { background: var(--md-sys-color-secondary-container); color: var(--md-sys-color-on-secondary-container); opacity: 1; }
+.ag-d { flex: none; width: 76px; height: 36px; display: flex; align-items: center; padding: 0 0 0 8px; border-radius: 12px; text-align: left; }
+.ag:not(.empty) .ag-d { height: 56px; }
+.ag-lab { white-space: nowrap; font-variant-numeric: tabular-nums; }
+.ag.today .ag-lab { color: var(--kave-today); font-weight: 700; }
+.ag-evs { flex: 1; display: flex; flex-direction: column; gap: 6px; min-width: 0; }
+.ag.empty .ag-evs { min-height: 36px; justify-content: center; }
+.ag-note { color: var(--md-sys-color-on-surface-variant); }
+.ag.sel .ag-note { color: inherit; }
+
+.evc {
+  --kc: var(--kave-data-other-container); --onkc: var(--kave-data-on-other-container);
+  display: flex; align-items: center; gap: 12px; width: 100%; min-width: 0; text-align: left;
+  padding: 10px 12px; border-radius: 12px; background: var(--kc); color: var(--onkc);
+}
+.evc.g-food { --kc: var(--kave-data-food-container); --onkc: var(--kave-data-on-food-container); }
+.evc.g-nights { --kc: var(--kave-data-nights-container); --onkc: var(--kave-data-on-nights-container); }
+.evc.g-culture { --kc: var(--kave-data-culture-container); --onkc: var(--kave-data-on-culture-container); }
+.evc.g-outdoors { --kc: var(--kave-data-outdoors-container); --onkc: var(--kave-data-on-outdoors-container); }
+.evc.g-travel { --kc: var(--kave-data-travel-container); --onkc: var(--kave-data-on-travel-container); }
+.evc.g-life { --kc: var(--kave-data-life-container); --onkc: var(--kave-data-on-life-container); }
+.evc.g-other { --kc: var(--kave-data-other-container); --onkc: var(--kave-data-on-other-container); }
+.evc:hover { box-shadow: inset 0 0 0 100vmax color-mix(in srgb, currentColor 8%, transparent); }
+.evc-em { font-size: 20px; flex: none; white-space: nowrap; }
+.evc-t { flex: 1; min-width: 0; display: flex; flex-direction: column; }
+.evc-t > * { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.evc-name { font-weight: 500; }
+.evc.cancelled .evc-name { text-decoration: line-through; }
+.evc.idea { outline: 1px dashed currentColor; outline-offset: -1px; }
+.evc-todo .m3-icon { font-size: 18px; }
+
+/* Expanded: the month stays open in a side pane beside the agenda */
+[data-size="expanded"] .cal { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 440px); gap: 24px; align-items: start; }
+[data-size="expanded"] .cal-agenda { order: 1; margin: 0; max-width: none; }
+[data-size="expanded"] .lc { order: 2; margin: 0; border-radius: 24px; top: 8px; }
+[data-size="expanded"] .lc-in { padding: 8px 12px 12px; }
+[data-size="expanded"] .app-col:has(.app-header.is-hidden) .lc { top: calc(var(--header-h, 64px) * -1 + 8px); padding-top: 0; }

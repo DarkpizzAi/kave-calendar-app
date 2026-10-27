@@ -129,12 +129,6 @@ test("cal: search ignores accents and case, across title, venue, city, guests", 
 
 /* ---- older years on demand (Isa, 2026-09-24: 2024 and 2025 reachable) ---- */
 import { pastMonths } from "../js/cal-model.js";
-import { loadRange } from "../js/views.js";
-
-test("cal: the range starts at the oldest year loaded", () => {
-  eq(loadRange("2026-09-24", "", "2024").min, "2024-01-01");
-  eq(loadRange("2026-09-24", "").min, "2026-01-01");
-});
 test("cal: Grid's past months run across years, oldest first", () => {
   eq(pastMonths("2026-03-10", "2025", 4), ["2025-11", "2025-12", "2026-01", "2026-02"]);
   eq(pastMonths("2026-03-10", "2026", 12), ["2026-01", "2026-02"]);
@@ -270,4 +264,97 @@ test("cal: gridDots fits the top edge: up to 3 dots, past that 2 and a plus", ()
   eq(gridDots(2), { dots: 2, plus: false });
   eq(gridDots(3), { dots: 3, plus: false }, "three fit");
   eq(gridDots(4), { dots: 2, plus: true }, "past three: two and a plus");
+});
+
+/* ---- Task 3: the Interactive calendar (week strip, month, agenda) ---- */
+import { agendaDays, stripWeek, monthCells, firstFullyVisible, clampDay, clampMonth, addMonths,
+  categoryGroup, stripGesture, rowMeta, GROUP_OF } from "../js/cal-model.js";
+import { addDays as addDays_ } from "../js/dates.js";
+import { CATEGORIES } from "../js/icons.js";
+
+test("strip week runs Monday to Sunday", () => {
+  eq(stripWeek("2026-10-29"), ["2026-10-26","2026-10-27","2026-10-28","2026-10-29","2026-10-30","2026-10-31","2026-11-01"]);
+  eq(stripWeek("2026-10-26")[0], "2026-10-26", "a Monday opens its own week");
+  eq(stripWeek("2026-11-01")[0], "2026-10-26", "a Sunday closes it");
+});
+test("month cells: October 2026 starts on Thursday the 1st, five rows", () => {
+  const c = monthCells("2026-10");
+  eq([c.length, c[0].day, c[0].inMonth, c[3].day, c[3].inMonth], [35, "2026-09-28", false, "2026-10-01", true]);
+});
+test("month cells: a month that needs six rows gets six", () => {
+  const c = monthCells("2026-08");
+  eq([c.length, c[0].day, c[41].day], [42, "2026-07-27", "2026-09-06"]);
+  eq(monthCells("2027-02").length, 35, "February 2027 would fit four rows, but a month is five at least");
+});
+test("agenda keeps the empty days", () => {
+  eq(agendaDays("2026-10-30", "2026-11-02").length, 4);
+  eq(agendaDays("2026-10-30", "2026-11-02"), ["2026-10-30", "2026-10-31", "2026-11-01", "2026-11-02"]);
+  eq(agendaDays("2026-11-02", "2026-10-30"), [], "a backwards range is empty");
+});
+test("highlight is the first row fully below the strip", () => {
+  eq(firstFullyVisible([{ day: "a", top: 0 }, { day: "b", top: 40 }, { day: "c", top: 90 }], 30, 16), "b");
+  eq(firstFullyVisible([{ day: "a", top: 0 }, { day: "b", top: 40 }], 100, 16), null, "nothing below the edge");
+  eq(firstFullyVisible([{ day: "a", top: 20 }, { day: "b", top: 60 }], 30, 16), "b", "a row half under the strip is skipped");
+});
+test("clamping", () => {
+  eq(clampDay("2028-11-01", "2025-10-26", "2028-10-26"), "2028-10-26");
+  eq(clampDay("2025-01-01", "2025-10-26", "2028-10-26"), "2025-10-26");
+  eq(clampDay("2026-10-26", "2025-10-26", "2028-10-26"), "2026-10-26");
+  eq(clampMonth("2028-11", "2025-10-26", "2028-10-26"), "2028-10", "no empty month past the end");
+  eq(clampMonth("2025-09", "2025-10-26", "2028-10-26"), "2025-10", "none before the start");
+  eq(addMonths("2026-12", 1), "2027-01");
+  eq(addMonths("2026-01", -1), "2025-12");
+});
+test("review focus 3: at the ends of the range, arrows and swipes stop", () => {
+  const min = "2025-10-26", max = "2028-10-26";
+  eq(clampDay(addDays_("2028-10-26", 7), min, max), "2028-10-26", "next week at the end");
+  eq(clampDay(addDays_("2025-10-26", -7), min, max), "2025-10-26", "previous week at the start");
+  eq(clampMonth(addMonths("2028-10", 1), min, max), "2028-10", "next month at the end");
+  eq(clampMonth(addMonths("2025-10", -1), min, max), "2025-10", "previous month at the start");
+});
+
+test("categories map to the seven colour groups (spec section 2)", () => {
+  const want = {
+    food: ["eating", "drinks"], nights: ["live-music", "clubbing", "birthday"], culture: ["cinema", "activity", "games"],
+    outdoors: ["park", "beach", "sport", "hike"], travel: ["transport", "accommodation", "business-trip"],
+    life: ["work", "visitor", "health"], other: ["none"],
+  };
+  for (const [g, types] of Object.entries(want)) for (const t of types) eq(categoryGroup(t), g, t);
+  eq(categoryGroup("something-new"), "other", "an unlisted category falls to Other");
+  eq(categoryGroup(undefined), "other");
+  eq(Object.keys(GROUP_OF).sort(), Object.values(want).flat().filter((t) => t !== "none").sort(), "every listed category is mapped, once");
+});
+test("categories: every catalogue category lands in a group", () => {
+  for (const c of CATEGORIES) ok(["food", "nights", "culture", "outdoors", "travel", "life", "other"].includes(categoryGroup(c.type)), c.type);
+});
+
+test("strip gestures: sideways moves, down opens, up closes, small movement is a tap", () => {
+  eq(stripGesture({ dx: -60, dy: 5 }), "next");
+  eq(stripGesture({ dx: 60, dy: -5 }), "prev");
+  eq(stripGesture({ dx: 3, dy: 55 }), "open");
+  eq(stripGesture({ dx: -3, dy: -55 }), "close");
+  eq(stripGesture({ dx: 20, dy: 15 }), null, "a tap that wobbled");
+  eq(stripGesture({ dx: 50, dy: 49 }), "prev", "the longer axis wins");
+});
+
+test("review focus 1: a day with three events has one strip emoji and three agenda cards", () => {
+  const d = "2026-10-29";
+  const evs = [ev("a", d, { activities: [act("eating")] }), ev("b", d, { activities: [act("transport")] }), ev("c", d, { activities: [act("cinema")] })];
+  eq(indexByDay(evs).get(d).length, 3, "the agenda lists all three");
+  const best = pickDayIcon(indexByDay(evs).get(d), d, { order: DAY_PRIORITY, me: "isa" });
+  eq(best.a.type, "transport", "the Grid emoji order's winner is the one emoji the strip shows");
+});
+test("review focus 2: no time reads All day, a week-long stay reads on each day, the strip keeps its emoji", () => {
+  const stay = ev("s", "2026-11-02", { end: "2026-11-08", activities: [act("accommodation")] });
+  const idx = indexByDay([stay]);
+  eq([...idx.keys()].length, 7, "the stay is on seven days");
+  eq(rowMeta(stay, "2026-11-02"), "Check in");
+  eq(rowMeta(stay, "2026-11-05"), "All day", "a middle night reads All day");
+  eq(rowMeta(stay, "2026-11-08"), "Check out");
+  const mid = pickDayIcon(idx.get("2026-11-05"), "2026-11-05", { order: DAY_PRIORITY, me: "isa" });
+  ok(mid && mid.a.type === "accommodation", "a middle night still has its emoji in the strip");
+  eq(rowMeta(ev("n", "2026-11-02"), "2026-11-02"), "All day", "no time");
+  eq(rowMeta(ev("t", "2026-11-02", { startTime: "20:30" }), "2026-11-02"), "20:30");
+  eq(rowMeta(ev("t", "2026-11-02", { startTime: "20:30", endTime: "22:00" }), "2026-11-02"), "20:30 to 22:00");
+  eq(rowMeta(ev("m", "2026-11-02", { end: "2026-11-04", startTime: "20:30" }), "2026-11-03"), "All day", "a span's later days are all-day");
 });

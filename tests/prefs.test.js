@@ -5,7 +5,7 @@ import { CATEGORIES } from "../js/icons.js";
 
 test("prefs: the defaults", () => {
   const p = readPrefs({});
-  eq([p.defaultView, p.defaultDetail, "showWeekdayHeader" in p], ["grid", "full", false]);
+  eq([p.defaultView, p.defaultDetail, "showWeekdayHeader" in p], ["week", "full", false]);
   eq(p.gridOrder, DAY_PRIORITY);
 });
 test("prefs: a stored hidden-categories list is ignored, so nothing can stay hidden", () => {
@@ -13,21 +13,24 @@ test("prefs: a stored hidden-categories list is ignored, so nothing can stay hid
   eq("hiddenCategories" in p, false);
 });
 test("prefs: the Calendar defaults summary", () => {
-  const p = readPrefs({ defaultView: "agenda", defaultDetail: "minimal" });
-  eq(defaultsSummary(p), "Agenda, Minimal");
+  const p = readPrefs({ defaultView: "month", defaultDetail: "minimal" });
+  eq(defaultsSummary(p), "Month, Minimal");
 });
 test("prefs: a saved Partial (retired 2026-10-11) reads as Full", () => {
   eq(readPrefs({ defaultDetail: "partial" }).defaultDetail, "full");
 });
 test("prefs: stored junk falls back to defaults", () => {
   const p = readPrefs({ defaultView: "daily", defaultDetail: 3 });
-  eq([p.defaultView, p.defaultDetail], ["grid", "full"]);
+  eq([p.defaultView, p.defaultDetail], ["week", "full"]);
 });
-test("prefs: old view names in a saved default migrate", () => {
-  eq(readPrefs({ defaultView: "yearly" }).defaultView, "grid", "yearly became grid");
-  eq(readPrefs({ defaultView: "glance" }).defaultView, "grid", "glance became grid");
-  eq(readPrefs({ defaultView: "monthly" }).defaultView, "agenda", "monthly became agenda");
-  eq(readPrefs({ defaultView: "weekly" }).defaultView, "grid", "weekly has no successor: the default");
+test("prefs: old view names in a saved default migrate (grid to month, agenda to week)", () => {
+  eq(readPrefs({ defaultView: "grid" }).defaultView, "month", "grid became month");
+  eq(readPrefs({ defaultView: "agenda" }).defaultView, "week", "agenda became week");
+  eq(readPrefs({ defaultView: "yearly" }).defaultView, "month", "yearly was grid, now month");
+  eq(readPrefs({ defaultView: "glance" }).defaultView, "month", "glance was grid, now month");
+  eq(readPrefs({ defaultView: "monthly" }).defaultView, "week", "monthly was agenda, now week");
+  eq(readPrefs({ defaultView: "weekly" }).defaultView, "week", "weekly has no successor: the default");
+  eq([readPrefs({ defaultView: "week" }).defaultView, readPrefs({ defaultView: "month" }).defaultView], ["week", "month"], "the new names are kept");
 });
 test("prefs: a stored Weekday letters value is ignored", () => {
   eq("showWeekdayHeader" in readPrefs({ showWeekdayHeader: false }), false);

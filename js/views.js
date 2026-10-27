@@ -1,12 +1,17 @@
-/* Compass: how far the views reach, as data. Pure and tested; drawing lives
-   in calendar.js. */
+/* Compass: how far the calendar reaches, as data. Pure and tested; drawing
+   lives in calendar.js. */
 "use strict";
 
-/* How far the views reach: back to 1 January of this year, or of the oldest
-   year loaded on demand (Search goes on into earlier years); forward to the
-   end of the year after next, or to the last event if that is later. */
-export function loadRange(today, lastEventDay, floorYear) {
-  const max = (Number(today.slice(0, 4)) + 2) + "-12-31";
-  const from = floorYear && floorYear < today.slice(0, 4) ? floorYear : today.slice(0, 4);
-  return { min: from + "-01-01", max: lastEventDay && lastEventDay > max ? lastEventDay : max };
+/* "YYYY-MM-DD" shifted by whole years; 29 February lands on the 28th where
+   the other year has no 29th. */
+function shiftYears(day, n) {
+  const y = Number(day.slice(0, 4)) + n, md = day.slice(5);
+  if (md === "02-29") return `${y}-${new Date(Date.UTC(y, 1, 29)).getUTCMonth() === 1 ? "02-29" : "02-28"}`;
+  return `${y}-${md}`;
+}
+
+/* One year back to two years ahead of today, exactly: the strip, the month
+   and the agenda stop there and no later. */
+export function loadRange(today) {
+  return { min: shiftYears(today, -1), max: shiftYears(today, 2) };
 }

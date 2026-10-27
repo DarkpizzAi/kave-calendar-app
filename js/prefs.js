@@ -8,7 +8,8 @@
 
 import { DAY_PRIORITY } from "./cal-model.js";
 
-export const VIEW_NAMES = [["grid", "Grid"], ["agenda", "Agenda"]];
+/* Which state the calendar strip opens in: one week, or the whole month. */
+export const VIEW_NAMES = [["week", "Week"], ["month", "Month"]];
 /* Partial (the other person greyed) was retired on 2026-10-11, once grey
    became every level's rule: a saved "partial" reads as Full, which now
    looks exactly as Partial did. */
@@ -16,18 +17,18 @@ export const DETAIL_NAMES = [["full", "Full"], ["minimal", "Minimal"]];
 const oneOf = (list, v, fallback) => (list.some(([k]) => k === v) ? v : fallback);
 const labelOf = (list, v) => list.find(([k]) => k === v)[1];
 
-/* Old view names that may still sit in a saved defaultView: yearly and
-   glance became grid, monthly became agenda; weekly has nothing to map to,
-   so it falls back to the default. "grid" is not here: it is today's Grid,
-   a valid choice, never an old name to drop. */
-const OLD_VIEW_NAME = { weekly: null, monthly: "agenda", yearly: "grid", glance: "grid" };
+/* Old view names that may still sit in a saved defaultView. Grid became the
+   open month and Agenda the week strip over the agenda; yearly and glance
+   were Grid, monthly was Agenda; weekly has nothing to map to, so it falls
+   back to the default. */
+const OLD_VIEW_NAME = { grid: "month", agenda: "week", weekly: null, monthly: "week", yearly: "month", glance: "month" };
 const migrateViewKey = (v) => (Object.prototype.hasOwnProperty.call(OLD_VIEW_NAME, v) ? OLD_VIEW_NAME[v] : v);
 
 /* Settings as stored -> clean preferences. Anything unexpected falls back. */
 export function readPrefs(settings) {
   const s = settings || {};
   return {
-    defaultView: oneOf(VIEW_NAMES, migrateViewKey(s.defaultView), "grid"),
+    defaultView: oneOf(VIEW_NAMES, migrateViewKey(s.defaultView), "week"),
     defaultDetail: oneOf(DETAIL_NAMES, s.defaultDetail, "full"),
     gridOrder: readGridOrder(s.gridOrder),
   };
