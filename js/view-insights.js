@@ -140,7 +140,7 @@ function numbersHtml(counts, year) {
   const body = counts.length
     ? `<div class="ins-shapes">${counts.map((c, i) =>
       `<button type="button" class="ins-shape" data-ins="cat" data-key="${esc(c.key)}" aria-label="${esc(`${c.label}, ${c.count}. Open its history`)}">`
-      + `<span class="ins-blob m3-emoji ${i % 2 ? "is-scallop" : i % 3 ? "is-soft" : "is-round"}" style="${kaveKey(categoryGroup((TILE[c.key] || { types: [] }).types[0]))}" aria-hidden="true">${esc(c.emoji)}</span>`
+      + `<span class="ins-blob m3-emoji ${i % 2 ? "is-scallop" : i % 3 ? "is-soft" : "is-round"}" style="${hue(c.key)}" aria-hidden="true">${esc(c.emoji)}</span>`
       + `<span class="m3-headline-s m3-num">${c.count}</span><span class="m3-body-s m3-variant ins-shape__l">${esc(c.label.toLowerCase())}</span></button>`).join("")}</div>`
     : '<p class="m3-body-m m3-variant">Nothing counted yet this year.</p>';
   return `<section class="ins-card" aria-labelledby="insNumbers">${cardHead("insNumbers", `${year} in numbers`, history)}${body}</section>`;
@@ -160,7 +160,7 @@ function stubInner(w) {
     + `<span class="m3-title-s tk-title">${esc(w.title)}</span><span class="tk-perf" aria-hidden="true"></span>`
     + `<span class="m3-label-m tk-date">${esc(fmt(w.date))}</span>`;
 }
-function stubLink(w) {
+export function stubLink(w) {
   const u = wallTap(w);
   const cls = "ticket";
   return u

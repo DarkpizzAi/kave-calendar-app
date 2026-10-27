@@ -1,5 +1,7 @@
 import { test, eq, ok } from "./run.js";
 import { fakeGh } from "./helpers.js";
+import { stubLink } from "../js/view-insights.js";
+import { ticketWall } from "../js/insights-data.js";
 import { answerKey, answerPath, mergeOutbox, queueLines, answeredKeys, cleanupCounts, pruneSent, pruneIfFresh, compactStamp, flushOutbox, ANSWERS_DIR } from "../js/cleanup.js";
 
 const ans = (card, line, value = "isa", at = "2026-10-25T10:00:00Z") => ({ card, line, action: "accepted", value, by: "isa", at });
@@ -119,4 +121,19 @@ test("pruneIfFresh: a failed queue read keeps sent as it was", () => {
 test("a malformed queue never throws", () => {
   eq(queueLines({ cards: "oops" }), []);
   eq(queueLines({ cards: {} }), []);
+});
+
+test("the rendered wall ticket is a Drive link in a new tab, with no viewer hook", () => {
+  const url = "https://drive.google.com/file/d/abc/view";
+  const e = { id: "e1", title: "Old gig", start: "2026-03-01", end: "2026-03-01", status: "planned", activities: [{ type: "live-music", icon: "x" }], city: "barcelona", venue: "", owner: "shared", links: [{ label: "Ticket", url }] };
+  const w = ticketWall([e], "2026-10-25", "isa")[0];
+  const box = document.createElement("div");
+  box.innerHTML = stubLink(w);
+  const a = box.firstElementChild;
+  eq(a.tagName, "A");
+  eq(a.getAttribute("href"), url);
+  eq(a.getAttribute("target"), "_blank");
+  ok(a.getAttribute("rel").includes("noopener"));
+  ok(![...a.attributes].some((t) => t.name.startsWith("data-")), "no data- hook on the ticket");
+  ok(!a.querySelector("[data-ins],[data-sact],[data-ia]"));
 });
