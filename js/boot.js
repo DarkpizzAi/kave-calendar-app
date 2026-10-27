@@ -7,6 +7,7 @@
    prevent a flash of the wrong palette. */
 "use strict";
 
+import { sizeClass } from "../m3/kave-m3.js";
 import { initTheme } from "./theme.js";
 import { render, isCalendar, dataSync, actions, currentView } from "./render.js";
 import { wire, showBanner } from "./wire.js";
@@ -21,6 +22,10 @@ import { keepTickets } from "./tickets.js";
 import { github } from "../github.js";
 
 initTheme();
+/* the kit's layout rules key off <html data-size>, so it follows the window */
+const stampSize = () => { document.documentElement.dataset.size = sizeClass(innerWidth); };
+stampSize();
+addEventListener("resize", stampSize);
 wire();
 
 const data = await appData();

@@ -72,19 +72,23 @@ reload always shows your latest edit. The service worker does not run on
 
 ## The look
 
-`tokens.css` is **generated**. It is a verbatim copy of
-`brand/data/household-tokens.css` in kave-hub, placed by that repo's
-`brand/tools/sync-household-tokens.py`.
-
-**Never hand-edit `tokens.css`.** Edit the hub and re-sync. To check this copy
-has not drifted, from the kave-hub repo:
+Kave Compass is on Material 3. The kit lives in `m3/` (`kave-m3-tokens.css`,
+`kave-m3.css`, `kave-m3.js`) and is **generated**: copied from `brand/` in
+kave-hub by that repo's `brand/tools/sync-household-tokens.py`, together with
+the icons at the repo root. **Never hand-edit `m3/`.** Edit the hub and
+re-sync. To check this copy has not drifted, from the kave-hub repo:
 
 ```bash
 python brand/tools/sync-household-tokens.py --check
 ```
 
-`styles.css` uses those tokens and defines none of its own. Density tier here
-is `phone`.
+The palette is one of five seeds (`blue`, `teal`, `yellow`, `periwinkle`,
+`terracotta`), set as `<html data-seed>` by `#theme-preload` and
+`js/theme.js`; a stored `cobalt`, `amber` or `chartreuse` maps to `blue`,
+`yellow`, `blue`. `js/boot.js` sets `<html data-size>` (compact, medium or
+expanded) from the kit's `sizeClass`. `styles.css` uses the kit's tokens and
+defines no colour of its own. `tokens.css` is still synced but no longer
+linked.
 
 ## Icons
 

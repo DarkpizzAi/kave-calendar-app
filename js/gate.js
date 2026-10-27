@@ -38,7 +38,7 @@ export function gateHtml(step) {
       + '<button type="button" class="setup-choice" data-gate-me="isa">Isa</button>'
       + '<button type="button" class="setup-choice" data-gate-me="hugo">Hugo</button></div></div>';
   }
-  /* the swatch colours come from tokens.css (paletteAccents), not a copy */
+  /* the swatch colours come from the kit tokens (paletteAccents), not a copy */
   const accents = paletteAccents();
   return `<div class="gate">${mark}<div class="setup-row">${Object.entries(PALETTES).map(([id, name]) =>
     `<button type="button" class="setup-swatch" data-gate-palette="${escapeHtml(id)}" aria-label="${escapeHtml(name)}" style="background:${escapeHtml(accents[id] || "")}"></button>`).join("")}</div></div>`;

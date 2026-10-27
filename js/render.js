@@ -11,7 +11,7 @@
 
 import { store } from "./store.js";
 import { escapeHtml, copyText } from "./util.js";
-import { PALETTES, applyPalette, themeBootRan, paletteAccents, paletteSofts } from "./theme.js";
+import { PALETTES, toSeed, applyPalette, themeBootRan, paletteAccents, paletteSofts } from "./theme.js";
 import { status as syncStatus, checkToken } from "./sync.js";
 import { ICON } from "./chrome-icons.js";
 import { calendarHtml, afterCalendar, backToToday, todaysCount, refreshArchive } from "./calendar.js";
@@ -80,10 +80,10 @@ function renderSettings() {
   const s = store.state.settings;
   const prefs = readPrefs(s);
   const me = s.me;
-  /* the hex comes from tokens.css via paletteAccents(): a value this app
+  /* the hex comes from the kit tokens via paletteAccents(): a value this app
      read, still escaped before it reaches a style attribute */
   const accents = paletteAccents(), softs = paletteSofts();
-  const current = PALETTES[s.palette] ? s.palette : "cobalt";
+  const current = toSeed(s.palette);
   const theme = `<div class="choices">${Object.entries(PALETTES).map(([id, n]) =>
     `<button class="${current === id ? "on" : ""}" aria-pressed="${current === id}" data-palette="${escapeHtml(id)}">`
     + `<span class="pal" style="background:conic-gradient(${escapeHtml(accents[id] || "")} 0 180deg, ${escapeHtml(softs[id] || "")} 180deg 360deg)"></span>${escapeHtml(n)}</button>`).join("")}</div>`;

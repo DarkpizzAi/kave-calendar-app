@@ -1,7 +1,7 @@
 /* Compass: palette and colour-scheme handling.
 
-   The token values are NOT here. They live in tokens.css, generated from
-   brand/data/household-tokens.css in kave-hub. This module only decides
+   The token values are NOT here. They live in m3/kave-m3-tokens.css, generated from
+   brand/data/kave-m3-tokens.css in kave-hub. This module only decides
    which palette is selected and keeps the browser's colour-scheme in step.
 
    Light or dark follows the OS and nothing else. There is deliberately no
@@ -11,15 +11,25 @@
 
 import { store } from "./store.js";
 
-/* palette id -> display name. Must stay in step with the [data-palette]
-   blocks in tokens.css; adding one here without adding it there silently
-   falls back to Cobalt. #theme-preload in index.html repeats the non-Cobalt
-   ids (it runs before modules load); change both, then recompute its hash. */
+/* seed id -> display name. Must stay in step with the [data-seed] blocks in
+   m3/kave-m3-tokens.css (blue is the bare :root). #theme-preload in index.html
+   repeats the id list and the legacy map (it runs before modules load);
+   change both, then recompute its hash. */
 export const PALETTES = {
-  cobalt: "Cobalt",
-  amber: "Amber",
-  chartreuse: "Chartreuse",
+  blue: "Blue",
+  teal: "Teal",
+  yellow: "Yellow",
+  periwinkle: "Periwinkle",
+  terracotta: "Terracotta",
 };
+/* A palette stored before Material 3 maps across: cobalt and chartreuse become
+   blue, amber becomes yellow. Anything unknown is blue. */
+const LEGACY = { cobalt: "blue", amber: "yellow", chartreuse: "blue" };
+const has = (o, k) => Object.prototype.hasOwnProperty.call(o, k);
+export function toSeed(id) {
+  if (has(PALETTES, id)) return id;
+  return has(LEGACY, id) ? LEGACY[id] : "blue";
+}
 
 export function darkNow() {
   return matchMedia("(prefers-color-scheme: dark)").matches;
@@ -27,17 +37,14 @@ export function darkNow() {
 
 /* Tell the browser which way the page leans. This is what darkens the Android
    gesture bar; the status bar at the top is the phone's own and takes no
-   instruction from us. tokens.css also declares color-scheme, but an
+   instruction from us. the kit tokens also declare color-scheme, but an
    installed app can outlive a token change, so the app states it too. */
 export function syncColorScheme() {
   document.documentElement.style.colorScheme = darkNow() ? "dark" : "light";
 }
 
 export function applyPalette(palette) {
-  const root = document.documentElement;
-  /* a palette retired from the hub (lime, tangerine, volt) reads as Cobalt */
-  if (PALETTES[palette] && palette !== "cobalt") root.setAttribute("data-palette", palette);
-  else root.removeAttribute("data-palette");
+  document.documentElement.setAttribute("data-seed", toSeed(palette));
   syncColorScheme();
 }
 
@@ -48,9 +55,9 @@ export function initTheme() {
   matchMedia("(prefers-color-scheme: dark)").addEventListener("change", syncColorScheme);
 }
 
-/* Each palette's accent, for the swatches in Settings.
+/* Each seed's accent (--md-sys-color-primary), for the swatches in Settings.
 
-   Read from tokens.css rather than hardcoded here: a second copy of the hex
+   Read from the kit's tokens rather than hardcoded here: a second copy of the hex
    values is a second thing to keep in step, and it would drift the first time
    a palette is retuned in the hub. Same trick Spoon uses - set the attribute,
    read the resolved value, put it back - and it has to restore exactly what
@@ -58,23 +65,23 @@ export function initTheme() {
    recalculation per palette and the answer cannot change at runtime. */
 let accentCache = null;
 let softs = {};
-/* Each palette's --accent-soft, read in the same pass as its accent. */
+/* Each seed's primary container, read in the same pass as its accent. */
 export function paletteSofts() { paletteAccents(); return softs; }
 
 export function paletteAccents() {
   if (accentCache) return accentCache;
   const root = document.documentElement;
-  const prev = root.getAttribute("data-palette");
+  const prev = root.getAttribute("data-seed");
   const out = {};
   softs = {};
   for (const id of Object.keys(PALETTES)) {
-    if (id === "cobalt") root.removeAttribute("data-palette");
-    else root.setAttribute("data-palette", id);
-    out[id] = getComputedStyle(root).getPropertyValue("--accent").trim();
-    softs[id] = getComputedStyle(root).getPropertyValue("--accent-soft").trim();
+    root.setAttribute("data-seed", id);
+    const cs = getComputedStyle(root);
+    out[id] = cs.getPropertyValue("--md-sys-color-primary").trim();
+    softs[id] = cs.getPropertyValue("--md-sys-color-primary-container").trim();
   }
-  if (prev === null) root.removeAttribute("data-palette");
-  else root.setAttribute("data-palette", prev);
+  if (prev === null) root.removeAttribute("data-seed");
+  else root.setAttribute("data-seed", prev);
   accentCache = out;
   return out;
 }
