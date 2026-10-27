@@ -3,15 +3,18 @@
 Kave Compass ("Compass" in the code, the cache names and the repo) is the household planner: events, what they cost, trips, and the loose ends
 attached to them. Replaces Google Calendar and the yearly planning sheet.
 
-**`main` is sub-project A** (the live version is `VERSION` in
-`service-worker.js`): the data model and sync engine, the Calendar tab
-(Grid and Agenda, one sheet with levels), the event page and form,
-Settings, and three years imported from the yearly planning sheet.
-Insights, Trips and Radar are still dashed stubs, built in sub-projects B,
-C and D. A's design is one document in the private kave-hub repo,
-`docs/superpowers/specs/2026-09-24-compass-a-core-design.md`; what is next
-is `calendar/data/roadmap.md` there, and the product brainstorm for the
-later sub-projects is `calendar/data/compass-planning-app-brainstorm.md`.
+**This branch is v2.0, Kave Compass on Material 3** (the version is `VERSION`
+in `service-worker.js`). Two tabs: Calendar (a week or month strip over the
+agenda, with one sheet for a day, an event or a ticket, and the event form)
+and Insights (the next trip, the year in numbers, the ticket wall and the
+clean-up cards). Settings, the Roadmap and the Archive are pages reached from
+the menu drawer, and a magnifier in the top bar searches the whole app. Trips
+and Radar are not built: they are lines on the Roadmap page. The data model,
+the sync engine and the three imported years are sub-project A, unchanged.
+The design is a set of documents in the private kave-hub repo, starting with
+`docs/superpowers/specs/2026-09-24-compass-a-core-design.md`; what is next is
+`calendar/data/roadmap.md` there, and the product brainstorm for the later
+sub-projects is `calendar/data/compass-planning-app-brainstorm.md`.
 
 **This repo is the static app shell only.** No data, no secrets. It is public
 so GitHub Pages can serve it for free.
@@ -180,19 +183,22 @@ Native ES modules, no bundler, no build step.
 | `js/model.js`, `js/dates.js`, `js/money.js` | the event record, dates, costs |
 | `js/data.js` | the app's data instance over sync + local |
 | `js/cal-model.js` | pure Calendar logic (weeks, filters, trip/away rules) |
-| `js/views.js`, `js/holidays.js`, `js/filter.js` | ISO weeks, long weekends, detail levels |
+| `js/views.js` | `loadRange`: how far the calendar reaches (a year back to two years ahead) |
+| `js/holidays.js`, `js/filter.js` | Barcelona bank holidays (shipped with the app); the Full and Minimal detail levels |
 | `js/icons.js`, `js/chrome-icons.js` | the category catalogue, app-chrome SVGs |
 | `js/calendar.js` | the Calendar tab: drawing and its handlers |
-| `js/sheet.js` | levels, history, the sheet's depth animation |
-| `js/view-event.js`, `js/event-form.js` | the event page and form |
-| `js/prefs.js` | Calendar defaults and free-time blocking |
+| `js/sheet.js` | the sheet system: the bottom or side sheet and its levels, the form container, and the layers over them (menus, dialogs, pickers), one history entry each |
+| `js/view-event.js`, `js/event-form.js` | the event page and form; the pure form logic (drafts, cost rules, the save-time cost merge) |
+| `js/ticket-view.js`, `js/tickets.js` | the ticket viewer level; tickets kept on the phone in Cache Storage (`compass-tickets`) |
+| `js/insights-data.js`, `js/view-insights.js`, `js/cleanup.js` | the Insights tab: pure data, drawing and its sheets, and the clean-up queue and answers outbox |
+| `js/prefs.js` | Calendar defaults (view, detail level) and the Grid emoji order |
 | `js/updates.js` | check-for-updates and the sticky "A new version is ready" snackbar |
 | `js/search.js` | the whole-app search page: events, tickets, categories |
 | `js/pickers.js` | the Material date picker and the 24-hour time dial the event form opens |
 | `js/view-roadmap.js` | the Roadmap page: what each part is for, and what is coming |
 | `m3/kave-m3.js` | the Material 3 kit's behaviour (motion, layers, snackbars, size class); generated |
 | `js/gate.js` | the first-run gate: token, who, theme (the hub site's screen) |
-| `js/render.js` | the frame and Settings |
+| `js/render.js` | the frame (navigation, top bar, drawer, pages) and Settings |
 | `js/wire.js` | one-time listeners, sync snackbars, pull to refresh, the banner |
 | `js/boot.js` | entry point, service-worker registration |
 | `github.js` | Contents API client, carried over from Spoon |
@@ -214,10 +220,21 @@ features.
 
 ## Status
 
-Sub-project A is complete and live. The Calendar tab (Grid and Agenda,
-the event sheet and form), Settings (palette, calendar defaults, free
-time, sync status, token, who-am-I, check for updates), the first-run gate,
-and three years of real data imported from the sheet. The browser tests
-live in `tests/` (open `http://localhost:8778/tests/`).
+v2.0, Kave Compass on Material 3, is built on a branch and not deployed yet.
+Calendar (strip, month and agenda; the day, event and ticket sheet; the event
+form with its date and time pickers), Insights, whole-app search, and the pages
+Settings (palette, Calendar defaults, Grid emoji order, Archive, sync status,
+who-am-I, app link, token, check for updates), Roadmap and Archive. The browser
+tests live in `tests/` (open `http://localhost:8778/tests/`).
 
-Next: sub-project B (Trips and Radar).
+Next: Trips and Radar, which are Roadmap lines until they are built.
+
+### History
+
+Sub-project A (the data model and sync engine, the Calendar tab with Grid and
+Agenda in one sheet with levels, the event page and form, Settings with free
+time, and three years imported from the sheet) shipped first and was live on
+`main`. Insights, Trips and Radar were dashed stubs then, and sub-project B
+(Trips and Radar) was next. Superseded by v2.0 (Kave Compass on Material 3):
+Insights is built, free-time highlighting is gone, and Trips and Radar left
+the navigation for the Roadmap page.
