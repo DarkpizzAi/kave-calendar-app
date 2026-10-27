@@ -319,8 +319,10 @@ export function clampMonth(ym, min, max) {
    the edge, the caller allows 4px more) is always picked. */
 export function firstFullyVisible(rows, scrollTop, gap) {
   const from = scrollTop + gap - 8;
-  for (const r of rows) if (r.top >= from) return r.day;
-  return null;
+  /* rows run in order, so the first one at or below `from` is a binary search */
+  let lo = 0, hi = rows.length;
+  while (lo < hi) { const mid = (lo + hi) >> 1; if (rows[mid].top >= from) hi = mid; else lo = mid + 1; }
+  return lo < rows.length ? rows[lo].day : null;
 }
 
 /* One finished drag on the strip: sideways moves a week (a month when open),

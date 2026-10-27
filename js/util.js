@@ -52,4 +52,6 @@ export async function copyText(text, { clipboard = navigator.clipboard, legacy =
    scroll listener asks. The longer of two marks wins. */
 let jumpUntil = 0;
 export function markJump(ms = 900) { jumpUntil = Math.max(jumpUntil, Date.now() + ms); }
+/* the reader took over (a touch, a wheel): their scroll counts at once */
+export function clearJump() { jumpUntil = 0; }
 export const isJumping = () => Date.now() < jumpUntil;

@@ -11,7 +11,7 @@
    the gestures. Every synced string goes through escapeHtml. */
 "use strict";
 
-import { escapeHtml as esc, markJump, isJumping } from "./util.js";
+import { escapeHtml as esc, markJump, isJumping, clearJump } from "./util.js";
 import { addDays, dayOfWeek, todayKey } from "./dates.js";
 import { loadRange } from "./views.js";
 import { holidayOn } from "./holidays.js";
@@ -129,8 +129,12 @@ function redrawStrip() {
   const t = stripEl();
   if (!t) return;
   const h0 = t.offsetHeight;
+  /* keyboard focus survives the redraw: the same control is focused again */
+  const f = document.activeElement && t.contains(document.activeElement) ? document.activeElement : null;
+  const key = f && (f.dataset.day ? `[data-day="${f.dataset.day}"]` : f.dataset.act ? `[data-act="${f.dataset.act}"]` : "");
   t.getAnimations().forEach((a) => a.cancel());
   t.innerHTML = stripInner();
+  if (key) { const again = t.querySelector(key); if (again && !again.disabled) again.focus({ preventScroll: true }); }
   const h1 = t.offsetHeight, body = t.querySelector(".lc-week, .lc-grid");
   if (h0 && Math.abs(h1 - h0) > 2) {
     play(t, [{ height: `${h0}px` }, { height: `${h1}px` }], 400, EASE.emphasized);
@@ -199,6 +203,7 @@ function ensureYears() {
 /* ---- the tab ---- */
 export function calendarHtml() {
   S.fresh = !document.querySelector("#view .cal");
+  rowCache = null;
   frame = buildFrame();
   ensureYears();
   return `<div class="cal"><div class="lc" data-live>${stripInner()}</div><div class="cal-agenda">${agendaHtml()}</div></div>`;
@@ -211,7 +216,7 @@ export function afterCalendar(mn, before) {
     S.touched = false;
     goTo(S.sel, false);
     /* the fonts change row heights a little once they arrive */
-    if (document.fonts && document.fonts.ready) document.fonts.ready.then(() => { if (!S.touched && ctx.isCalendar()) goTo(S.sel, false); });
+    if (document.fonts && document.fonts.ready) document.fonts.ready.then(() => { rowCache = null; if (!S.touched && ctx.isCalendar()) goTo(S.sel, false); });
   } else {
     mn.scrollTop = before.top;
     markJump(400); // the redraw's scroll event may land after render()'s own mark
@@ -265,6 +270,9 @@ function goTo(d, smooth) {
    end. Any touch, wheel or press on the list stops it. ms 0 is a jump. */
 let glideId = 0, glideEnd = 0;
 function stopGlide() { cancelAnimationFrame(glideId); clearTimeout(glideEnd); glideId = glideEnd = 0; }
+/* the reader touched the list: the glide stops and their scroll drives the
+   highlight and the bar at once */
+function takeOver() { if (glideId || glideEnd) { stopGlide(); clearJump(); } }
 const bezier = (x1, y1, x2, y2) => (x) => {
   const at = (a, b, c, t) => ((1 - t) ** 3) * 0 + 3 * ((1 - t) ** 2) * t * a + 3 * (1 - t) * t * t * b + t ** 3 * c;
   let t = x;
@@ -283,7 +291,8 @@ function glideTo(mn, top, ms) {
   const step = (now) => {
     const p = Math.min(1, (now - t0) / ms);
     mn.scrollTop = from + (top - from) * emphasized(p);
-    glideId = p < 1 ? requestAnimationFrame(step) : 0;
+    if (p < 1) glideId = requestAnimationFrame(step);
+    else { glideId = 0; clearTimeout(glideEnd); glideEnd = 0; } /* landed: the snap timer must not fire later */
   };
   glideId = requestAnimationFrame(step);
   glideEnd = setTimeout(() => { stopGlide(); mn.scrollTop = top; }, ms + 100);
@@ -297,6 +306,10 @@ function markSel() {
   if (row) row.classList.add("sel");
 }
 
+/* Row tops, cached after each draw; a draw, a resize or the fonts arriving
+   drops it. */
+let rowCache = null;
+
 /* The reader scrolls the agenda: the highlight follows, the month stays as
    it is (open or closed). A scroll the app caused is not the reader's. */
 function onScroll() {
@@ -309,9 +322,10 @@ function onScroll() {
     const mn = view(), agenda = mn && mn.querySelector(".cal-agenda");
     if (!agenda) return;
     const base = agenda.getBoundingClientRect().top - mn.getBoundingClientRect().top + mn.scrollTop;
-    const rows = [...agenda.querySelectorAll("[data-row]")].map((r) => ({ day: r.dataset.row, top: base + r.offsetTop }));
+    /* row tops within the agenda, read once per draw (see rowCache) */
+    rowCache = rowCache || [...agenda.querySelectorAll("[data-row]")].map((r) => ({ day: r.dataset.row, top: r.offsetTop }));
     /* a day the app scrolled to sits exactly GAP below the edge; allow 4px more */
-    const cur = firstFullyVisible(rows, mn.scrollTop + edgeY(false), GAP + 4);
+    const cur = firstFullyVisible(rowCache, mn.scrollTop + edgeY(false) - base, GAP + 4);
     if (cur && cur !== S.sel) {
       S.sel = cur;
       if (!S.open || expanded()) S.month = cur.slice(0, 7);
@@ -449,12 +463,13 @@ export function initCalendar(c) {
   ctx = c;
   const mn = view();
   mn.addEventListener("scroll", onScroll, { passive: true });
-  for (const ev of ["wheel", "touchstart", "pointerdown"]) mn.addEventListener(ev, stopGlide, { passive: true });
+  for (const ev of ["wheel", "touchstart", "pointerdown"]) mn.addEventListener(ev, takeOver, { passive: true });
   document.addEventListener("click", onClick);
   stripGestures(mn);
   /* the window crossed a size class: the strip is a pane or a card now */
   let size = document.documentElement.dataset.size;
   window.addEventListener("resize", () => {
+    rowCache = null;
     const now = document.documentElement.dataset.size;
     if (now !== size) { size = now; if (ctx.isCalendar()) ctx.render(); }
   });
