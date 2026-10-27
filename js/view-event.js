@@ -14,7 +14,7 @@ import { newEvent, STATUS_LABEL, statusOf } from "./model.js";
 import { CATEGORIES as MONEY, formatCents, visibleCosts, toCents } from "./money.js";
 import { CATEGORIES, GROUPS, iconFor, categoryOf, onlyIcon } from "./icons.js";
 import { readForm, costDefaults, canChangeCost, addTask, addCost, addLinkTo, whenParts, mapsUrl, isMapsUrl, toDraft, costPayerText,
-  spanAfterStartChange, spanAfterEndChange, copyToDay } from "./event-form.js";
+  spanAfterStartChange, spanAfterEndChange, copyToDay, replaceCost, replaceTask, replaceLink, statusChoice, draftKey, isDirty } from "./event-form.js";
 import { defaultCity, shownStatus, categoryGroup, iconsOf } from "./cal-model.js";
 import { registerLevel, openLevel, replaceTop, back, closeAll, topLevel, openLayer, closeLayer, snack } from "./sheet.js";
 import { loadRange } from "./views.js";
@@ -37,6 +37,7 @@ let data = null;
 let draft = null;          // the form's values while "edit" or "new" is open
 let picker = null;         // the activity picker: null, "cat" or a category type
 let needing = null;        // which form field needs attention (drawn with is-error)
+let origKey = "";          // the draft as the form opened, to tell if it changed
 
 const me = () => store.state.settings.me;
 const find = (id) => data.events().find((e) => e.id === id);
@@ -47,8 +48,13 @@ const currentId = () => (topLevel() || {}).id;
 const lead = (icon) => `<span class="m3-list-item__lead m3-list-item__lead--plain">${ms(icon)}</span>`;
 /* One list row. text and sub are plain strings (escaped here); lead, trail and
    attrs are markup built from constants and already-escaped values. */
-function li({ icon = "", leadHtml = "", text, sub = "", trail = "", tag = "div", attrs = "", cls = "" }) {
+function li({ icon = "", leadHtml = "", text, sub = "", trail = "", tag = "div", attrs = "", cls = "", main = null }) {
   const tap = tag !== "div";
+  const inner = `${leadHtml || (icon ? lead(icon) : "")}<div class="m3-list-item__text"><div class="m3-body-l">${esc(text)}</div>`
+    + `${sub ? `<div class="m3-body-m m3-variant">${esc(sub)}</div>` : ""}</div>`;
+  /* a row whose text is tappable and whose end holds its own buttons: the
+     tappable part is a button or link inside the row, never around them */
+  if (main) return `<div class="m3-list-item${cls ? " " + cls : ""}"><${main.tag}${main.tag === "button" ? ' type="button"' : ""} class="row-main"${main.attrs}>${inner}</${main.tag}>${trail}</div>`;
   return `<${tag}${tag === "button" ? ' type="button"' : ""} class="m3-list-item${tap ? " m3-list-item--tap" : ""}${cls ? " " + cls : ""}"${attrs}>`
     + `${leadHtml || (icon ? lead(icon) : "")}<div class="m3-list-item__text"><div class="m3-body-l">${esc(text)}</div>`
     + `${sub ? `<div class="m3-body-m m3-variant">${esc(sub)}</div>` : ""}</div>${trail}</${tag}>`;
@@ -70,7 +76,10 @@ function costRow(k, removable) {
   const trail = `<span class="cost-amt"><span class="m3-title-m m3-num">${esc(formatCents(k.amount, k.currency))}</span>`
     + `<span class="m3-label-s m3-variant" title="${esc(long)}">${esc(word)}</span></span>`
     + (removable && canChangeCost(k) ? `<button type="button" class="m3-icon-btn" data-act="rmcost" data-k="${esc(k.id)}" aria-label="Remove this cost">${ms("close")}</button>` : "");
-  return li({ icon: "payments", text: k.name || MONEY_LABEL[k.category] || "Cost", sub: meta, trail, cls: canChangeCost(k) ? "" : "fixed" });
+  /* an estimate or a recorded line opens its dialog; one confirmed by an email
+     or locked by the bank extract stays read-only */
+  const main = canChangeCost(k) ? { tag: "button", attrs: ` data-act="editcost" data-k="${esc(k.id)}" aria-label="Edit ${esc(k.name || MONEY_LABEL[k.category] || "cost")}"` } : null;
+  return li({ icon: "payments", text: k.name || MONEY_LABEL[k.category] || "Cost", sub: meta, trail, cls: canChangeCost(k) ? "" : "fixed", main });
 }
 
 /* the total only when the visible lines share one currency */
@@ -82,16 +91,20 @@ function costTotal(lines) {
 }
 const costsHeading = (lines) => heading(`Costs${costTotal(lines) ? " · " + costTotal(lines) : ""}`);
 
-function linkRow(l, removeIdx = -1) {
+/* i is the link's position in the event's own links. On the page the row
+   opens the link and has an edit button; in the form the row opens the
+   dialog and has a remove button. */
+function linkRow(l, i, inForm) {
   const u = safeUrl(l.url);
   const map = isMapsUrl(l.url);
   const text = l.label && l.label !== "Link" ? l.label : map ? "Directions" : l.url;
-  const trail = removeIdx >= 0
-    ? `<button type="button" class="m3-icon-btn" data-act="rmlink" data-i="${removeIdx}" aria-label="Remove this link">${ms("close")}</button>`
-    : `<span class="m3-list-item__trail">${ms("open_in_new")}</span>`;
   const sub = String(l.url || "");
-  if (removeIdx >= 0 || !u) return li({ icon: map ? "map" : "link", text, sub, trail });
-  return li({ icon: map ? "map" : "link", text, sub, trail, tag: "a", attrs: ` href="${esc(u)}" target="_blank" rel="noopener noreferrer"` });
+  const edit = `<button type="button" class="m3-icon-btn" data-act="editlink" data-i="${i}" aria-label="Edit this link">${ms("edit")}</button>`;
+  const remove = `<button type="button" class="m3-icon-btn" data-act="rmlink" data-i="${i}" aria-label="Remove this link">${ms("close")}</button>`;
+  if (inForm) return li({ icon: map ? "map" : "link", text, sub, trail: remove, main: { tag: "button", attrs: ` data-act="editlink" data-i="${i}"` } });
+  if (!u) return li({ icon: map ? "map" : "link", text, sub, trail: edit });
+  return li({ icon: map ? "map" : "link", text, sub, trail: `${edit}<span class="m3-list-item__trail">${ms("open_in_new")}</span>`,
+    main: { tag: "a", attrs: ` href="${esc(u)}" target="_blank" rel="noopener noreferrer"` } });
 }
 
 /* ---------- the event page ---------- */
@@ -139,16 +152,18 @@ function eventPage(e) {
   if (e.notes) rows.push(li({ icon: "notes", text: e.notes, sub: "Notes", cls: "notes-row" }));
 
   const costs = visibleCosts(e.costs, me());
-  const todos = (e.checklist || []).map((c) =>
-    `<button type="button" class="m3-list-item m3-list-item--tap todo${c.done ? " done" : ""}" data-act="tick" data-c="${esc(c.id)}" role="checkbox" aria-checked="${!!c.done}">`
-    + `<span class="cb${c.done ? " on" : ""}" aria-hidden="true">${c.done ? ms("check") : ""}</span>`
-    + `<div class="m3-list-item__text"><div class="m3-body-l">${esc(c.text)}</div><div class="m3-body-m m3-variant">${esc(personName(c.assignee || "shared"))}</div></div></button>`);
+  const todos = (e.checklist || []).map((c) => li({
+    leadHtml: `<span class="cb${c.done ? " on" : ""}" aria-hidden="true">${c.done ? ms("check") : ""}</span>`,
+    text: c.text, sub: personName(c.assignee || "shared"), cls: `todo${c.done ? " done" : ""}`,
+    main: { tag: "button", attrs: ` data-act="tick" data-c="${esc(c.id)}" role="checkbox" aria-checked="${!!c.done}"` },
+    trail: `<button type="button" class="m3-icon-btn" data-act="edittodo" data-c="${esc(c.id)}" aria-label="Edit this to-do">${ms("edit")}</button>` }));
+  const all = e.links || [];
   const links = sp.links.filter((l) => l && safeUrl(l.url));
 
   return hero + grouped(rows)
     + costsHeading(costs) + grouped([...costs.map((k) => costRow(k, false)), addRow("Add a cost", "addcost")])
     + heading("To-dos") + grouped([...todos, addRow("Add a to-do", "addtodo")])
-    + heading("Links") + grouped([...links.map((l) => linkRow(l)), addRow("Add a link", "addlink", "link")]);
+    + heading("Links") + grouped([...links.map((l) => linkRow(l, all.indexOf(l), false)), addRow("Add a link", "addlink", "link")]);
 }
 
 /* ---------- the form ---------- */
@@ -200,19 +215,19 @@ function activityBlock(d) {
 
 function formPage(d) {
   const costs = visibleCosts(d.costs, me());
-  const todos = d.checklist.map((c, i) => li({ leadHtml: '<span class="cb" aria-hidden="true"></span>', text: c.text, sub: personName(c.assignee || "shared"),
+  const todos = d.checklist.map((c, i) => li({ leadHtml: `<span class="cb${c.done ? " on" : ""}" aria-hidden="true">${c.done ? ms("check") : ""}</span>`, text: c.text, sub: personName(c.assignee || "shared"),
+    main: { tag: "button", attrs: ` data-act="edittodo" data-i="${i}"` },
     trail: `<button type="button" class="m3-icon-btn" data-act="rmtodo" data-i="${i}" aria-label="Remove this to-do">${ms("close")}</button>` }));
-  const status = d.status === "idea" ? "planned" : d.status;
   return field("title", "Title", d.title, ' placeholder="What is it?" aria-label="Title"')
     + when("Starts", "start", d.start, d.startTime)
     + when("Ends", "end", d.end || d.start, d.endTime)
     + heading("Activity") + activityBlock(d)
     + heading("Where") + `<div class="fcol">${field("venue", "Venue", d.venue)}${field("city", "City", d.city)}</div>`
     + heading("Who") + `<div class="fcol">${chips("owner", OWNERS, d.owner)}${field("guests", "Guests, first names", d.guests)}</div>`
-    + heading("Status") + chips("status", STATUS_CHOICES, status)
+    + heading("Status") + chips("status", STATUS_CHOICES, statusChoice(d))
     + costsHeading(costs) + grouped([...costs.map((k) => costRow(k, true)), addRow("Add a cost", "addcost")])
     + heading("To-dos") + grouped([...todos, addRow("Add a to-do for Isa, Hugo or both", "addtodo")])
-    + heading("Links") + grouped([...d.links.map((l, i) => linkRow(l, i)), addRow("Add a link (tickets, maps, booking)", "addlink", "link")])
+    + heading("Links") + grouped([...d.links.map((l, i) => linkRow(l, i, true)), addRow("Add a link (tickets, maps, booking)", "addlink", "link")])
     + heading("Notes") + `<label class="m3-field"><span class="m3-field__label">Notes</span><textarea class="m3-field__input" data-f="notes" rows="3" aria-label="Notes">${esc(d.notes)}</textarea></label>`
     + `<div class="fcol">${field("refs", "Booking references, separated by commas", d.refs)}</div>`
     + (draft && draft.id ? `<button type="button" class="m3-btn m3-btn--outlined m3-btn--danger form-del" data-act="deleteform">${ms("delete")}Delete event</button>` : "");
@@ -285,49 +300,62 @@ function smallDialog({ title, fields, state, okLabel = "Add", isValid, submit, o
   return layer;
 }
 
-/* "Add a cost": amount, what for, a category, who paid. `target` is the event
-   (or the form's draft) the defaults come from; onAdd gets the new cost
-   fields and returns an error message or nothing. */
-function costDialog(target, onAdd) {
+/* "Add a cost" (or, with `existing`, edit one): amount, what for, a category,
+   who paid, split or mine, estimate or recorded. `target` is the event (or the
+   form's draft) the defaults come from; onSubmit gets the cost fields and
+   returns an error message or nothing. Typed costs are only ever an estimate
+   or recorded; confirmed and locked belong to the email and the bank. */
+function costDialog(target, onSubmit, existing = null) {
   const def = costDefaults(target, me());
-  const state = { amount: "", name: "", category: def.category, payer: def.payer === "hugo" ? "hugo" : "isa", currency: "EUR" };
-  const cur = `<select class="cur-select" data-d="currency" aria-label="Currency">${CURRENCIES.map(([v, l]) =>
-    `<option value="${v}">${esc(l)}</option>`).join("")}</select>`;
+  const euros = (c) => (c / 100).toFixed(2).replace(".", ",");
+  const state = existing
+    ? { amount: euros(existing.amount), name: existing.name || "", category: existing.category, payer: existing.payer === "hugo" ? "hugo" : "isa",
+        currency: existing.currency || "EUR", scope: existing.scope === "personal" ? "personal" : "shared", cstate: existing.state === "estimate" ? "estimate" : "recorded" }
+    : { amount: "", name: "", category: def.category, payer: def.payer === "hugo" ? "hugo" : "isa", currency: "EUR", scope: def.scope, cstate: "recorded" };
+  const currencies = CURRENCIES.some(([v]) => v === state.currency) ? CURRENCIES : [...CURRENCIES, [state.currency, state.currency]];
+  const cur = `<select class="cur-select" data-d="currency" aria-label="Currency">${currencies.map(([v, l]) =>
+    `<option value="${esc(v)}"${v === state.currency ? " selected" : ""}>${esc(l)}</option>`).join("")}</select>`;
+  const cats = MONEY.map((c) => [c.slug, c.label]);
+  if (!cats.some(([v]) => v === state.category)) cats.push([state.category, MONEY_LABEL[state.category] || state.category]);
   smallDialog({
-    title: "Add a cost", state, isValid: (s) => { const c = toCents(s.amount); return c != null && c > 0; },
+    title: existing ? "Edit cost" : "Add a cost", okLabel: existing ? "Save" : "Add", state,
+    isValid: (s) => { const c = toCents(s.amount); return c != null && c > 0; },
     fields: [
       { type: "text", key: "amount", label: "Amount", placeholder: "0,00", inputmode: "decimal", trail: cur },
       { type: "text", key: "name", label: "What for", placeholder: "Tickets, dinner..." },
-      { type: "chips", key: "category", label: "Category", options: MONEY.map((c) => [c.slug, c.label]) },
+      { type: "chips", key: "category", label: "Category", options: cats },
       { type: "chips", key: "payer", label: "Paid by", options: [["isa", "Isa"], ["hugo", "Hugo"]] },
+      { type: "chips", key: "scope", label: "Shared or mine", options: [["shared", "Split"], ["personal", "Mine"]] },
+      { type: "chips", key: "cstate", label: "The amount is", options: [["estimate", "Estimate"], ["recorded", "Recorded"]] },
     ],
-    submit: (s) => onAdd({ name: s.name, amountText: s.amount, currency: s.currency, payer: s.payer, scope: def.scope, state: "recorded", category: s.category }),
+    submit: (s) => onSubmit({ name: s.name, amountText: s.amount, currency: s.currency, payer: s.payer, scope: s.scope, state: s.cstate, category: s.category }),
   });
 }
 
-function todoDialog(onAdd) {
-  const state = { text: "", forWho: "shared" };
+function todoDialog(onSubmit, existing = null) {
+  const state = { text: existing ? existing.text : "", forWho: existing ? existing.assignee || "shared" : "shared" };
   smallDialog({
-    title: "Add a to-do", state, isValid: (s) => !!s.text.trim(),
+    title: existing ? "Edit to-do" : "Add a to-do", okLabel: existing ? "Save" : "Add", state, isValid: (s) => !!s.text.trim(),
     fields: [
       { type: "text", key: "text", label: "To-do", placeholder: "Buy a present, print the tickets..." },
       { type: "chips", key: "forWho", label: "For", options: [["isa", "Isa"], ["hugo", "Hugo"], ["shared", "Both"]] },
     ],
-    submit: (s) => onAdd(s.text, s.forWho),
+    submit: (s) => onSubmit(s.text, s.forWho),
   });
 }
 
-function linkDialog(onAdd) {
-  const state = { url: "", label: "" };
+function linkDialog(onSubmit, existing = null) {
+  const state = { url: existing ? existing.url : "", label: existing && existing.label !== "Link" ? existing.label : "" };
+  const note = (s) => (isMapsUrl(s.url) ? "A Maps link: it shows as Directions on the event." : "Paste a ticket, booking or Maps link.");
   smallDialog({
-    title: "Add a link", state, isValid: (s) => !!s.url.trim(),
+    title: existing ? "Edit link" : "Add a link", okLabel: existing ? "Save" : "Add", state, isValid: (s) => !!s.url.trim(),
     fields: [
       { type: "text", key: "url", label: "Link", placeholder: "https://", inputmode: "url" },
       { type: "text", key: "label", label: "Name (optional)", placeholder: "Booking, menu..." },
-      { type: "note", id: "map", text: (s) => (isMapsUrl(s.url) ? "A Maps link: it shows as Directions on the event." : "Paste a ticket, booking or Maps link.") },
+      { type: "note", id: "map", text: note },
     ],
-    onChange: (s, el) => { const n = el.querySelector('[data-note="map"]'); if (n) n.textContent = isMapsUrl(s.url) ? "A Maps link: it shows as Directions on the event." : "Paste a ticket, booking or Maps link."; },
-    submit: (s) => onAdd(s.url, s.label),
+    onChange: (s, el) => { const n = el.querySelector('[data-note="map"]'); if (n) n.textContent = note(s); },
+    submit: (s) => onSubmit(s.url, s.label),
   });
 }
 
@@ -435,6 +463,24 @@ function confirmDelete(id) {
   });
 }
 
+/* "Discard changes?": Escape, the phone's Back, the cross or a tap outside on a
+   form that has changed. Keep editing leaves it as it is. */
+function discardDialog() {
+  const layer = openLayer({
+    kind: "dialog", label: "Discard changes", cls: "m3-dialog--basic",
+    html: '<h2 class="m3-headline-s dlg-title">Discard changes?</h2>'
+      + '<p class="m3-body-m m3-variant">What you changed in this event has not been saved.</p>'
+      + '<div class="m3-dialog__actions"><button type="button" class="m3-btn m3-btn--text" data-dlg="keep">Keep editing</button>'
+      + '<button type="button" class="m3-btn m3-btn--filled" data-dlg="discard">Discard</button></div>',
+    onMount: (el) => el.addEventListener("click", (ev) => {
+      const b = ev.target.closest("[data-dlg]");
+      if (!b) return;
+      if (b.dataset.dlg === "keep") { closeLayer(layer); return; }
+      closeLayer(layer, () => { origKey = draftKey(draft); back(); });
+    }),
+  });
+}
+
 /* ---------- taps ---------- */
 async function pickDate(which) {
   const d = draft, rng = loadRange(todayKey());
@@ -456,34 +502,43 @@ async function pickTime(which) {
 
 function onPageAction(b, e) {
   const a = b.dataset.act;
-  if (a === "edit") { draft = toDraft(e); picker = null; needing = null; openLevel({ kind: "edit", id: e.id }); return; }
+  if (a === "edit") { draft = toDraft(e); origKey = draftKey(draft); picker = null; needing = null; openLevel({ kind: "edit", id: e.id }); return; }
   if (a === "menu") { openMenu(b, e); return; }
   if (a === "copyref") {
     copyText(b.dataset.v).then((ok) => { if (ok) snack("Copied " + b.dataset.v); });
     return;
   }
   if (a === "tick") { save(e, { ...e, checklist: e.checklist.map((c) => (c.id === b.dataset.c ? { ...c, done: !c.done } : c)) }); return; }
-  if (a === "addcost") {
+  if (a === "addcost" || a === "editcost") {
+    const old = a === "editcost" ? (e.costs || []).find((k) => k.id === b.dataset.k) : null;
+    if (a === "editcost" && (!old || !canChangeCost(old))) return;
     costDialog(e, (c) => {
       const cur = find(e.id);
       if (!cur) return "This event is no longer here.";
       let next;
-      try { next = addCost(cur, c, me(), new Date()); } catch { return "The amount is not a number."; }
+      try { next = old ? replaceCost(cur, old.id, c, me(), new Date()) : addCost(cur, c, me(), new Date()); } catch { return "The amount is not a number, or this cost cannot be changed."; }
       return save(cur, next) ? undefined : "The cost could not be saved.";
-    });
-  } else if (a === "addtodo") {
+    }, old);
+  } else if (a === "addtodo" || a === "edittodo") {
+    const old = a === "edittodo" ? (e.checklist || []).find((c) => c.id === b.dataset.c) : null;
+    if (a === "edittodo" && !old) return;
     todoDialog((text, forWho) => {
       const cur = find(e.id);
-      return cur && save(cur, addTask(cur, text, forWho)) ? undefined : "The to-do could not be saved.";
-    });
-  } else if (a === "addlink") {
+      if (!cur) return "This event is no longer here.";
+      const next = old ? replaceTask(cur, { id: old.id }, text, forWho) : addTask(cur, text, forWho);
+      return save(cur, next) ? undefined : "The to-do could not be saved.";
+    }, old);
+  } else if (a === "addlink" || a === "editlink") {
+    const i = a === "editlink" ? Number(b.dataset.i) : -1;
+    const old = i >= 0 ? (e.links || [])[i] : null;
+    if (a === "editlink" && !old) return;
     linkDialog((url, label) => {
       const cur = find(e.id);
       if (!cur) return "This event is no longer here.";
-      const next = addLinkTo(cur, { url, label });
+      const next = old ? replaceLink(cur, i, { url, label }) : addLinkTo(cur, { url, label });
       if (next === cur) return "That link is not valid, or it is already there.";
       return save(cur, next) ? undefined : "The link could not be saved.";
-    });
+    }, old);
   }
 }
 
@@ -496,7 +551,7 @@ function onFormAction(b, l) {
   if (a === "picktime") { pickTime(b.dataset.w); return; }
   if (a === "cleartime") { d[b.dataset.w === "start" ? "startTime" : "endTime"] = ""; return; }
   if (a === "deleteform") { confirmDelete(l.id); return; }
-  if (pick) { d[pick] = b.dataset.v; return; }
+  if (pick) { d[pick] = b.dataset.v; if (pick === "status") d.statusTouched = true; return; }
   if (a === "addact") picker = "cat";
   else if (a === "pickclose") picker = null;
   else if (a === "pickback") picker = "cat";
@@ -508,21 +563,33 @@ function onFormAction(b, l) {
   else if (a === "rmtodo") d.checklist.splice(Number(b.dataset.i), 1);
   else if (a === "rmlink") d.links.splice(Number(b.dataset.i), 1);
   else if (a === "rmcost") d.costs = d.costs.filter((k) => k.id !== b.dataset.k || !canChangeCost(k));
-  else if (a === "addcost") {
+  else if (a === "addcost" || a === "editcost") {
+    const old = a === "editcost" ? d.costs.find((k) => k.id === b.dataset.k) : null;
+    if (a === "editcost" && (!old || !canChangeCost(old))) return;
     costDialog(d, (c) => {
       if (draft !== d) return "";
-      try { d.costs = addCost(d, c, me(), new Date()).costs; } catch { return "The amount is not a number."; }
+      try { d.costs = (old ? replaceCost(d, old.id, c, me(), new Date()) : addCost(d, c, me(), new Date())).costs; } catch { return "The amount is not a number, or this cost cannot be changed."; }
       redraw();
-    });
-  } else if (a === "addtodo") {
-    todoDialog((text, forWho) => { if (draft === d) { d.checklist = addTask(d, text, forWho).checklist; redraw(); } });
-  } else if (a === "addlink") {
+    }, old);
+  } else if (a === "addtodo" || a === "edittodo") {
+    const key = a === "edittodo" ? (d.checklist[Number(b.dataset.i)] && d.checklist[Number(b.dataset.i)].id ? { id: d.checklist[Number(b.dataset.i)].id } : { index: Number(b.dataset.i) }) : null;
+    const old = key ? d.checklist[Number(b.dataset.i)] : null;
+    if (a === "edittodo" && !old) return;
+    todoDialog((text, forWho) => {
+      if (draft !== d) return;
+      d.checklist = (old ? replaceTask(d, key, text, forWho) : addTask(d, text, forWho)).checklist;
+      redraw();
+    }, old);
+  } else if (a === "addlink" || a === "editlink") {
+    const i = a === "editlink" ? Number(b.dataset.i) : -1;
+    const old = i >= 0 ? d.links[i] : null;
+    if (a === "editlink" && !old) return;
     linkDialog((url, label) => {
       if (draft !== d) return "";
-      const next = addLinkTo(d, { url, label });
+      const next = old ? replaceLink(d, i, { url, label }) : addLinkTo(d, { url, label });
       if (next === d) return "That link is not valid, or it is already there.";
       d.links = next.links; redraw();
-    });
+    }, old);
   }
 }
 
@@ -543,6 +610,9 @@ export function initEvent(ctx) {
       bar: () => `<button type="button" class="m3-btn m3-btn--filled" data-act="save">${kind === "new" ? "Add" : "Save"}</button>`,
       onAction: (b) => onFormAction(b, topLevel()),
       onInput: (t) => onInput(t),
+      /* a form with unsaved changes asks before it closes (sheet.js calls these) */
+      guard: () => isDirty(draft, origKey),
+      onGuard: () => discardDialog(),
     });
   }
 }
@@ -551,7 +621,7 @@ export function initEvent(ctx) {
    so the form (and F22's trip-aware default city) starts there. */
 export function newEventForm(date) {
   if (!me()) { snack("Choose who you are in Settings first."); return; }
-  draft = blank(date); picker = null; needing = null;
+  draft = blank(date); origKey = draftKey(draft); picker = null; needing = null;
   openLevel({ kind: "new" });
   setTimeout(() => { const t = document.querySelector('#sheetRoot [data-f="title"]'); if (t) t.focus({ preventScroll: true }); }, 60);
 }

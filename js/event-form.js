@@ -4,6 +4,7 @@
 
 import { validateEvent, newEvent, addLink } from "./model.js";
 import { newCostLine, toCents, EDITABLE_STATES } from "./money.js";
+import { linkTier, shownStatus } from "./cal-model.js";
 import { safeUrl, uid } from "./util.js";
 import { dayOfWeek, daysOf, addDays } from "./dates.js";
 
@@ -149,11 +150,12 @@ export function whenParts(e, thisYear = e.start.slice(0, 4)) {
 /* A copy is a fresh event on the chosen day with the same length. It takes
    the shape of the original, not its money or its paperwork: no cost lines
    (a copied line would be a second claim on one bank line), no stored
-   tickets, no booking references, no Drive ticket link, no trip. To-dos come
+   tickets, no booking references, no ticket link (linkTier 0, the app's own
+   definition of a ticket), no trip. To-dos come
    back unticked. It goes through newEvent, so it is a normal new event. */
 export function copyToDay(e, day, { me, now }) {
   const span = e.end && e.end > e.start ? daysBetween(e.start, e.end) : 0;
-  const links = (e.links || []).filter((l) => l && !/^ticket/i.test(String(l.label || "")));
+  const links = (e.links || []).filter((l) => l && linkTier(l) !== 0);
   const fresh = newEvent({
     title: e.title, owner: e.owner, start: day, end: span ? addDays(day, span) : "",
     startTime: e.startTime || "", endTime: e.endTime || "", status: "planned",
@@ -171,3 +173,55 @@ export function addLinkTo(e, { url, label }) {
   if (u && !/^[a-z][a-z0-9+.-]*:/i.test(u)) u = "https://" + u;
   return addLink(e, { label: String(label == null ? "" : label).trim(), url: u });
 }
+
+/* ---- editing what the small dialogs added (fix round 1) ---- */
+
+/* Replace one hand-typed cost with the dialog's values. Whatever the dialog
+   does not show (id, enteredBy, evidence) is kept; a changed amount adds a
+   typed evidence entry. A confirmed or locked line (an email or the bank
+   extract) is never changed here, and a typed cost never becomes either. */
+export function replaceCost(e, id, c, me, now) {
+  const old = (e.costs || []).find((k) => k.id === id);
+  if (!old || !canChangeCost(old)) throw new Error("this cost cannot be changed here");
+  const amount = toCents(c.amountText);
+  if (amount == null || amount <= 0) throw new Error("the amount is not a number");
+  if (!EDITABLE_STATES.includes(c.state)) throw new Error("only estimate or recorded can be typed");
+  const currency = c.currency || "EUR";
+  const changed = amount !== old.amount || currency !== (old.currency || "EUR");
+  const next = { ...old, name: String(c.name || "").trim(), category: c.category, payer: c.payer, scope: c.scope, amount, currency, state: c.state };
+  if (changed) next.evidence = [...(old.evidence || []), { kind: "typed", amount, currency, by: me, at: now.toISOString() }];
+  return { ...e, costs: e.costs.map((k) => (k.id === id ? next : k)) };
+}
+
+/* Replace a to-do by id (or by position when it has no id), keeping done and
+   anything else it carries. An empty text changes nothing. */
+export function replaceTask(e, key, text, forWho) {
+  const clean = String(text || "").trim();
+  const list = e.checklist || [];
+  const i = key.id ? list.findIndex((c) => c.id === key.id) : key.index;
+  if (!clean || i == null || i < 0 || i >= list.length) return e;
+  const item = { ...list[i], text: clean, assignee: forWho === "isa" || forWho === "hugo" ? forWho : null };
+  return { ...e, checklist: list.map((c, j) => (j === i ? item : c)) };
+}
+
+/* Replace the link at position i. Unsafe, or another link's address, changes
+   nothing; the name is optional. */
+export function replaceLink(e, i, { url, label }) {
+  const list = e.links || [];
+  let u = String(url == null ? "" : url).trim();
+  if (u && !/^[a-z][a-z0-9+.-]*:/i.test(u)) u = "https://" + u;
+  const safe = safeUrl(u);
+  if (!safe || i < 0 || i >= list.length || list.some((l, j) => j !== i && l.url === safe)) return e;
+  return { ...e, links: list.map((l, j) => (j === i ? { ...l, label: String(label || "").trim() || "Link", url: safe } : l)) };
+}
+
+/* The status chip the form shows: what the page shows (a ticket link reads as
+   Booked, an idea as Planned) until the person taps a chip. */
+export function statusChoice(d) {
+  const s = d.statusTouched ? d.status : shownStatus(d);
+  return s === "idea" ? "planned" : s;
+}
+
+/* A form is dirty when its draft differs from how it opened. */
+export const draftKey = (d) => JSON.stringify(d);
+export const isDirty = (d, key) => !!d && JSON.stringify(d) !== key;

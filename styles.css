@@ -308,3 +308,7 @@ button.m3-list-item, a.m3-list-item { width: 100%; text-align: left; text-decora
 .tp-n { position: absolute; width: 40px; height: 40px; margin: -20px 0 0 -20px; border-radius: 50%; display: grid; place-items: center; font-size: 15px; color: var(--md-sys-color-on-surface); font-variant-numeric: tabular-nums; }
 .tp-n.in { width: 32px; height: 32px; margin: -16px 0 0 -16px; font-size: 13px; color: var(--md-sys-color-on-surface-variant); }
 .tp-n.on { background: var(--md-sys-color-primary); color: var(--md-sys-color-on-primary); }
+
+/* a row whose text is tappable while its end holds its own buttons (fix round 1) */
+.m3-list-item > .row-main { display: flex; align-items: center; gap: 16px; flex: 1; min-width: 0; align-self: stretch; margin: -8px 0 -8px -16px; padding: 8px 0 8px 16px; text-align: left; text-decoration: none; color: inherit; border-radius: inherit; }
+.m3-list-item > .row-main:hover { box-shadow: inset 0 0 0 100vmax color-mix(in srgb, currentColor 8%, transparent); }

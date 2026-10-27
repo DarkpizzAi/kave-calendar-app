@@ -327,6 +327,15 @@ export function openLevel(l, opts = {}) {
 function popTop() {
   if (layers.length) { finishLayer(layers[layers.length - 1]); return; }
   if (!stack.length) return;
+  /* a level can refuse to leave (a form with unsaved changes): the entry the
+     browser just spent is put back and the level says why */
+  const top = stack[stack.length - 1], def = custom[top.kind];
+  if (def && def.guard && def.guard(top)) {
+    closing.delete(top);
+    try { history.pushState({ compassLevel: stack.length }, ""); } catch { /* sandboxed host */ }
+    if (def.onGuard) def.onGuard(top);
+    return;
+  }
   const gone = stack.pop();
   closing.delete(gone);
   sync(isForm(gone) ? "" : "shallower");
@@ -477,7 +486,12 @@ export function initSheet() {
     const s = e.target.closest("[data-sact]");
     if (s && !s.disabled) {
       const a = s.dataset.sact;
-      if (a === "scrim" || a === "close") { if (a === "scrim" && fromForm) back(); else closeAll(); }
+      if (a === "scrim" || a === "close") {
+        /* a tap outside a form with unsaved changes does not close it */
+        const g = l && custom[l.kind];
+        if (a === "scrim" && fromForm) { if (!(g && g.guard && g.guard(l))) back(); }
+        else closeAll();
+      }
       else if (a === "back") back();
       else if (a === "newday") { if (dayAdd && l) dayAdd(l.d); }
       else if (a === "prev" || a === "next") stepDay(a);
@@ -490,7 +504,8 @@ export function initSheet() {
       const depth = layers.length;
       custom[l.kind].onAction(btn);
       /* a layer opened, or another level: it has drawn itself already (M2) */
-      if (layers.length === depth && view && view.lv === l && (shown === view || formShown === view)) paint(view, l, "");
+      /* a level that has just been closed (Save) is not drawn again, it would flash empty */
+      if (layers.length === depth && view && view.lv === l && (shown === view || formShown === view) && !closing.has(l)) paint(view, l, "");
     }
   });
   const onField = (e) => {

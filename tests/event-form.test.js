@@ -1,6 +1,7 @@
 import { test, eq, ok, throws } from "./run.js";
 import { readForm, costDefaults, canChangeCost, addTask, addCost, whenLine, whenParts, mapsUrl, toDraft, isMapsUrl, costPayerText,
-  spanAfterStartChange, spanAfterEndChange, copyToDay, addLinkTo } from "../js/event-form.js";
+  spanAfterStartChange, spanAfterEndChange, copyToDay, addLinkTo,
+  replaceCost, replaceTask, replaceLink, statusChoice, draftKey, isDirty } from "../js/event-form.js";
 import { newEvent, validateEvent } from "../js/model.js";
 import { newCostLine } from "../js/money.js";
 
@@ -140,7 +141,8 @@ test("form: an event with no time reads All day, one with a time reads the time"
   eq(whenParts(base({ end: "2026-09-26" })).date, "Thursday 24 September to Saturday 26 September");
 });
 test("copy: a copy is a new event on the chosen day with the same span, fresh ids, and none of the original's money, tickets or references", () => {
-  const src = { ...base({ end: "2026-09-26", startTime: "21:00", bookingRefs: ["RA-1"], links: [{ label: "RA", url: "https://ra.co/x" }, { label: "Ticket, Drive", url: "https://drive.google.com/file/d/1/view" }],
+  const src = { ...base({ end: "2026-09-26", startTime: "21:00", bookingRefs: ["RA-1"], links: [{ label: "RA", url: "https://ra.co/x" }, { label: "Ticket, Drive", url: "https://drive.google.com/file/d/1/view" },
+      { label: "Boarding pass", url: "https://air.example/bp" }, { label: "Entrada", url: "https://tix.example/e" }],
     checklist: [{ id: "c1", text: "buy", done: true, assignee: "hugo" }] }),
     costs: [{ id: "co_1", name: "Tickets", category: "leisure/events-nightlife", payer: "isa", scope: "shared", amount: 2000, currency: "EUR", state: "locked", evidence: [{ kind: "bank" }], enteredBy: "isa" }],
     tickets: [{ id: "0123456789abcdef", ext: "pdf", pages: 1 }], source: { kind: "instinct" }, trip: "t1" };
@@ -150,7 +152,7 @@ test("copy: a copy is a new event on the chosen day with the same span, fresh id
   eq(c.checklist.map((x) => [x.text, x.done, x.assignee]), [["buy", false, "hugo"]], "to-dos come back unticked");
   ok(c.checklist[0].id !== "c1", "fresh to-do id");
   eq([c.costs, c.bookingRefs, c.tickets, c.deleted, c.source, c.trip], [[], [], undefined, false, { kind: "app" }, null]);
-  eq(c.links, [{ label: "RA", url: "https://ra.co/x" }], "the Drive ticket link stays with the original");
+  eq(c.links, [{ label: "RA", url: "https://ra.co/x" }], "ticket links (Ticket, Boarding pass, Entrada) stay with the original");
   eq(c.updated.by, "hugo");
 });
 test("copy: a one-day event copies to a one-day event, and a copy into another year is allowed", () => {
@@ -163,4 +165,58 @@ test("links: adding a link keeps the name optional and refuses an unsafe or repe
   eq(addLinkTo(e, { url: "javascript:alert(1)", label: "x" }), e);
   eq(addLinkTo(e, { url: "https://ra.co/x", label: "again" }), e);
   eq(addLinkTo(e, { url: "ra.co/y", label: " Menu " }).links[1].label, "Menu", "a bare host gets https");
+});
+
+/* ---- fix round 1: editing rows, status, dirty ---- */
+const costEv = () => ({ ...base(), costs: [
+  { id: "a", name: "Tix", category: "x", payer: "isa", scope: "shared", amount: 500, currency: "EUR", state: "recorded", evidence: [{ kind: "typed", amount: 500 }], enteredBy: "hugo", extra: 1 },
+  { id: "b", name: "Mail", category: "x", payer: "isa", scope: "shared", amount: 900, currency: "EUR", state: "confirmed", evidence: [{ kind: "email" }], enteredBy: "isa" },
+  { id: "c", name: "Bank", category: "x", payer: "isa", scope: "shared", amount: 700, currency: "EUR", state: "locked", evidence: [{ kind: "bank" }], enteredBy: "isa" }] });
+const dlg = { name: " Tickets ", amountText: "6,50", currency: "EUR", payer: "hugo", scope: "personal", state: "estimate", category: "y" };
+test("edit cost: replaces the typed line, keeps id, enteredBy and unseen fields, and records a changed amount", () => {
+  const e = replaceCost(costEv(), "a", dlg, "isa", now);
+  const k = e.costs[0];
+  eq([k.id, k.name, k.amount, k.scope, k.state, k.payer, k.enteredBy, k.extra], ["a", "Tickets", 650, "personal", "estimate", "hugo", "hugo", 1]);
+  eq(k.evidence.length, 2);
+  eq(e.costs.slice(1), costEv().costs.slice(1));
+  eq(replaceCost(costEv(), "a", { ...dlg, amountText: "5" }, "isa", now).costs[0].evidence.length, 1, "an unchanged amount adds no evidence");
+});
+test("edit cost: a confirmed or locked line is never changed, and a typed one never becomes one", async () => {
+  await throws(() => replaceCost(costEv(), "b", dlg, "isa", now));
+  await throws(() => replaceCost(costEv(), "c", dlg, "isa", now));
+  await throws(() => replaceCost(costEv(), "a", { ...dlg, state: "locked" }, "isa", now));
+  await throws(() => replaceCost(costEv(), "a", { ...dlg, state: "confirmed" }, "isa", now));
+  await throws(() => replaceCost(costEv(), "a", { ...dlg, amountText: "abc" }, "isa", now));
+});
+test("add cost: scope and state come from the dialog, still only estimate or recorded", () => {
+  const e = addCost(base(), { ...dlg }, "isa", now);
+  eq([e.costs[0].scope, e.costs[0].state], ["personal", "estimate"]);
+});
+test("edit to-do: by id or by position, keeps done and other fields; empty text changes nothing", () => {
+  const e = { ...base(), checklist: [{ id: "c1", text: "buy", done: true, assignee: null, note: "n" }, { text: "no id", done: false, assignee: "isa" }] };
+  const r = replaceTask(e, { id: "c1" }, " buy more ", "hugo");
+  eq(r.checklist[0], { id: "c1", text: "buy more", done: true, assignee: "hugo", note: "n" });
+  eq(replaceTask(e, { index: 1 }, "x", "shared").checklist[1], { text: "x", done: false, assignee: null });
+  eq(replaceTask(e, { id: "c1" }, "  ", "isa"), e);
+  eq(replaceTask(e, { id: "zz" }, "x", "isa"), e);
+});
+test("edit link: replaces at its position, keeps other fields, refuses unsafe or a duplicate", () => {
+  const e = { ...base(), links: [{ label: "RA", url: "https://ra.co/x", kind: "k" }, { label: "Menu", url: "https://menu.example/" }] };
+  eq(replaceLink(e, 0, { url: "ra.co/y", label: "" }).links[0], { label: "Link", url: "https://ra.co/y", kind: "k" });
+  eq(replaceLink(e, 0, { url: "javascript:alert(1)", label: "x" }), e);
+  eq(replaceLink(e, 0, { url: "https://menu.example/", label: "x" }), e);
+  eq(replaceLink(e, 0, { url: "https://ra.co/x", label: "Renamed" }).links[0].label, "Renamed", "its own address is fine");
+});
+test("status chips: seeded as the page shows it, untouched until a chip is tapped", () => {
+  eq(statusChoice({ status: "idea", links: [] }), "planned");
+  eq(statusChoice({ status: "done", links: [] }), "planned", "a legacy done reads as planned");
+  eq(statusChoice({ status: "planned", links: [{ label: "Ticket", url: "https://x.example" }] }), "booked");
+  eq(statusChoice({ status: "planned", statusTouched: true, links: [{ label: "Ticket", url: "https://x.example" }] }), "planned");
+});
+test("dirty form: a draft differs from its opening key only after a change", () => {
+  const d = toDraft(base()), key = draftKey(d);
+  eq(isDirty(d, key), false);
+  d.title = "Changed";
+  eq(isDirty(d, key), true);
+  eq(isDirty(null, key), false);
 });
