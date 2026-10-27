@@ -43,6 +43,24 @@ export function costDefaults(event, me) {
 /* Confirmed (an email) and locked (the bank) lines are never changed here. */
 export const canChangeCost = (line) => EDITABLE_STATES.includes(line.state);
 
+/* Save-time merge of the cost lines. The form works on a snapshot taken when
+   it opened, so a sync may have confirmed or locked a line since. Lines that
+   cannot be changed here come from the live event exactly as they are now
+   (and are never dropped); editable lines come from the draft, so its edits
+   and removals stand. Pure: neither argument is changed. */
+export function mergeDraftCosts(liveCosts, draftCosts) {
+  const live = liveCosts || [], draft = draftCosts || [];
+  const liveById = new Map(live.map((k) => [k.id, k]));
+  const out = [], used = new Set();
+  for (const k of draft) {
+    const l = k && liveById.get(k.id);
+    if (l && !canChangeCost(l)) { if (!used.has(l.id)) { out.push(l); used.add(l.id); } }
+    else out.push(k);
+  }
+  for (const l of live) if (!canChangeCost(l) && !used.has(l.id)) out.push(l);
+  return out;
+}
+
 /* "Add a task" at the end of To do. Both leaves it unassigned. */
 export function addTask(event, text, forWho) {
   const clean = String(text || "").trim();

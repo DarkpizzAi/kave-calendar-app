@@ -13,7 +13,7 @@ import { todayKey } from "./dates.js";
 import { newEvent, STATUS_LABEL, statusOf } from "./model.js";
 import { CATEGORIES as MONEY, formatCents, visibleCosts, toCents } from "./money.js";
 import { CATEGORIES, GROUPS, iconFor, categoryOf, onlyIcon } from "./icons.js";
-import { readForm, costDefaults, canChangeCost, addTask, addCost, addLinkTo, whenParts, mapsUrl, isMapsUrl, toDraft, costPayerText,
+import { readForm, costDefaults, canChangeCost, addTask, addCost, addLinkTo, whenParts, mapsUrl, isMapsUrl, toDraft, costPayerText, mergeDraftCosts,
   spanAfterStartChange, spanAfterEndChange, copyToDay, replaceCost, replaceTask, replaceLink, findLinkIndex, statusChoice, draftKey, isDirty } from "./event-form.js";
 import { defaultCity, shownStatus, categoryGroup, iconsOf } from "./cal-model.js";
 import { registerLevel, openLevel, replaceTop, back, closeAll, topLevel, openLayer, closeLayer, snack } from "./sheet.js";
@@ -395,7 +395,7 @@ function saveForm(l) {
   } else {
     const prev = find(l.id);
     if (!prev) { snack("This event is no longer here."); return; }
-    if (save(prev, { ...prev, ...fields, costs: draft.costs })) { draft = null; picker = null; back(); }
+    if (save(prev, { ...prev, ...fields, costs: mergeDraftCosts(prev.costs, draft.costs) })) { draft = null; picker = null; back(); }
   }
 }
 

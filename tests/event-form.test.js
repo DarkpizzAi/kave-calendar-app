@@ -1,7 +1,7 @@
 import { test, eq, ok, throws } from "./run.js";
 import { readForm, costDefaults, canChangeCost, addTask, addCost, whenLine, whenParts, mapsUrl, toDraft, isMapsUrl, costPayerText,
   spanAfterStartChange, spanAfterEndChange, copyToDay, addLinkTo,
-  replaceCost, replaceTask, replaceLink, statusChoice, draftKey, isDirty, findLinkIndex } from "../js/event-form.js";
+  replaceCost, replaceTask, replaceLink, statusChoice, draftKey, isDirty, findLinkIndex, mergeDraftCosts } from "../js/event-form.js";
 import { newEvent, validateEvent } from "../js/model.js";
 import { newCostLine } from "../js/money.js";
 
@@ -230,4 +230,16 @@ test("find link: found by what it is after a reorder, an insert or a removal; go
   const d1 = { label: "One", url: "https://same.example/" }, d2 = { label: "Two", url: "https://same.example/" };
   eq(findLinkIndex({ links: [d2, d1] }, d1), 1, "a repeated address is told apart by its name");
   eq(findLinkIndex({ links: [d2] }, d1), 0, "a lone link at that address is the same link, renamed");
+});
+test("event form: save keeps the live locked lines and takes editable lines from the draft", () => {
+  const live = [{ id: "a", state: "locked", cents: 100 }, { id: "b", state: "estimate", cents: 200 }, { id: "c", state: "confirmed", cents: 300 }, { id: "d", state: "recorded", cents: 400 }];
+  const draft = [{ id: "a", state: "estimate", cents: 100 }, { id: "b", state: "estimate", cents: 250 }, { id: "n", state: "recorded", cents: 5 }];
+  const out = mergeDraftCosts(live, draft);
+  eq(out.find((k) => k.id === "a"), live[0], "a line locked since the form opened stays locked");
+  eq(out.find((k) => k.id === "b").cents, 250, "draft edits to editable lines win");
+  eq(out.find((k) => k.id === "c"), live[2], "a locked line the draft lacks is not dropped");
+  eq(out.some((k) => k.id === "d"), false, "a draft-removed editable line is removed");
+  ok(out.some((k) => k.id === "n"), "a new draft line is kept");
+  eq(out.length, 4);
+  eq(live.length, 4, "the live list is untouched");
 });
