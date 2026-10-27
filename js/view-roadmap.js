@@ -11,7 +11,7 @@ export const ROADMAP = [
   { key: "calendar", name: "Calendar", icon: "calendar_month", live: true,
     text: "Events, what they cost and the loose ends attached to them, in Grid and Agenda." },
   { key: "insights", name: "Insights", icon: "insights", live: true,
-    text: "What Compass noticed: questions to answer and facts worth knowing." },
+    text: "What Kave Compass noticed: questions to answer and facts worth knowing." },
   { key: "trips", name: "Trips", icon: "flight", live: false,
     text: "For what is real: booked trips, their phases and what they cost." },
   { key: "radar", name: "Radar", icon: "radar", live: false,

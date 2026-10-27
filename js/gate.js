@@ -29,7 +29,7 @@ export function gateStep() {
    headline; there are still no labels, no placeholder and no error text. */
 const dialog = (inner) => '<div class="m3-scrim" aria-hidden="true"></div>'
   + '<div class="m3-dialog m3-dialog--basic gate" role="dialog" aria-modal="true" aria-labelledby="gateTitle">'
-  + `<h2 class="m3-headline-s" id="gateTitle">Compass</h2>${inner}</div>`;
+  + `<h2 class="m3-headline-s" id="gateTitle">Kave Compass</h2>${inner}</div>`;
 
 export function gateHtml(step) {
   if (step === "token") {

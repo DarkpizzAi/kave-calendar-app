@@ -153,7 +153,7 @@ function settingsHtml() {
     ${group("This device",
       staticRow(`<label class="m3-field"><span class="m3-field__label">App link</span><input class="m3-field__input" id="appLink" type="text" value="${esc(APP_URL)}" readonly></label>`
         + `<div class="set-actions"><button type="button" id="copyAppLink" class="m3-btn m3-btn--tonal">${ms("content_copy")}Copy</button></div>`
-        + hint("Open Compass on another device: copy this and send it to your phone."))
+        + hint("Open Kave Compass on another device: copy this and send it to your phone."))
       + staticRow(`<label class="m3-field"><span class="m3-field__label">GitHub token</span><input class="m3-field__input" id="tokenInput" type="password" placeholder="${s.token ? "Token saved" : "github_pat_..."}"`
         + ` autocomplete="off" autocapitalize="off" spellcheck="false" enterkeyhint="done"></label>${tok}`
         + `<div class="set-actions"><button type="button" id="clearToken" class="m3-btn m3-btn--text"${s.token ? "" : " disabled"}>Clear token</button></div>`

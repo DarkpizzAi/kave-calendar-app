@@ -1,6 +1,6 @@
-# Compass
+# Kave Compass
 
-The household planner: events, what they cost, trips, and the loose ends
+Kave Compass ("Compass" in the code, the cache names and the repo) is the household planner: events, what they cost, trips, and the loose ends
 attached to them. Replaces Google Calendar and the yearly planning sheet.
 
 **`main` is sub-project A** (the live version is `VERSION` in
@@ -87,23 +87,19 @@ The palette is one of five seeds (`blue`, `teal`, `yellow`, `periwinkle`,
 `js/theme.js`; a stored `cobalt`, `amber` or `chartreuse` maps to `blue`,
 `yellow`, `blue`. `js/boot.js` sets `<html data-size>` (compact, medium or
 expanded) from the kit's `sizeClass`. `styles.css` uses the kit's tokens and
-defines no colour of its own. `tokens.css` is still synced but no longer
-linked.
+defines no colour of its own. `tokens.css` (pre-Material) is still synced by
+the script and still sits in the repo, but `index.html` no longer links it and
+`SHELL` no longer caches it.
 
 ## Icons
 
-`icon-512.png` is the master artwork: a flat, solid-colour ring-and-needle
-compass in the app's own accent, matching the household look's app-tile
-icon rule (one clear symbol per app, flat and smooth, no photorealism - the
-same construction logic as Spoon's bowl-and-spoon). To change it:
-
-```bash
-python make_icons.py
-```
-
-That derives `icon-192.png`, `icon-512-maskable.png` (opaque, artwork at 70%
-so any launcher crop is safe) and `apple-touch-icon.png` (flattened; iOS
-paints alpha black). Then bump `VERSION` in `service-worker.js`.
+The icons are **generated** too: `icon-512.png`, `icon-192.png`,
+`icon-512-maskable.png`, `icon-512-monochrome.png`, `apple-touch-icon.png`,
+`favicon-32.png` and `favicon.svg` are copied to the repo root from
+`brand/icons/compass/` in kave-hub by the same `sync-household-tokens.py`. Never
+hand-edit them: change the artwork in the hub, re-sync, and bump `VERSION` in
+`service-worker.js`. `manifest.json` lists 192 and 512 as `any`, 512 as
+`maskable` and 512 as `monochrome`.
 
 ## Deploy
 
@@ -192,6 +188,9 @@ Native ES modules, no bundler, no build step.
 | `js/prefs.js` | Calendar defaults and free-time blocking |
 | `js/updates.js` | check-for-updates and the sticky "A new version is ready" snackbar |
 | `js/search.js` | the whole-app search page: events, tickets, categories |
+| `js/pickers.js` | the Material date picker and the 24-hour time dial the event form opens |
+| `js/view-roadmap.js` | the Roadmap page: what each part is for, and what is coming |
+| `m3/kave-m3.js` | the Material 3 kit's behaviour (motion, layers, snackbars, size class); generated |
 | `js/gate.js` | the first-run gate: token, who, theme (the hub site's screen) |
 | `js/render.js` | the frame and Settings |
 | `js/wire.js` | one-time listeners, sync snackbars, pull to refresh, the banner |

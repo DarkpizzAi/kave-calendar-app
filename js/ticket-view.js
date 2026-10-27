@@ -15,7 +15,7 @@ import { github } from "../github.js";
 import { registerLevel, openLevel, back, topLevel, refreshSheet } from "./sheet.js";
 import { ticketsOf, readTicket, openStore, originalUrl, repoPath, mimeOf, fileNameOf, PASS_NOTE } from "./tickets.js";
 
-export const NOT_ON_PHONE = "This ticket is not on this phone yet; open Compass once with signal.";
+export const NOT_ON_PHONE = "This ticket is not on this phone yet; open Kave Compass once with signal.";
 
 let ctx = null;
 let cur = null;      // { t, status: "loading" | "ready" | "missing", urls, original }
@@ -84,7 +84,7 @@ async function sendCopy() {
   if (!mine) return;
   let blob;
   try { blob = await originalBlob(); }
-  catch { ctx.banner("The file is not on this phone yet. Open Compass once with signal."); return; }
+  catch { ctx.banner("The file is not on this phone yet. Open Kave Compass once with signal."); return; }
   const type = mimeOf(mine.t.ext), name = fileNameOf(mine.t);
   const file = new File([blob], name, { type });
   try {

@@ -1,9 +1,9 @@
-# Compass - non-negotiables
+# Kave Compass - non-negotiables
 
 Rules that are expensive to break and easy to break by accident. Everything
 else, including the whole design system, lives in the `brand` plugin of the
-private `kave-hub` repo: read `brand/data/household-look.md` and
-`brand/data/household-tokens.css`, or invoke its `apply-household-look`
+private `kave-hub` repo: read `brand/data/household-look-m3-draft.md` (the
+Material 3 spec this app is built on), or invoke its `apply-household-look`
 skill. **Do not restate the design system here.** This repo is public.
 
 ## Never rename
@@ -11,6 +11,11 @@ skill. **Do not restate the design system here.** This repo is public.
 The repo, its GitHub Pages URL, and the `CACHE` name in `service-worker.js`
 are the deployment's identity. Renaming any of them moves the live URL and
 orphans every installed copy on every phone. There is no migration path.
+
+The display name is "Kave Compass" (title, manifest, gate, search); that is
+only what people see. The code, `CACHE` (`kave-compass-<VERSION>`),
+`TICKET_CACHE` (`compass-tickets`, never versioned, so stored tickets survive
+every deploy) and the repo keep the old name.
 
 Renamed once, deliberately, on 2026-09-25 (Isa's request, the day after the
 first deploy): `kave-compass-app` became
@@ -25,17 +30,24 @@ In `service-worker.js`. **A token change counts as a deploy.** A stale
 service worker will happily keep serving the old shell and the old look, and
 the symptom looks like "my change did nothing" rather than like an error.
 
-## `tokens.css` is generated
+## `m3/` is generated. Never hand-edit it
 
-It is a verbatim copy of `brand/data/household-tokens.css` in kave-hub,
-placed by that repo's `brand/tools/sync-household-tokens.py`.
+`m3/kave-m3-tokens.css`, `m3/kave-m3.css` and `m3/kave-m3.js` are placed by
+kave-hub's `brand/tools/sync-household-tokens.py`, from the Material 3 source
+in the hub. The icons at the repo root (`icon-*.png`, `apple-touch-icon.png`,
+`favicon-32.png`, `favicon.svg`) come from the same script. Change a colour, a
+component or an icon **there**, run the script, and bump `VERSION` here.
+While on a branch, adopt with `--target Compass=<path to this checkout>`; run
+without `--target`, the script writes into the main checkout. Run it with
+`--check --target ...` before shipping: a stale copy looks exactly like a
+working one.
 
-**Never hand-edit it.** Edit the hub and re-sync. Check for drift with
-`python brand/tools/sync-household-tokens.py --check` from the hub. If you
-change how this app links or names that file, flip its flag in that script's
-`TARGETS` in the same commit, or the check stops guarding it silently.
-
-`styles.css` uses those tokens and must define none of its own.
+`styles.css` uses the kit's tokens and must define none of its own.
+`tokens.css` (pre-Material) is still written by the script but `index.html`
+no longer links it and `SHELL` no longer caches it. The `TARGETS` entry in
+the script still says Compass links it; if you change how this app links or
+names a synced file, flip its flag in that script's `TARGETS` in the same
+commit, or the check stops guarding it silently.
 
 ## Security: XSS is the whole threat model
 
@@ -56,10 +68,12 @@ on this origin can read it and write to the private repo.
 
 ## Every module goes in `SHELL`
 
-In `service-worker.js`. A module missing there is a module the app cannot
+In `service-worker.js`. A file missing there is a file the app cannot
 load offline, and nothing reports it until someone opens the app with no
-signal. Adding a file under `js/` means adding it to `SHELL` in the same
-change.
+signal. Adding a file under `js/` or `m3/`, an icon, or anything else
+`index.html` or an import loads means adding it to `SHELL` in the same
+change. Diff `SHELL` against the imports and the `index.html` links, not
+against memory.
 
 ## `eol=lf`
 

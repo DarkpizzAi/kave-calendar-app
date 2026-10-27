@@ -1,4 +1,4 @@
-/* Compass service worker.
+/* Kave Compass service worker.
 
    Caches the static shell so the app installs and opens offline. Data
    (api.github.com) always hits the network. Bump VERSION on every deploy so
@@ -11,7 +11,7 @@
    so the teardown has to live here to be able to break out of a stale shell.
 */
 
-const VERSION = "v1.70";
+const VERSION = "v2.0";
 const CACHE = `kave-compass-${VERSION}`;
 
 /* The phone's ticket files (CACHE_NAME in js/tickets.js). Not versioned: a
@@ -41,7 +41,9 @@ if (IS_LOCAL_DEV) {
 const SHELL = [
   "./",
   "index.html",
-  "tokens.css",
+  "m3/kave-m3-tokens.css",
+  "m3/kave-m3.css",
+  "m3/kave-m3.js",
   "styles.css",
   "manifest.json",
   "github.js",
@@ -67,6 +69,9 @@ const SHELL = [
   "js/chrome-icons.js",
   "js/calendar.js",
   "js/view-insights.js",
+  "js/view-roadmap.js",
+  "js/pickers.js",
+  "js/search.js",
   "js/sheet.js",
   "js/store.js",
   "js/theme.js",
@@ -79,7 +84,10 @@ const SHELL = [
   "icon-192.png",
   "icon-512.png",
   "icon-512-maskable.png",
+  "icon-512-monochrome.png",
   "apple-touch-icon.png",
+  "favicon.svg",
+  "favicon-32.png",
 ];
 
 const FONT_HOSTS = ["fonts.googleapis.com", "fonts.gstatic.com"];
