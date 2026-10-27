@@ -20,21 +20,80 @@ button { font: inherit; color: inherit; cursor: pointer; background: none; borde
 input, textarea, select { font: inherit; color: inherit; }
 a { color: var(--md-sys-color-primary); }
 
+/* ---------- shell: top bar, navigation bar, rail ---------- */
 .shell {
   height: 100%; height: 100dvh;
-  display: flex; flex-direction: column;
+  display: flex; flex-direction: row;
   position: relative; overflow: hidden;
-  max-width: 1120px; margin: 0 auto;
 }
-.app-header { flex: none; padding: 12px 16px; }
-.app-header h1 { margin: 0; font-size: 22px; line-height: 28px; font-weight: 400; }
-#view { flex: 1; min-height: 0; overflow-y: auto; padding: 0 16px; }
-.bottom-nav { flex: none; display: flex; background: var(--md-sys-color-surface-container); }
-.bottom-nav button { flex: 1; padding: 12px 4px; }
+.app-col { flex: 1; min-width: 0; display: flex; flex-direction: column; position: relative; }
+/* The top bar floats over the scroller and slides away on the reader's own
+   downward scroll (render.js toggles .is-hidden); #view keeps the room for it
+   as padding, so hiding it never shifts the content under the finger. */
+.app-header {
+  position: absolute; top: 0; left: 0; right: 0; z-index: 5; height: auto; min-height: 64px;
+  padding-top: env(safe-area-inset-top, 0px); margin-top: 0;
+  transition: transform 250ms cubic-bezier(.2, 0, 0, 1);
+}
+.app-header.is-hidden { transform: translateY(-100%); }
+.app-header .m3-top-bar__title { margin: 0; font-weight: 400; }
+.app-spacer { width: 48px; flex: none; }
+#view { flex: 1; min-height: 0; overflow-y: auto; padding: var(--header-h, 64px) 16px 24px; }
+.view-leaving { position: absolute; left: 0; right: 0; pointer-events: none; overflow: hidden; }
+
+.app-nav-bar { flex: none; padding-bottom: calc(16px + env(safe-area-inset-bottom, 0px)); height: auto; min-height: 80px; }
+.app-nav-bar .m3-nav-item, .app-rail .m3-rail__item { background: none; border: 0; }
+.app-rail { display: none; padding-top: calc(16px + env(safe-area-inset-top, 0px)); gap: 12px; z-index: 6; }
+.app-rail > .m3-icon-btn { margin: 0 0 4px; }
+.app-rail > .m3-fab { margin: 0 0 12px; }
+/* compact: New event floats bottom right, above the bar */
+.app-fab { bottom: calc(96px + env(safe-area-inset-bottom, 0px)); }
+[data-size="medium"] .app-rail, [data-size="expanded"] .app-rail { display: flex; }
+[data-size="medium"] .app-nav-bar, [data-size="expanded"] .app-nav-bar { display: none; }
+[data-size="medium"] .app-fab, [data-size="expanded"] .app-fab { display: none; }
+/* the menu button lives in the rail there; the space stays so the title stays centred */
+[data-size="medium"] .app-menu-btn, [data-size="expanded"] .app-menu-btn { visibility: hidden; }
+[data-size="medium"] #view, [data-size="expanded"] #view { padding-left: 24px; padding-right: 24px; }
+
+/* pages */
+.page-col { max-width: 720px; margin: 0 auto; width: 100%; display: flex; flex-direction: column; gap: 16px; }
+.page-intro { padding: 0 4px; }
+#pageBody { overflow-x: hidden; }
+
+/* Settings */
+.set-group { display: flex; flex-direction: column; gap: 8px; }
+.set-group > .m3-list-header { min-height: 32px; }
+.set-row-btn { width: 100%; text-align: left; }
+.set-row-btn .m3-list-item__trail { display: grid; place-items: center; }
+.set-col { align-items: stretch; flex-direction: column; gap: 8px; padding: 12px 16px; }
+.set-col > * { min-width: 0; }
+.set-actions { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.set-line { display: flex; align-items: center; gap: 8px; }
+.set-line i { width: 8px; height: 8px; border-radius: 50%; background: var(--md-sys-color-outline); flex: none; }
+.set-line.ok i { background: var(--md-sys-color-primary); }
+.set-line.error i { background: var(--md-sys-color-error); }
+.set-line.working i { background: var(--md-sys-color-tertiary); }
+.set-error { color: var(--md-sys-color-error); }
+
+/* Grid emoji order */
+.og-list { list-style: none; margin: 0; padding: 0; }
+.og-row { gap: 12px; }
+.og-row.drag { background: var(--md-sys-color-secondary-container); }
+.og-n { width: 20px; text-align: center; color: var(--md-sys-color-on-surface-variant); }
+.og-e { font-size: 22px; }
+.og-l { flex: 1; min-width: 0; }
+.og-handle { touch-action: none; cursor: grab; display: grid; place-items: center; width: 40px; height: 40px; color: var(--md-sys-color-on-surface-variant); }
+.og-mv.down .m3-icon { transform: none; }
 
 /* The first-run gate shows alone: js/render.js toggles body.gated. */
-body.gated .app-header, body.gated .bottom-nav, body.gated #fabs { display: none; }
+body.gated .app-header, body.gated .app-nav-bar, body.gated .app-rail, body.gated .app-fab { display: none; }
+.gate .m3-headline-s { margin: 0; }
+.gate-actions { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
 
-/* Interim chrome icon size (the old rule, without its colours) until the
-   shell is rebuilt on the kit in Task 2; the emoji and kit icons are not SVG. */
+/* a click target must not show the text cursor of its parent */
+.m3-swatch .m3-icon { font-size: 18px; }
+
+/* Interim line-icon size for the old inline SVGs inside the tabs and sheets
+   (calendar, Insights, day sheet), until Tasks 3 to 5 swap them for Material
+   Symbols; the shell itself uses the font. */
 .shell svg { width: 18px; height: 18px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }

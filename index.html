@@ -97,12 +97,47 @@
 </head>
 <body>
   <div class="shell">
-    <header class="app-header"><h1 id="tabName">Calendar</h1></header>
-    <main id="view" class="mn"></main>
-    <nav class="bottom-nav" id="nav" aria-label="Sections"></nav>
-    <div id="fabs"></div>
+    <!-- Medium and expanded: the rail, menu button first, then New event, then
+         the destinations. Which of rail and bar shows follows <html data-size>. -->
+    <nav class="m3-rail app-rail" aria-label="Sections">
+      <button type="button" id="railMenuBtn" class="m3-icon-btn" aria-label="Menu"><span class="m3-icon" aria-hidden="true">menu</span></button>
+      <button type="button" id="railAdd" class="m3-fab" aria-label="New event"><span class="m3-icon" aria-hidden="true">add</span></button>
+      <div class="m3-rail__items" id="railItems"></div>
+    </nav>
+    <div class="app-col">
+      <header class="m3-top-bar m3-top-bar--center app-header" id="topBar">
+        <button type="button" id="menuBtn" class="m3-icon-btn app-menu-btn" aria-label="Menu"><span class="m3-icon" aria-hidden="true">menu</span></button>
+        <h1 id="tabName" class="m3-top-bar__title m3-title-l">Calendar</h1>
+        <button type="button" id="searchBtn" class="m3-icon-btn" aria-label="Search"><span class="m3-icon" aria-hidden="true">search</span></button>
+      </header>
+      <main id="view" class="mn"></main>
+      <nav class="m3-nav-bar app-nav-bar" id="nav" aria-label="Sections"></nav>
+    </div>
+    <button type="button" id="fab" class="m3-fab m3-fab--float app-fab" aria-label="New event"><span class="m3-icon" aria-hidden="true">add</span></button>
     <div id="archiveRoot"></div>
     <div id="sheetRoot"></div>
+  </div>
+
+  <!-- Menu drawer: modal, holds Settings and Roadmap. The scrim must stay the
+       drawer's previous sibling (enterLayer animates it with the drawer). -->
+  <div id="drawerScrim" class="m3-scrim" hidden></div>
+  <nav id="drawer" class="m3-drawer" role="dialog" aria-modal="true" aria-label="Menu" hidden>
+    <div class="m3-drawer__head">
+      <span class="m3-app-mark"><span class="m3-icon m3-icon--fill" aria-hidden="true">calendar_month</span></span>
+      <span class="m3-title-l">Kave Compass</span>
+    </div>
+    <button type="button" class="m3-drawer__item" data-page="settings"><span class="m3-icon" aria-hidden="true">settings</span><span class="m3-drawer__label">Settings</span></button>
+    <button type="button" class="m3-drawer__item" data-page="roadmap"><span class="m3-icon" aria-hidden="true">route</span><span class="m3-drawer__label">Roadmap</span></button>
+  </nav>
+  <!-- Pages (Settings, Roadmap and what Settings opens): full screen, back
+       arrow, one history entry each -->
+  <div id="page" class="m3-page" role="dialog" aria-modal="true" aria-labelledby="pageTitle" hidden>
+    <header class="m3-top-bar m3-top-bar--center">
+      <button type="button" id="pageBack" class="m3-icon-btn" aria-label="Back"><span class="m3-icon" aria-hidden="true">arrow_back</span></button>
+      <h1 id="pageTitle" class="m3-top-bar__title m3-title-l"></h1>
+      <span class="app-spacer"></span>
+    </header>
+    <div class="m3-sheet__body page-body" id="pageBody"></div>
   </div>
 
   <script type="module" src="js/boot.js"></script>

@@ -12,8 +12,8 @@
 import { escapeHtml } from "./util.js";
 import { store } from "./store.js";
 import { probeToken } from "./sync.js";
-import { PALETTES, applyPalette, paletteAccents } from "./theme.js";
-import { ICON } from "./chrome-icons.js";
+import { PALETTES, applyPalette, SEED_HEX } from "./theme.js";
+import { ms } from "./chrome-icons.js";
 
 /* true between a fresh token and the theme pick, this session only */
 let fresh = false;
@@ -25,23 +25,25 @@ export function gateStep() {
   return fresh ? "theme" : null;
 }
 
-const mark = '<span class="gate-mark">Compass</span>';
+/* The gate is a Material dialog over a scrim. The wordmark is the dialog's
+   headline; there are still no labels, no placeholder and no error text. */
+const dialog = (inner) => '<div class="m3-scrim" aria-hidden="true"></div>'
+  + '<div class="m3-dialog m3-dialog--basic gate" role="dialog" aria-modal="true" aria-labelledby="gateTitle">'
+  + `<h2 class="m3-headline-s" id="gateTitle">Compass</h2>${inner}</div>`;
 
 export function gateHtml(step) {
   if (step === "token") {
-    return `<div class="gate">${mark}<div class="gate-field">`
-      + '<input id="gateToken" type="password" autocomplete="off" autocapitalize="off" spellcheck="false" aria-label="Access" data-1p-ignore data-lpignore="true">'
-      + `<button type="button" class="gate-go" id="gateGo" aria-label="Connect">${ICON.arrow}</button></div></div>`;
+    return dialog('<label class="m3-field"><input class="m3-field__input" id="gateToken" type="password" autocomplete="off" autocapitalize="off" spellcheck="false" aria-label="Access" data-1p-ignore data-lpignore="true"></label>'
+      + `<div class="m3-dialog__actions"><button type="button" class="m3-btn m3-btn--filled" id="gateGo" aria-label="Connect">${ms("arrow_forward")}</button></div>`);
   }
   if (step === "who") {
-    return `<div class="gate">${mark}<div class="setup-row">`
-      + '<button type="button" class="setup-choice" data-gate-me="isa">Isa</button>'
-      + '<button type="button" class="setup-choice" data-gate-me="hugo">Hugo</button></div></div>';
+    return dialog('<div class="gate-actions">'
+      + '<button type="button" class="m3-btn m3-btn--tonal setup-choice" data-gate-me="isa">Isa</button>'
+      + '<button type="button" class="m3-btn m3-btn--tonal setup-choice" data-gate-me="hugo">Hugo</button></div>');
   }
-  /* the swatch colours come from the kit tokens (paletteAccents), not a copy */
-  const accents = paletteAccents();
-  return `<div class="gate">${mark}<div class="setup-row">${Object.entries(PALETTES).map(([id, name]) =>
-    `<button type="button" class="setup-swatch" data-gate-palette="${escapeHtml(id)}" aria-label="${escapeHtml(name)}" style="background:${escapeHtml(accents[id] || "")}"></button>`).join("")}</div></div>`;
+  /* the swatch colours are the five seed identities (SEED_HEX) */
+  return dialog(`<div class="m3-swatch-row">${Object.entries(PALETTES).map(([id, name]) =>
+    `<button type="button" class="m3-swatch setup-swatch" data-gate-palette="${escapeHtml(id)}" aria-label="${escapeHtml(name)}" style="background:${escapeHtml(SEED_HEX[id] || "")}"></button>`).join("")}</div>`);
 }
 
 /* Wires the gate just drawn. onToken runs once a token is saved. */

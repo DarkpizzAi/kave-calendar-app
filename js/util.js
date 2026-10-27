@@ -46,3 +46,10 @@ export async function copyText(text, { clipboard = navigator.clipboard, legacy =
   }
   try { return !!legacy(); } catch { return false; }
 }
+
+/* A scroll the app caused itself (a redraw, "back to today") is not the
+   reader's: the top bar must not hide for it. Callers mark the jump, the
+   scroll listener asks. The longer of two marks wins. */
+let jumpUntil = 0;
+export function markJump(ms = 900) { jumpUntil = Math.max(jumpUntil, Date.now() + ms); }
+export const isJumping = () => Date.now() < jumpUntil;

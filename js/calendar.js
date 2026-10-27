@@ -7,7 +7,7 @@
    through safeUrl. */
 "use strict";
 
-import { escapeHtml as esc } from "./util.js";
+import { escapeHtml as esc, markJump } from "./util.js";
 import { addDays, dayOfWeek, mondayOf, todayKey } from "./dates.js";
 import { loadRange } from "./views.js";
 import { holidayOn } from "./holidays.js";
@@ -571,6 +571,7 @@ function onClick(e) {
 /* Back to today: the list opens on today, so this is a scroll to it. */
 export function backToToday() {
   const t = document.getElementById("today");
+  markJump();
   if (t) t.scrollIntoView({ block: "start", behavior: matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth" });
 }
 

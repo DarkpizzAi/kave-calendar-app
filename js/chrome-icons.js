@@ -44,3 +44,7 @@ export const ICON = {
   /* the Free-time toggle (calendar.js) */
   leaf: svg('<path d="M5 21c0-9 4-16 14-16 0 10-7 14-14 16Z"/><path d="M5 21c3-5 7-8 11-10"/>'),
 };
+
+/* Material Symbols for the shell (the font is loaded in index.html). The name
+   is always a constant from this app's own code, never data. */
+export const ms = (name, cls = "") => `<span class="m3-icon${cls ? " " + cls : ""}" aria-hidden="true">${name}</span>`;

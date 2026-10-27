@@ -41,7 +41,7 @@ async function syncNow() {
   Object.assign(dataSync, r.ok ? { state: "ok", message: "Synced" }
     : { state: kind === "offline" ? "offline" : "failed",
         message: kind === "offline" ? "Offline. Your edits are kept and sent when you are back online."
-          : kind === "unauthorized" ? "Sync failed: the token was rejected. Check it in Advanced settings."
+          : kind === "unauthorized" ? "Sync failed: the token was rejected. Check it in Settings."
           : kind === "rateLimited" ? "Sync failed: rate limited by GitHub. It retries on its own."
           : "Sync failed: " + ((r.error && r.error.message) || "unknown error") }, { at: Date.now() });
   render();
@@ -53,6 +53,7 @@ async function syncNow() {
 }
 
 actions.sync = syncNow;
+actions.add = () => newEventForm();
 initSheet();
 initEvent({ data, refresh: refreshSheet });
 initInsights({ data, render, view: currentView, banner: showBanner });

@@ -22,6 +22,9 @@ export const PALETTES = {
   periwinkle: "Periwinkle",
   terracotta: "Terracotta",
 };
+/* The seed colour of each palette, shown as its swatch (an identity, not a
+   theme colour: the same five hexes the kit's seeds are built from). */
+export const SEED_HEX = { blue: "#4285f4", teal: "#009688", yellow: "#ffc107", periwinkle: "#5c6bc0", terracotta: "#c05c46" };
 /* A palette stored before Material 3 maps across: cobalt and chartreuse become
    blue, amber becomes yellow. Anything unknown is blue. */
 const LEGACY = { cobalt: "blue", amber: "yellow", chartreuse: "blue" };

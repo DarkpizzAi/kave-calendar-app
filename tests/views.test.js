@@ -85,3 +85,12 @@ test("iconFor only ever returns a catalogue icon", () => {
   eq(iconFor({ type: "eating", icon: '<b id="x">x</b>' }, { owner: "isa" }, "isa"), "🍴", "markup in the data never comes back out");
   eq(iconFor({ type: "eating", icon: "🍕" }, { owner: "isa" }, "isa"), "🍕", "a listed icon is kept");
 });
+
+/* ---- navigation (Material 3 shell) ---- */
+test("navigation: two tabs, Trips and Radar in the roadmap", async () => {
+  const { VIEWS } = await import("../js/render.js");
+  const { ROADMAP } = await import("../js/view-roadmap.js");
+  eq(Object.keys(VIEWS), ["calendar", "insights"]);
+  eq(ROADMAP.map((r) => r.key), ["calendar", "insights", "trips", "radar"]);
+  eq(ROADMAP.map((r) => r.live), [true, true, false, false]);
+});
