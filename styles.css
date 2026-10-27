@@ -96,7 +96,7 @@ body.gated .app-header, body.gated .app-nav-bar, body.gated .app-rail, body.gate
 /* Interim line-icon size for the old inline SVGs inside the tabs and sheets
    (calendar, Insights, day sheet), until Tasks 3 to 5 swap them for Material
    Symbols; the shell itself uses the font. */
-.shell svg { width: 18px; height: 18px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+.shell svg, #sheetRoot svg { width: 18px; height: 18px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
 
 /* ---------- Calendar: the week strip that opens into the month, over the agenda ----------
    One scroller (#view). The strip is sticky inside it and sits under the top
@@ -167,13 +167,13 @@ span.lc-title { padding-left: 8px; }
   display: flex; align-items: center; gap: 12px; width: 100%; min-width: 0; text-align: left;
   padding: 10px 12px; border-radius: 12px; background: var(--kc); color: var(--onkc);
 }
-.evc.g-food { --kc: var(--kave-data-food-container); --onkc: var(--kave-data-on-food-container); }
-.evc.g-nights { --kc: var(--kave-data-nights-container); --onkc: var(--kave-data-on-nights-container); }
-.evc.g-culture { --kc: var(--kave-data-culture-container); --onkc: var(--kave-data-on-culture-container); }
-.evc.g-outdoors { --kc: var(--kave-data-outdoors-container); --onkc: var(--kave-data-on-outdoors-container); }
-.evc.g-travel { --kc: var(--kave-data-travel-container); --onkc: var(--kave-data-on-travel-container); }
-.evc.g-life { --kc: var(--kave-data-life-container); --onkc: var(--kave-data-on-life-container); }
-.evc.g-other { --kc: var(--kave-data-other-container); --onkc: var(--kave-data-on-other-container); }
+.evc.g-food, .dcard.g-food { --kc: var(--kave-data-food-container); --onkc: var(--kave-data-on-food-container); }
+.evc.g-nights, .dcard.g-nights { --kc: var(--kave-data-nights-container); --onkc: var(--kave-data-on-nights-container); }
+.evc.g-culture, .dcard.g-culture { --kc: var(--kave-data-culture-container); --onkc: var(--kave-data-on-culture-container); }
+.evc.g-outdoors, .dcard.g-outdoors { --kc: var(--kave-data-outdoors-container); --onkc: var(--kave-data-on-outdoors-container); }
+.evc.g-travel, .dcard.g-travel { --kc: var(--kave-data-travel-container); --onkc: var(--kave-data-on-travel-container); }
+.evc.g-life, .dcard.g-life { --kc: var(--kave-data-life-container); --onkc: var(--kave-data-on-life-container); }
+.evc.g-other, .dcard.g-other { --kc: var(--kave-data-other-container); --onkc: var(--kave-data-on-other-container); }
 .evc:hover { box-shadow: inset 0 0 0 100vmax color-mix(in srgb, currentColor 8%, transparent); }
 .evc-em { font-size: 20px; flex: none; white-space: nowrap; }
 .evc-t { flex: 1; min-width: 0; display: flex; flex-direction: column; }
@@ -189,3 +189,122 @@ span.lc-title { padding-left: 8px; }
 [data-size="expanded"] .lc { order: 2; margin: 0; border-radius: 24px; top: 8px; }
 [data-size="expanded"] .lc-in { padding: 8px 12px 12px; }
 [data-size="expanded"] .app-col:has(.app-header.is-hidden) .lc { top: calc(var(--header-h, 64px) * -1 + 8px); padding-top: 0; }
+
+
+/* ---------- the sheet system (Task 4): sheet, form, menus, dialogs, pickers ----------
+   Sheets, the form and the layers over them live outside .shell (sheet.js), so
+   the shell can be inert behind them. Stacking: scrim 20, sheet 21, form 22
+   and 23, menus, dialogs and pickers 26 and 27, snackbar 30. */
+.m3-scrim--clear { background: transparent; }
+.form-host .m3-scrim { z-index: 22; }
+.form-host .m3-dialog, .form-host .m3-page { z-index: 23; }
+.layer-dialog .m3-scrim, .layer-menu .m3-scrim { z-index: 26; }
+.layer-dialog .m3-dialog { z-index: 27; }
+.layer-menu .m3-menu { position: fixed; z-index: 27; }
+.sheet { outline: none; }
+.sheet-head .bar-acts { display: flex; align-items: center; gap: 4px; }
+.sback:empty { display: none; }
+.sheet-head .sback { display: flex; }
+.sheet-head { padding-left: 4px; }
+.sstage { flex: 1; min-height: 0; display: grid; grid-template-columns: minmax(0, 1fr); grid-template-rows: minmax(0, 1fr); overflow: hidden; }
+.sstage > .sbody { grid-area: 1 / 1; gap: 8px; min-height: 0; }
+.m3-sheet--bottom:not(.is-tall) { min-height: min(320px, 60%); }
+.m3-sheet--bottom .sbody { padding-bottom: 24px; }
+.m3-page .sheet-head { padding-top: env(safe-area-inset-top, 0px); }
+.m3-page.form-sheet { padding-bottom: env(safe-area-inset-bottom, 0px); }
+.m3-dialog.form-sheet { width: min(600px, calc(100% - 48px)); height: min(86%, 760px); }
+.form-sheet .sbody { gap: 12px; padding-top: 16px; padding-bottom: calc(32px + env(safe-area-inset-bottom, 0px)); }
+.form-sheet .m3-list-header { padding-left: 4px; min-height: 40px; }
+.sbody .m3-list-header { padding-left: 4px; min-height: 40px; margin-top: 8px; }
+.sbody .pad { padding: 16px; }
+.sbody > .m3-grouped { flex: none; }
+
+/* legacy chrome of the Insights levels, until Task 5 rebuilds them */
+.act-btn { height: 40px; padding: 0 16px; border-radius: 20px; font-weight: 500; color: var(--md-sys-color-primary); }
+.act-btn.primary { background: var(--md-sys-color-primary); color: var(--md-sys-color-on-primary); }
+
+/* the day sheet */
+.dpage { display: flex; flex-direction: column; gap: 12px; }
+.dhol { display: flex; align-items: center; gap: 8px; margin: 0; padding: 8px 12px; border-radius: 12px; background: var(--md-sys-color-tertiary-container); color: var(--md-sys-color-on-tertiary-container); }
+.dhol .m3-icon { font-size: 20px; }
+.dlist { display: flex; flex-direction: column; gap: 8px; }
+.dcard { --kc: var(--kave-data-other-container); --onkc: var(--kave-data-on-other-container); border-radius: 12px; background: var(--kc); color: var(--onkc); min-width: 0; }
+.dcard-main { display: flex; align-items: center; gap: 12px; width: 100%; min-width: 0; text-align: left; padding: 12px; border-radius: 12px; }
+.dcard-main:hover { box-shadow: inset 0 0 0 100vmax color-mix(in srgb, currentColor 8%, transparent); }
+.dcard-acts { display: flex; flex-wrap: wrap; gap: 8px; padding: 0 12px 12px; }
+.dcard.grey .evc-em { filter: grayscale(1); opacity: .6; }
+.dcard.cancelled .evc-name { text-decoration: line-through; }
+.dcard.idea { outline: 1px dashed currentColor; outline-offset: -1px; }
+
+/* the event page */
+.ev-hero { background: var(--kave-kc); color: var(--kave-onkc); border-radius: 28px; padding: 20px; display: flex; flex-direction: column; gap: 6px; min-width: 0; margin-bottom: 8px; }
+.ev-hero p { margin: 0; }
+.ev-emo { font-size: 40px; line-height: 1.1; }
+.ev-title { margin: 0; overflow-wrap: anywhere; }
+.ev-title.cancelled { text-decoration: line-through; }
+.ev-meta { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.ev-status { background: color-mix(in srgb, currentColor 14%, transparent); color: inherit; }
+button.m3-list-item, a.m3-list-item { width: 100%; text-align: left; text-decoration: none; color: inherit; }
+.m3-list-item .m3-btn { text-decoration: none; }
+.add-row { color: var(--md-sys-color-primary); }
+.add-row .m3-body-l { font-weight: 500; }
+.notes-row .m3-list-item__text > * { white-space: normal; }
+.cost-amt { display: flex; flex-direction: column; align-items: flex-end; padding-right: 4px; }
+.cb { width: 18px; height: 18px; border: 2px solid var(--md-sys-color-on-surface-variant); border-radius: 2px; flex: none; display: grid; place-items: center; margin: 0 3px; }
+.cb.on { background: var(--md-sys-color-primary); border-color: var(--md-sys-color-primary); color: var(--md-sys-color-on-primary); }
+.cb .m3-icon { font-size: 16px; font-variation-settings: "FILL" 0, "wght" 700, "GRAD" 0, "opsz" 20; }
+.todo.done .m3-body-l { text-decoration: line-through; color: var(--md-sys-color-on-surface-variant); }
+
+/* the form */
+.fsec-h { margin: 0 0 8px 4px; }
+.fgrid { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 12px; }
+.fcol { display: flex; flex-direction: column; gap: 16px; }
+.fld { padding-right: 4px; cursor: default; }
+.fld-main { flex: 1; min-width: 0; height: 54px; text-align: left; font-size: 16px; letter-spacing: .5px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.fld-main.is-empty { color: var(--md-sys-color-on-surface-variant); }
+.fld-ic { color: var(--md-sys-color-on-surface-variant); margin: 0 8px 0 4px; }
+.m3-field textarea { resize: vertical; padding: 14px 0; font: inherit; font-size: 16px; }
+.m3-field:has(textarea) { align-items: flex-start; }
+.form-del { align-self: flex-start; margin-top: 8px; }
+.picker { gap: 8px; }
+.catgroup { margin: 8px 0 0 4px; }
+.cat-chip { background: var(--kave-kc); color: var(--kave-onkc); border-color: transparent; padding-left: 8px; }
+.emogrid { display: grid; grid-template-columns: repeat(auto-fill, minmax(48px, 1fr)); gap: 8px; }
+.emobtn { height: 52px; border-radius: 16px; background: var(--kave-kc); color: var(--kave-onkc); font-size: 26px; display: grid; place-items: center; }
+.picker-x { align-self: flex-start; }
+
+/* small dialogs: a cost, a to-do, a link, delete */
+.add-dialog { max-height: 86%; }
+.dlg-title { margin: 0; flex: none; }
+.dlg-center { text-align: center; }
+.dlg-ic { align-self: center; margin: 0; flex: none; }
+.dlg-body { display: flex; flex-direction: column; gap: 16px; overflow: auto; min-height: 0; padding-top: 8px; }
+.dlg-grp { display: flex; flex-direction: column; gap: 8px; }
+.dlg-grp > p { margin: 0 4px; }
+.dlg-err { margin: 0; color: var(--md-sys-color-error); }
+.cur-select { border: 0; background: none; font: inherit; color: var(--md-sys-color-on-surface); padding: 0 8px; outline: none; max-width: 40%; }
+.m3-dialog--basic.add-dialog { overflow: auto; }
+
+/* date picker and 24-hour time dial */
+.m3-dialog.dp-dialog { width: min(360px, calc(100% - 32px)); padding: 0; gap: 0; overflow: auto; }
+.dp-head { padding: 16px 24px 12px; display: flex; flex-direction: column; gap: 8px; flex: none; }
+.dp-nav { display: flex; align-items: center; padding: 4px 12px 0 24px; flex: none; }
+.dp-grid { display: grid; grid-template-columns: repeat(7, 40px); justify-content: center; gap: 4px; padding: 4px 12px; flex: none; }
+.dp-w { height: 40px; display: grid; place-items: center; font-size: 14px; color: var(--md-sys-color-on-surface); }
+.dp-d { width: 40px; height: 40px; border-radius: 50%; display: grid; place-items: center; font-size: 14px; font-variant-numeric: tabular-nums; color: var(--md-sys-color-on-surface); }
+.dp-d.today { box-shadow: inset 0 0 0 1px var(--md-sys-color-primary); color: var(--md-sys-color-primary); }
+.dp-d.on { background: var(--md-sys-color-primary); color: var(--md-sys-color-on-primary); box-shadow: none; }
+.dp-d:hover:not(.on) { box-shadow: inset 0 0 0 100vmax color-mix(in srgb, currentColor 8%, transparent); }
+.dp-d:disabled { opacity: .38; pointer-events: none; }
+.dp-acts { padding: 8px 12px 12px; flex: none; }
+.tp-boxes { display: flex; align-items: center; gap: 4px; }
+.tp-box { width: 96px; height: 72px; border-radius: 8px; background: var(--md-sys-color-surface-container-highest); color: var(--md-sys-color-on-surface); font-size: 45px; line-height: 52px; display: grid; place-items: center; font-variant-numeric: tabular-nums; }
+.tp-box.on { background: var(--md-sys-color-primary-container); color: var(--md-sys-color-on-primary-container); }
+.tp-colon { width: 24px; text-align: center; }
+.tp-dial { position: relative; width: 256px; height: 256px; border-radius: 50%; background: var(--md-sys-color-surface-container-highest); margin: 8px auto 0; flex: none; }
+.tp-dial svg { position: absolute; inset: 0; width: 256px; height: 256px; }
+.tp-hand { stroke: var(--md-sys-color-primary); stroke-width: 2; }
+.tp-pivot { fill: var(--md-sys-color-primary); }
+.tp-n { position: absolute; width: 40px; height: 40px; margin: -20px 0 0 -20px; border-radius: 50%; display: grid; place-items: center; font-size: 15px; color: var(--md-sys-color-on-surface); font-variant-numeric: tabular-nums; }
+.tp-n.in { width: 32px; height: 32px; margin: -16px 0 0 -16px; font-size: 13px; color: var(--md-sys-color-on-surface-variant); }
+.tp-n.on { background: var(--md-sys-color-primary); color: var(--md-sys-color-on-primary); }

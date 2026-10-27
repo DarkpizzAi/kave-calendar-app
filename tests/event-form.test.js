@@ -1,5 +1,6 @@
 import { test, eq, ok, throws } from "./run.js";
-import { readForm, costDefaults, canChangeCost, addTask, addCost, whenLine, mapsUrl, toDraft, isMapsUrl, costPayerText } from "../js/event-form.js";
+import { readForm, costDefaults, canChangeCost, addTask, addCost, whenLine, whenParts, mapsUrl, toDraft, isMapsUrl, costPayerText,
+  spanAfterStartChange, spanAfterEndChange, copyToDay, addLinkTo } from "../js/event-form.js";
 import { newEvent, validateEvent } from "../js/model.js";
 import { newCostLine } from "../js/money.js";
 
@@ -114,4 +115,52 @@ test("F41: someone else's cost says who paid; a shared cost adds Split cost", ()
   eq(costPayerText({ payer: "isa", scope: "shared" }, "isa"), "Split cost");
   eq(costPayerText({ payer: "hugo", scope: "shared" }, "isa"), "Paid by Hugo · Split cost");
   eq(costPayerText({ payer: "hugo", scope: "shared" }, "hugo"), "Split cost");
+});
+
+/* ---- Task 4: dates in the form, copy, links ---- */
+test("form: moving the start keeps the span", () => {
+  eq(spanAfterStartChange("2026-11-06", "2026-11-08", "2026-11-13"), { start: "2026-11-13", end: "2026-11-15" });
+  eq(spanAfterStartChange("2026-11-06", "2026-11-06", "2026-11-13"), { start: "2026-11-13", end: "2026-11-13" });
+  eq(spanAfterStartChange("2026-12-30", "2027-01-02", "2027-02-27"), { start: "2027-02-27", end: "2027-03-02" }, "across a month and a year");
+});
+test("form: moving the start with no end leaves the end empty", () => {
+  eq(spanAfterStartChange("2026-11-06", "", "2026-11-13"), { start: "2026-11-13", end: "" });
+  eq(spanAfterStartChange("2026-11-06", null, "2026-11-13"), { start: "2026-11-13", end: "" });
+});
+test("form: an end before the start pulls the start back to it", () => {
+  eq(spanAfterEndChange("2026-11-06", "2026-11-08", "2026-11-03"), { start: "2026-11-03", end: "2026-11-03" });
+  eq(spanAfterEndChange("2026-11-06", "2026-11-08", "2026-11-10"), { start: "2026-11-06", end: "2026-11-10" });
+  eq(spanAfterEndChange("2026-11-06", "", "2026-11-06"), { start: "2026-11-06", end: "2026-11-06" });
+});
+test("form: an event with no time reads All day, one with a time reads the time", () => {
+  eq(whenParts(base()).time, "All day");
+  eq(whenParts(base({ startTime: "21:00" })).time, "21:00");
+  eq(whenParts(base({ startTime: "21:00", endTime: "03:00" })).time, "21:00 to 03:00");
+  eq(whenParts(base({ end: "2026-09-30" })).time, "All day", "a stay with no times is all day");
+  eq(whenParts(base({ end: "2026-09-26" })).date, "Thursday 24 September to Saturday 26 September");
+});
+test("copy: a copy is a new event on the chosen day with the same span, fresh ids, and none of the original's money, tickets or references", () => {
+  const src = { ...base({ end: "2026-09-26", startTime: "21:00", bookingRefs: ["RA-1"], links: [{ label: "RA", url: "https://ra.co/x" }, { label: "Ticket, Drive", url: "https://drive.google.com/file/d/1/view" }],
+    checklist: [{ id: "c1", text: "buy", done: true, assignee: "hugo" }] }),
+    costs: [{ id: "co_1", name: "Tickets", category: "leisure/events-nightlife", payer: "isa", scope: "shared", amount: 2000, currency: "EUR", state: "locked", evidence: [{ kind: "bank" }], enteredBy: "isa" }],
+    tickets: [{ id: "0123456789abcdef", ext: "pdf", pages: 1 }], source: { kind: "instinct" }, trip: "t1" };
+  const c = copyToDay(src, "2026-10-10", { me: "hugo", now });
+  eq([c.start, c.end, c.startTime, c.title, c.status], ["2026-10-10", "2026-10-12", "21:00", "Worakls", "planned"]);
+  ok(c.id && c.id !== src.id, "a new id");
+  eq(c.checklist.map((x) => [x.text, x.done, x.assignee]), [["buy", false, "hugo"]], "to-dos come back unticked");
+  ok(c.checklist[0].id !== "c1", "fresh to-do id");
+  eq([c.costs, c.bookingRefs, c.tickets, c.deleted, c.source, c.trip], [[], [], undefined, false, { kind: "app" }, null]);
+  eq(c.links, [{ label: "RA", url: "https://ra.co/x" }], "the Drive ticket link stays with the original");
+  eq(c.updated.by, "hugo");
+});
+test("copy: a one-day event copies to a one-day event, and a copy into another year is allowed", () => {
+  const c = copyToDay(base(), "2027-01-05", { me: "isa", now });
+  eq([c.start, c.end], ["2027-01-05", null]);
+});
+test("links: adding a link keeps the name optional and refuses an unsafe or repeated url", () => {
+  const e = addLinkTo(base(), { url: "https://ra.co/x", label: "" });
+  eq(e.links.map((l) => [l.label, l.url]), [["Link", "https://ra.co/x"]]);
+  eq(addLinkTo(e, { url: "javascript:alert(1)", label: "x" }), e);
+  eq(addLinkTo(e, { url: "https://ra.co/x", label: "again" }), e);
+  eq(addLinkTo(e, { url: "ra.co/y", label: " Menu " }).links[1].label, "Menu", "a bare host gets https");
 });

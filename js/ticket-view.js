@@ -1,7 +1,9 @@
 /* Compass: the ticket viewer (stage 4, spec 6.3). A level of the one sheet:
    the ticket's pages full width and scrollable, pinch to zoom (nothing here
-   blocks touch gestures), Close and Send a copy in the bar. The screen is
-   kept awake while it is open, so a QR code does not dim at the gate.
+   blocks touch gestures), Send a copy in the bar and the sheet's own back
+   arrow to leave. The screen is kept awake while it is open, so a QR code
+   does not dim at the gate. Task 4 only restyled it (Material 3 buttons and
+   text); what it opens and how it works offline are unchanged.
 
    The pages come from the phone (Cache Storage, kept by tickets.js), so this
    works with no signal and no Google sign-in. A ticket the phone does not
@@ -57,10 +59,11 @@ export async function openTicket(eventId, tid) {
 }
 
 function body() {
-  if (!cur) return `<p class="hint pad">${esc(NOT_ON_PHONE)}</p>`;
-  if (cur.status === "loading") return '<p class="hint pad">Opening the ticket...</p>';
-  if (cur.status === "missing") return `<p class="hint pad">${esc(NOT_ON_PHONE)}</p>`;
-  if (!cur.urls.length) return `<p class="hint pad">${esc(PASS_NOTE)}</p>`;
+  const note = (t) => `<div class="m3-empty-state"><span class="m3-empty-state__icon"><span class="m3-icon" aria-hidden="true">confirmation_number</span></span><p class="m3-body-m m3-variant">${esc(t)}</p></div>`;
+  if (!cur) return note(NOT_ON_PHONE);
+  if (cur.status === "loading") return note("Opening the ticket...");
+  if (cur.status === "missing") return note(NOT_ON_PHONE);
+  if (!cur.urls.length) return note(PASS_NOTE);
   return `<div class="tkv">${cur.urls.map((u, i) =>
     `<img src="${esc(u)}" alt="${esc(cur.t.name || "Ticket")}, page ${i + 1} of ${cur.urls.length}">`).join("")}</div>`;
 }
@@ -99,7 +102,7 @@ export function initTicketView(c) {
   registerLevel("ticket", {
     title: () => (cur && cur.t.name) || "Ticket",
     body,
-    bar: () => '<button class="act-btn" data-tk-act="send">Send a copy</button><button class="act-btn primary" data-tk-act="close">Close</button>',
+    bar: () => '<button type="button" class="m3-btn m3-btn--tonal" data-tk-act="send"><span class="m3-icon" aria-hidden="true">share</span>Send a copy</button>',
     onAction: (b) => {
       if (b.dataset.tkAct === "send") sendCopy();
       else if (b.dataset.tkAct === "close") back();

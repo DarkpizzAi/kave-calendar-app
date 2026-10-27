@@ -355,8 +355,8 @@ export function backToToday() {
   goTo(S.sel, true);
 }
 
-/* The sheet never opens over the menu drawer or a page: while one is up the
-   whole shell is inert and nothing here reacts. */
+/* The sheet never opens over the menu drawer or a page: while one is up (or a
+   sheet is open) the whole shell is inert and nothing here reacts. */
 const layerUp = () => { const s = document.querySelector(".shell"); return !!(s && s.inert); };
 
 function onClick(e) {
@@ -369,7 +369,12 @@ function onClick(e) {
     if (a === "toggle") { S.open = !S.open; S.month = S.sel.slice(0, 7); redrawStrip(); }
     else if (a === "today") backToToday();
     else if (a === "day") openLevel({ kind: "day", d: b.dataset.d });
-    else if (a === "event") { e.stopPropagation(); openLevel({ kind: "event", id: b.dataset.id }); }
+    else if (a === "event") {
+      e.stopPropagation();
+      /* the card grows into the event sheet (container transform) */
+      const r = b.getBoundingClientRect();
+      openLevel({ kind: "event", id: b.dataset.id }, { from: { x: r.left, y: r.top, w: r.width, h: r.height } });
+    }
     else return;
   }
   e.preventDefault();

@@ -115,8 +115,10 @@
     </div>
     <button type="button" id="fab" class="m3-fab m3-fab--float app-fab" aria-label="New event"><span class="m3-icon" aria-hidden="true">add</span></button>
     <div id="archiveRoot"></div>
-    <div id="sheetRoot"></div>
   </div>
+  <!-- The sheet system (sheet.js): outside .shell, so the shell can be inert
+       while a sheet, a form, a menu or a picker is open. -->
+  <div id="sheetRoot"></div>
 
   <!-- Menu drawer: modal, holds Settings and Roadmap. The scrim must stay the
        drawer's previous sibling (enterLayer animates it with the drawer). -->

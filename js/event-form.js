@@ -2,10 +2,10 @@
    page and the event form"). Pure and tested; view-event.js draws them. */
 "use strict";
 
-import { validateEvent } from "./model.js";
+import { validateEvent, newEvent, addLink } from "./model.js";
 import { newCostLine, toCents, EDITABLE_STATES } from "./money.js";
 import { safeUrl, uid } from "./util.js";
-import { dayOfWeek, daysOf } from "./dates.js";
+import { dayOfWeek, daysOf, addDays } from "./dates.js";
 
 const LONGDOW = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"];
 const MONTHS = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
@@ -113,4 +113,61 @@ export function costPayerText(cost, viewer) {
   if (cost.payer !== viewer) parts.push("Paid by " + (cost.payer === "isa" ? "Isa" : cost.payer === "hugo" ? "Hugo" : "Both of us"));
   if (cost.scope === "shared") parts.push("Split cost");
   return parts.join(" · ");
+}
+
+/* ---- the form's dates (Task 4) ---- */
+
+/* Whole days from a to b (b later is positive). Day keys are plain dates, so
+   a UTC difference is exact through a daylight-saving change. */
+const daysBetween = (a, b) => Math.round((Date.parse(b + "T00:00:00Z") - Date.parse(a + "T00:00:00Z")) / 86400000);
+
+/* Moving the start keeps the length of the event: a stay of three days moved
+   a week is still three days. No end stays no end. */
+export function spanAfterStartChange(start, end, newStart) {
+  if (!end) return { start: newStart, end: "" };
+  const span = Math.max(0, daysBetween(start, end));
+  return { start: newStart, end: addDays(newStart, span) };
+}
+
+/* Choosing an end before the start pulls the start back to it, so the two
+   can never cross. */
+export function spanAfterEndChange(start, end, newEnd) {
+  return newEnd < start ? { start: newEnd, end: newEnd } : { start, end: newEnd };
+}
+
+/* The day and the time, apart: "Thursday 24 September" and "21:00 to 03:00".
+   An event with no time reads "All day", the same word the agenda uses. */
+export function whenParts(e, thisYear = e.start.slice(0, 4)) {
+  const line = whenLine(e, thisYear), cut = line.indexOf(" · ");
+  const date = cut < 0 ? line : line.slice(0, cut);
+  const time = cut < 0 ? "All day" : line.slice(cut + 3);
+  return { date, time };
+}
+
+/* ---- copy to another day (Task 4) ---- */
+
+/* A copy is a fresh event on the chosen day with the same length. It takes
+   the shape of the original, not its money or its paperwork: no cost lines
+   (a copied line would be a second claim on one bank line), no stored
+   tickets, no booking references, no Drive ticket link, no trip. To-dos come
+   back unticked. It goes through newEvent, so it is a normal new event. */
+export function copyToDay(e, day, { me, now }) {
+  const span = e.end && e.end > e.start ? daysBetween(e.start, e.end) : 0;
+  const links = (e.links || []).filter((l) => l && !/^ticket/i.test(String(l.label || "")));
+  const fresh = newEvent({
+    title: e.title, owner: e.owner, start: day, end: span ? addDays(day, span) : "",
+    startTime: e.startTime || "", endTime: e.endTime || "", status: "planned",
+    activities: JSON.parse(JSON.stringify(e.activities || [])), city: e.city || "", venue: e.venue || "",
+    guests: e.guests || "", notes: e.notes || "", links: JSON.parse(JSON.stringify(links)),
+    checklist: (e.checklist || []).map((c) => ({ id: "ck_" + uid(), text: c.text, done: false, assignee: c.assignee || null })),
+  }, { me, now });
+  return fresh;
+}
+
+/* "Add a link": the address is required, the name is not. A bare host gets
+   https. Anything unsafe, or already there, changes nothing. */
+export function addLinkTo(e, { url, label }) {
+  let u = String(url == null ? "" : url).trim();
+  if (u && !/^[a-z][a-z0-9+.-]*:/i.test(u)) u = "https://" + u;
+  return addLink(e, { label: String(label == null ? "" : label).trim(), url: u });
 }

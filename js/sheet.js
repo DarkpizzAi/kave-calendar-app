@@ -1,113 +1,93 @@
-/* Compass: the one sheet (spec section 3, "The sheet").
+/* Compass: the sheet system (Material 3 popups, spec sections 8 to 10).
 
-   Levels, top to bottom: a single day, then whatever other screens register
-   (the event page and form, Settings' sheets). Tapping
-   inside replaces the content and the title; there is never a second sheet.
-   Each level is a history entry, so phone Back, browser Back, Escape and
-   Backspace go up one level; tapping or swiping the header closes it.
-
-   Depth moves vertically: going deeper, the old content slides up and out
-   while the new level rises from the bottom; Back reverses. (Switching views
-   stays sideways: views sit side by side, levels stack.) */
+   One history entry per layer. The order, bottom to top:
+     the sheet      a bottom sheet on a phone, a side sheet on wider windows;
+                    it holds the stack of levels (a single day, the event
+                    page, the ticket, whatever other screens register);
+     the form       the event form is a level too, but it draws as a
+                    full-screen dialog on a phone and a dialog otherwise,
+                    over the sheet it was opened from;
+     layers         menus, dialogs and pickers (openLayer): each takes a
+                    history entry, so the phone's Back closes exactly one.
+   A level opened from another moves along the shared axis. The container
+   under a modal layer is inert, and focus returns to what opened it.
+   Closing always goes through history, so Back, Escape, a scrim tap and a
+   button are one path, and a second request for the same close is ignored. */
 "use strict";
 
-import { escapeHtml as esc, safeUrl } from "./util.js";
+import { escapeHtml as esc } from "./util.js";
 import { addDays, dayOfWeek } from "./dates.js";
 import { holidayOn, isProvisional } from "./holidays.js";
-import { iconsOf, guestsExcludingViewer, rowLinks, shownStatus, gesture } from "./cal-model.js";
+import { iconsOf, guestsExcludingViewer, rowMeta, categoryGroup, gesture, hasOpenTodos } from "./cal-model.js";
 import { frameNow, detailGrey, dayEvents } from "./calendar.js";
-import { ICON } from "./chrome-icons.js";
-import { STATUS_LABEL } from "./model.js";
-import { splitLinks, dayTicketLine } from "./tickets.js";
+import { ms } from "./chrome-icons.js";
+import { splitLinks, ticketButton } from "./tickets.js";
+import { enterLayer, exitLayer, sharedAxisIn, sharedAxisOut, play, EASE, motionFactor, showSnackbar } from "../m3/kave-m3.js";
 
 const LONGDOW = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"];
 const MONTHS = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
 const longDay = (d) => `${LONGDOW[dayOfWeek(d)]} ${Number(d.slice(8))} ${MONTHS[Number(d.slice(5, 7)) - 1]}`;
-const reduced = () => matchMedia("(prefers-reduced-motion: reduce)").matches;
+const who = (o) => (o === "isa" ? "Isa" : o === "hugo" ? "Hugo" : "Both of you");
+const compact = () => { const s = document.documentElement.dataset.size; return s !== "medium" && s !== "expanded"; };
 
-/* Run fn once an animation ends, or after a timeout: animationend never
-   fires while the page is hidden or throttled, and layers must not pile up. */
-function afterAnim(el, fn, ms = 450) {
-  let done = false;
-  const go = () => { if (!done) { done = true; fn(); } };
-  el.addEventListener("animationend", (e) => { if (e.target === el) go(); });
-  setTimeout(go, ms);
-}
+let stack = [];          // levels, bottom to top
+let layers = [];         // menus, dialogs, pickers, bottom to top
+let root = null;         // #sheetRoot: the sheet and the form
+let layerRoot = null;    // #layerRoot: the transient layers
+let shown = null;        // the sheet on screen: { lv, host, el, side, ... }
+let formShown = null;    // the form on screen
+let opener = null;       // what had focus when the first layer opened
+const closing = new WeakSet(); // layers and levels already asked to close
 
-let stack = [];
-let root = null;
-
-/* F21: the single day view's own "+", persisted the way the header bar
-   already persists (it lives in the sheet's fixed chrome, outside the
-   scrolling .sbody, exactly how the "+" fab stays on screen elsewhere in
-   the Calendar tab -- calendar.js/render.js's #fabs). view-event.js sets
-   this once, at boot, to avoid a circular import. */
+/* The single day's own "+": set once at boot to avoid a circular import. */
 let dayAdd = null;
 export function setDayAdd(fn) { dayAdd = fn; }
 
-/* Other screens add their own levels (Settings: Calendar defaults,
-   Categories; the event page and form): { title(level), body(level),
-   onAction(button), bar(level) for buttons in the bar, onInput(field) }. */
+/* Other screens add their own levels: { title(level), body(level),
+   bar(level) for the header's buttons, onAction(button), onInput(field, event),
+   layer: "form" to draw as a full-screen dialog / dialog }. */
 const custom = {};
 export function registerLevel(kind, def) { custom[kind] = def; }
 
-export const sheetOpen = () => stack.length > 0;
+const isForm = (l) => !!(l && custom[l.kind] && custom[l.kind].layer === "form");
+export const sheetOpen = () => stack.length > 0 || layers.length > 0;
 export const topLevel = () => stack[stack.length - 1] || null;
+const sheetLevels = () => stack.filter((l) => !isForm(l));
 
 function title(l) {
   if (custom[l.kind]) return custom[l.kind].title(l);
   return l.kind === "day" ? longDay(l.d) : "";
 }
 
-const who = (o) => (o === "isa" ? "Isa" : o === "hugo" ? "Hugo" : "Both of you");
+/* ---------- the day level ---------- */
+const firstType = (e) => (e.activities && e.activities[0] && e.activities[0].type) || "none";
 
-/* Day level: no cards, a strip per event; a time and names say what they
-   are, so no "When / Who / Where" labels. Layout A (title left, icons right,
-   a chevron column) until Task 9c settles it. */
-/* The icons share a flex row with the chevron, beside the (possibly
-   multi-line) title block, so they centre on the chevron rather than on
-   the title's first line. */
-/* Name, title, status pill, in that order. Named only when the event is
-   neither the viewer's own nor shared. */
-function stripName(e, f) { return e.owner !== f.me && e.owner !== "shared" ? who(e.owner) : ""; }
-
-const LINK_GLYPH = ["🎟", "📱", "🌐"];
-function strip(e, f, d) {
-  /* Emoji left; title; one grey line (time, guests, open to-dos); the best
-     tier of links, a line each, then "+ N more"; status top right. The guests
-     rule (viewer's own name removed) stays in guestsExcludingViewer. */
+function dayCard(e, f, d) {
+  const theirs = detailGrey(e);
+  const group = theirs ? "other" : categoryGroup(firstType(e));
+  const cancelled = e.status === "cancelled";
+  const cls = ["dcard", "g-" + group, theirs ? "grey" : "", e.status === "idea" ? "idea" : "", cancelled ? "cancelled" : ""].filter(Boolean).join(" ");
   const guests = guestsExcludingViewer(e.guests, who(f.me));
-  const name = stripName(e, f);
-  const open = (e.checklist || []).filter((c) => !c.done).length;
-  const meta = [d === e.start ? e.startTime : "", guests].filter(Boolean).map(esc).join('<span class="dsep">·</span>');
-  const count = open ? `<span class="dcount" role="img" aria-label="${open} open to-do${open > 1 ? "s" : ""}">${open}${ICON.checkbox}</span>` : "";
-  /* A stored ticket opens the phone's copy: its lines replace the Drive
-     ticket link here (the event page keeps "Open in Drive"). */
-  const sp = splitLinks(e);
-  const rl = rowLinks(sp.links.filter((l) => safeUrl(l.url)));
-  const rest = sp.tickets.length && rl.tier > 0 ? { shown: [], more: rl.shown.length + rl.more, tier: 0 } : rl;
-  const { shown, more, tier } = rest;
-  const links = sp.tickets.map((t) => dayTicketLine(e, t)).join("") + shown.map((l) => `<a class="dlink" href="${esc(safeUrl(l.url))}" target="_blank" rel="noopener noreferrer">`
-    + `<span aria-hidden="true">${LINK_GLYPH[tier]}</span><span class="dlt">${esc(l.label)}</span>${ICON.chev}</a>`).join("")
-    + (more ? `<p class="dmore">+ ${more} more link${more > 1 ? "s" : ""}</p>` : "");
-  const status = shownStatus(e);
-  const st = status === "booked" ? " st-b" : status === "cancelled" ? " st-c" : "";
-  return `<section class="dsec dst${st}${detailGrey(e) ? " greyw" : ""}" data-sact="event" data-id="${esc(e.id)}" role="button" tabindex="0">`
-    + `<span class="dem">${iconsOf(e, f.me).map(esc).join("")}</span>`
-    + `<div class="dmain"><h3>${name ? `${esc(name)} ` : ""}${esc(e.title)}</h3>`
-    + `<span class="dstat">${esc(STATUS_LABEL[status] || "")}</span>`
-    + (meta || count ? `<p class="dline">${meta}</p>${count}` : "") + (links ? `<div class="dlinks">${links}</div>` : "")
-    + `</div></section>`;
+  const sub = [theirs ? who(e.owner) : "", rowMeta(e, d), guests, e.venue || ""].filter(Boolean).map(esc).join(" · ");
+  const todo = hasOpenTodos(e) ? `<span class="evc-todo" role="img" aria-label="Open to-dos">${ms("checklist")}</span>` : "";
+  const tickets = splitLinks(e).tickets.map((t) => ticketButton(e, t, "m3-btn m3-btn--tonal m3-btn--small dcard-tk",
+    `${ms("confirmation_number")}<span>${esc(t.name || "Ticket")}</span>`, `Open ${t.name || "the ticket"}`)).join("");
+  return `<div class="${cls}"><button type="button" class="dcard-main" data-sact="event" data-id="${esc(e.id)}">`
+    + `<span class="evc-em m3-emoji" aria-hidden="true">${iconsOf(e, f.me).map(esc).join("")}</span>`
+    + `<span class="evc-t"><span class="evc-name m3-body-l">${esc(e.title)}</span><span class="m3-body-s">${sub}</span></span>${todo}</button>`
+    + (tickets ? `<div class="dcard-acts">${tickets}</div>` : "") + "</div>";
 }
-/* The day's events come from dayEvents (calendar.js): the same list
-   whichever view the day was opened from -- cancelled ones included, shown
-   with their Cancelled status -- and every event when opened from the
-   Archive (`archive` on the level). */
+
 function dayBody(l, f) {
   const d = l.d, evs = dayEvents(d, l.archive), hol = holidayOn(d);
   /* a year the Generalitat has not published yet is our own guess: say so */
   const holText = hol ? `Bank holiday: ${hol}${isProvisional(d) ? " (provisional)" : ""}` : "";
-  return `<div class="dpage">${hol ? `<p class="dhol">${esc(holText)}</p>` : ""}${evs.map((e) => strip(e, f, d)).join("")}</div>`;
+  const holiday = hol ? `<p class="dhol m3-body-m">${ms("celebration")}<span>${esc(holText)}</span></p>` : "";
+  const list = evs.length ? `<div class="dlist">${evs.map((e) => dayCard(e, f, d)).join("")}</div>`
+    : `<div class="m3-empty-state"><span class="m3-empty-state__icon">${ms("event_available")}</span>`
+      + `<p class="m3-title-m">Nothing planned</p><p class="m3-body-m m3-variant">A free day. Add something, or keep it that way.</p>`
+      + `<button type="button" class="m3-btn m3-btn--tonal" data-sact="newday">${ms("add")}Add an event</button></div>`;
+  return `<div class="dpage">${holiday}${list}</div>`;
 }
 
 function body(l) {
@@ -116,97 +96,255 @@ function body(l) {
   return f && l.kind === "day" ? dayBody(l, f) : "";
 }
 
-/* ---- drawing ---- */
-/* [old's exit class, new's entrance class] per anim value draw() gets. */
-const ANIM_DIR = { deeper: ["out-up", "in-up"], shallower: ["out-down", "in-down"],
-  next: ["out-left", "in-left"], prev: ["out-right", "in-right"] };
-function draw(anim) {
-  if (!stack.length) {
-    if (!root.firstChild) return;
-    const sh = root.querySelector(".sheet");
-    if (reduced() || !sh) { root.innerHTML = ""; return; }
-    sh.classList.add("out");
-    root.querySelector(".shade").classList.add("out");
-    afterAnim(sh, () => { if (!stack.length) root.innerHTML = ""; });
-    return;
-  }
-  const l = stack[stack.length - 1];
-  let sh = root.querySelector(".sheet:not(.out)");
-  if (!sh) {
-    root.innerHTML = '<div class="shade" data-sact="close"></div><section class="sheet in" role="dialog" aria-modal="true" aria-labelledby="stitle">'
-      + '<header class="sbar" data-sact="close" data-swipe="sheet"><span class="grab" aria-hidden="true"></span>'
-      + '<div class="stitle-wrap"><h2 class="stitle" id="stitle"></h2><div class="stags"></div></div><div class="bar-acts"></div></header>'
-      + '<div class="sstage"></div></section>';
-    sh = root.querySelector(".sheet");
-    anim = "";
-  }
-  sh.className = `sheet lv-${l.kind}${anim === "" && sh.classList.contains("in") ? " in" : ""}`;
-  sh.querySelector(".stitle").textContent = title(l);
-  const def = custom[l.kind];
-  sh.querySelector(".stags").innerHTML = def && def.tags ? def.tags(l) : "";
-  sh.querySelector(".bar-acts").innerHTML = l.kind === "day"
-    ? `<button class="sbtn" data-sact="newday" aria-label="Add an event">${ICON.plus}</button>`
-    : def && def.bar ? def.bar(l) : "";
-  const stage = sh.querySelector(".sstage");
-  const fresh = document.createElement("div");
-  fresh.className = "sbody";
-  fresh.innerHTML = body(l);
-  const old = stage.querySelector(".sbody:not(.leaving)");
-  stage.querySelectorAll(".sbody.leaving").forEach((n) => n.remove());
-  if (!old || !anim || reduced()) {
-    /* a redraw in place (a tick, new data) keeps where the reader was */
-    const keep = old && !anim ? old.scrollTop : 0;
-    stage.replaceChildren(fresh);
-    fresh.scrollTop = keep;
-    return;
-  }
-  /* both layers stay until the animation ends, so the old one visibly
-     leaves -- vertically for stack depth (deeper/shallower), horizontally
-     for a day swipe (next/prev, ANIM_DIR below): the old day slides out
-     the way the finger swiped, the new one arrives from the far side, the
-     same two-layer trick either way. */
-  const [outCls, inCls] = ANIM_DIR[anim] || ANIM_DIR.shallower;
-  old.classList.add("leaving", outCls);
-  fresh.classList.add(inCls);
-  stage.append(fresh);
-  afterAnim(fresh, () => { old.remove(); fresh.classList.remove(inCls); });
+/* The day's own buttons: earlier, later, add. They stop at the ends of the
+   calendar's range. */
+function dayBar(l) {
+  const f = frameNow(), r = f && f.range;
+  const prev = !r || l.d > r.min, next = !r || l.d < r.max;
+  return `<button type="button" class="m3-icon-btn" data-sact="prev" aria-label="Previous day"${prev ? "" : " disabled"}>${ms("chevron_left")}</button>`
+    + `<button type="button" class="m3-icon-btn" data-sact="next" aria-label="Next day"${next ? "" : " disabled"}>${ms("chevron_right")}</button>`
+    + `<button type="button" class="m3-icon-btn" data-sact="newday" aria-label="Add an event on this day">${ms("add")}</button>`;
 }
 
-/* A background redraw (new data from a sync) must never rebuild an open
-   form: the input would be replaced and the phone's keyboard would close
-   mid-word (final review I2). The form's values live in its draft anyway. */
-const FORMS = ["edit", "new", "ins-clean"]; // the clean-up cards hold a free-text box
-export const refreshable = (l) => !!l && !FORMS.includes(l.kind);
+/* ---------- the containers ---------- */
+function headHtml(side) {
+  return `<header class="m3-sheet__head sheet-head"${side ? "" : " data-grip"}><span class="sback"></span>`
+    + `<h2 class="m3-sheet__title" id="stitle"></h2><div class="bar-acts"></div>`
+    + (side ? `<button type="button" class="m3-icon-btn" data-sact="close" aria-label="Close">${ms("close")}</button>` : "") + "</header>";
+}
+
+function mountHost(className, innerHtml) {
+  const host = document.createElement("div");
+  host.className = "layer-host " + className;
+  host.innerHTML = innerHtml;
+  root.append(host);
+  return host;
+}
+
+function mountSheet(l, from) {
+  const side = !compact();
+  const host = mountHost("sheet-host",
+    '<div class="m3-scrim" data-sact="scrim"></div>'
+    + `<section class="sheet ${side ? "m3-sheet--side" : "m3-sheet--bottom"}" role="dialog" aria-modal="true" aria-labelledby="stitle" tabindex="-1">`
+    + (side ? "" : '<div class="m3-drag-handle" data-grip aria-hidden="true"></div>')
+    + headHtml(side) + '<div class="sstage"></div></section>');
+  const el = host.querySelector(".sheet");
+  shown = { lv: null, host, el, side, kind: side ? "side" : "bottom", stage: host.querySelector(".sstage"), dragged: false };
+  paint(shown, l, "", true);
+  enterLayer(el, shown.kind, from);
+  if (!side) bindDrag(shown);
+  syncInert();
+  el.focus({ preventScroll: true });
+}
+
+function mountForm(l) {
+  const page = compact();
+  const host = mountHost("form-host",
+    (page ? "" : '<div class="m3-scrim" data-sact="scrim"></div>')
+    + `<section class="sheet form-sheet ${page ? "m3-page" : "m3-dialog"}" role="dialog" aria-modal="true" aria-labelledby="stitle" tabindex="-1">`
+    + headHtml(true).replace(/<button type="button" class="m3-icon-btn" data-sact="close"[^>]*>.*?<\/button>/, "")
+    + '<div class="sstage"></div></section>');
+  const el = host.querySelector(".sheet");
+  /* a form closes with a cross at its left, where a back arrow would be */
+  host.querySelector(".sback").innerHTML = `<button type="button" class="m3-icon-btn" data-sact="back" aria-label="Close without saving">${ms("close")}</button>`;
+  formShown = { lv: null, host, el, side: false, kind: page ? "page" : "dialog", stage: host.querySelector(".sstage") };
+  paint(formShown, l, "", true);
+  enterLayer(el, formShown.kind);
+  syncInert();
+  el.focus({ preventScroll: true });
+}
+
+/* Draw a level into a container: its header, then its body. anim is
+   "deeper", "shallower", "next" or "prev" (the shared axis along x), or ""
+   for a redraw in place that keeps where the reader was. */
+function paint(view, l, anim, first = false) {
+  const prevLv = view.lv;
+  view.lv = l;
+  const sheetView = view === shown;
+  const el = view.el, def = custom[l.kind];
+  el.dataset.level = l.kind;
+  el.querySelector(".stitle, .m3-sheet__title").textContent = title(l);
+  const depth = sheetLevels().length;
+  if (sheetView) el.querySelector(".sback").innerHTML = depth > 1
+    ? `<button type="button" class="m3-icon-btn" data-sact="back" aria-label="Back">${ms("arrow_back")}</button>` : "";
+  el.querySelector(".bar-acts").innerHTML = l.kind === "day" ? dayBar(l) : def && def.bar ? def.bar(l) : "";
+  /* a phone's sheet is as tall as its content, up to nearly the screen, but
+     a page of detail is always tall so going deeper does not jump */
+  const h0 = sheetView && !view.side && !first ? el.offsetHeight : 0;
+  if (sheetView && !view.side) el.classList.toggle("is-tall", l.kind !== "day");
+  const fresh = document.createElement("div");
+  fresh.className = "m3-sheet__body sbody";
+  fresh.innerHTML = body(l);
+  const stage = view.stage;
+  const old = stage.querySelector(".sbody:not(.leaving)");
+  stage.querySelectorAll(".sbody.leaving").forEach((n) => n.remove());
+  if (!old || !anim || !motionFactor()) {
+    const keep = old && !anim && prevLv && prevLv.kind === l.kind && prevLv.id === l.id && prevLv.d === l.d ? old.scrollTop : 0;
+    stage.replaceChildren(fresh);
+    fresh.scrollTop = keep;
+  } else {
+    const dir = anim === "deeper" || anim === "next" ? 1 : -1;
+    old.classList.add("leaving");
+    old.inert = true;
+    stage.append(fresh);
+    sharedAxisOut(old, dir).then(() => old.remove());
+    sharedAxisIn(fresh, dir);
+  }
+  if (h0 && Math.abs(el.offsetHeight - h0) > 2) play(el, [{ height: `${h0}px` }, { height: `${el.offsetHeight}px` }], 300, EASE.emphasized);
+}
+
+function hideView(view, onDone) {
+  view.host.inert = true;
+  const done = () => { view.host.remove(); if (onDone) onDone(); };
+  /* a dragged sheet is already leaving on its own animation */
+  if (view.dragged) setTimeout(done, 280);
+  else if (!motionFactor()) done();
+  else exitLayer(view.el, view.kind).then(done);
+}
+
+/* Everything below the top modal is inert; focus and the screen reader stay
+   inside it. */
+function syncInert() {
+  const hosts = [];
+  if (shown) hosts.push(shown.host);
+  if (formShown) hosts.push(formShown.host);
+  layers.forEach((l) => hosts.push(l.host));
+  hosts.forEach((h, i) => { h.inert = i < hosts.length - 1; });
+  const shell = document.querySelector(".shell");
+  if (shell) shell.inert = hosts.length > 0;
+}
+
+function restoreFocus() {
+  const o = opener; opener = null;
+  if (o && o.isConnected && o.offsetParent !== null) { try { o.focus({ preventScroll: true }); } catch { /* gone */ } }
+}
+
+/* Bring the screen in line with the stack. force repaints the top level's
+   container even when it is the same level object. */
+function sync(anim = "", from = null, force = false) {
+  const top = stack[stack.length - 1] || null;
+  const formLv = isForm(top) ? top : null;
+  const sheetLv = sheetLevels().pop() || null;
+  const formGone = !formLv && formShown;
+  if (formLv) {
+    if (!formShown) mountForm(formLv);
+    else if (formShown.lv !== formLv || force) paint(formShown, formLv, anim);
+  } else if (formShown) {
+    const f = formShown; formShown = null;
+    hideView(f);
+  }
+  if (sheetLv) {
+    if (!shown) mountSheet(sheetLv, from);
+    else if (shown.lv !== sheetLv || (force && !formLv) || formGone) paint(shown, sheetLv, shown.lv !== sheetLv ? anim : "");
+  } else if (shown) {
+    const s = shown; shown = null;
+    hideView(s);
+  }
+  syncInert();
+  if (!stack.length) restoreFocus();
+}
+
+/* ---------- drag to close (a phone's bottom sheet) ---------- */
+function bindDrag(view) {
+  const { el, host } = view, scrim = host.querySelector(".m3-scrim");
+  let y0 = null, dy = 0, h = 1, id = null;
+  host.querySelectorAll("[data-grip]").forEach((g) => {
+    g.style.touchAction = "none";
+    g.addEventListener("pointerdown", (e) => {
+      if (e.target.closest("button")) return;
+      el.getAnimations().forEach((a) => a.cancel());
+      y0 = e.clientY; dy = 0; h = el.offsetHeight || 1; id = e.pointerId;
+      try { g.setPointerCapture(e.pointerId); } catch { /* a synthetic pointer */ }
+    });
+    g.addEventListener("pointermove", (e) => {
+      if (y0 == null || e.pointerId !== id) return;
+      dy = Math.max(0, e.clientY - y0);
+      el.style.transform = `translateY(${dy}px)`;
+      if (scrim) scrim.style.opacity = String(Math.max(0, 1 - dy / h));
+    });
+    const end = (cancelled) => {
+      if (y0 == null) return;
+      y0 = null;
+      const from = dy;
+      const fade = scrim ? Number(scrim.style.opacity || 1) : 1;
+      if (!cancelled && from > h / 3) {
+        /* leave from where the finger let go; the history is walked back at once */
+        const t = Math.max(120, 250 * (1 - from / h));
+        view.dragged = true;
+        if (scrim) play(scrim, [{ opacity: fade }, { opacity: 0 }], t, "linear", { fill: "forwards" });
+        play(el, [{ transform: `translateY(${from}px)` }, { transform: "translateY(100%)" }], t, EASE.accelerate, { fill: "forwards" });
+        closeAll();
+      } else {
+        /* a cancelled gesture is never a close: spring back, scrim back to full */
+        el.style.transform = "";
+        if (scrim) { scrim.style.opacity = ""; if (from > 0) play(scrim, [{ opacity: fade }, { opacity: 1 }], 250, "linear"); }
+        if (from > 0) play(el, [{ transform: `translateY(${from}px)` }, { transform: "none" }], 250, EASE.decelerate);
+      }
+    };
+    g.addEventListener("pointerup", () => end(false));
+    g.addEventListener("pointercancel", () => end(true));
+    g.addEventListener("lostpointercapture", () => { if (y0 != null) end(true); });
+  });
+}
+
+/* ---------- the stack ---------- */
+/* A form is never redrawn by a background sync: the input would be replaced
+   and the phone's keyboard would close mid-word (final review I2). Its
+   values live in its draft anyway. */
+const FORMS = ["edit", "new", "ins-clean"]; // the event form, and the clean-up cards with their free-text box
+export const refreshable = (l) => !!l && !isForm(l) && !FORMS.includes(l.kind);
 
 /* Called after the page redraws (new data): refresh the open level in place. */
-export function refreshSheet() { if (refreshable(stack[stack.length - 1])) draw(""); }
+export function refreshSheet() {
+  const top = topLevel();
+  if (shown && top && refreshable(top) && shown.lv === top) paint(shown, top, "");
+}
 
 /* Swap the level on top for another (a new event, once saved, becomes its
-   page; a day swipe steps to the next/previous day, anim "next"/"prev").
-   Defaults to no animation -- an in-place redraw (a form's own re-render,
-   an edit becoming its event page) must never suddenly slide. */
+   page; a day step goes to the next or previous day). Defaults to no
+   animation: an in-place redraw must never suddenly slide. */
 export function replaceTop(l, anim = "") {
   if (!stack.length) return openLevel(l);
   stack[stack.length - 1] = l;
-  draw(anim);
+  sync(anim, null, true);
 }
 
-export function openLevel(l) {
+/* opts.from is the card's rectangle: the sheet grows out of it (container
+   transform) when this is the first level. */
+export function openLevel(l, opts = {}) {
   const deeper = stack.length > 0;
+  /* never over the menu drawer or a page: while one is up the shell is inert
+     and nothing of ours is open */
+  const shell = document.querySelector(".shell");
+  if (!deeper && shell && shell.inert) return;
+  if (layers.length) return;
+  if (!deeper) opener = document.activeElement;
   stack.push(l);
   try { history.pushState({ compassLevel: stack.length }, ""); } catch { /* sandboxed host */ }
-  draw(deeper ? "deeper" : "");
+  sync(deeper && !isForm(l) ? "deeper" : "", opts.from || null);
 }
 
-function up() {
+function popTop() {
+  if (layers.length) { finishLayer(layers[layers.length - 1]); return; }
   if (!stack.length) return;
-  stack.pop();
-  draw(stack.length ? "shallower" : "");
+  const gone = stack.pop();
+  closing.delete(gone);
+  sync(isForm(gone) ? "" : "shallower");
 }
 
+/* One step back, once: a second request for the same close is ignored until
+   the first has landed (a double tap, Escape then a tap). */
 export function back() {
-  if (!stack.length) return false;
-  try { history.back(); } catch { up(); }
+  const top = layers[layers.length - 1] || stack[stack.length - 1];
+  if (!top) return false;
+  if (closing.has(top)) return true;
+  closing.add(top);
+  try { history.back(); } catch { popTop(); return true; }
+  /* a history that never answers must not leave the layer stuck */
+  setTimeout(() => {
+    const still = layers[layers.length - 1] || stack[stack.length - 1];
+    if (still === top && closing.has(top)) popTop();
+  }, 700);
   return true;
 }
 
@@ -220,48 +358,144 @@ export function createPopGate() {
 const pops = createPopGate();
 
 export function closeAll() {
-  const n = stack.length;
+  const n = layers.length + stack.length;
   if (!n) return;
+  const inFlight = [...layers, ...stack].filter((x) => closing.has(x)).length;
+  const lay = layers; layers = [];
+  lay.forEach((l) => { l.closing = true; teardownLayer(l); if (l.onClose) l.onClose(); });
   stack = [];
-  draw("");
-  /* history.go(-n) fires a single popstate for the whole jump */
-  pops.expect(1);
-  try { history.go(-n); } catch { pops.reset(); }
+  sync("");
+  const steps = n - inFlight;
+  if (steps > 0) {
+    /* history.go(-n) fires a single popstate for the whole jump */
+    pops.expect(1);
+    try { history.go(-steps); } catch { pops.reset(); }
+  }
 }
 
+/* ---------- menus, dialogs and pickers ---------- */
+/* openLayer({ kind: "dialog" | "menu", html, label, anchor, cls, onMount, onClose })
+   html is built by the caller with every synced string escaped. Returns the
+   layer; closeLayer(layer, after) closes it through history and then runs
+   after (so a second layer can be opened without racing the first). */
+export function openLayer({ kind = "dialog", html, label = "", anchor = null, cls = "", onMount = null, onClose = null }) {
+  const host = document.createElement("div");
+  host.className = "layer-host layer-" + kind;
+  const scrim = document.createElement("div");
+  scrim.className = "m3-scrim" + (kind === "menu" ? " m3-scrim--clear" : "");
+  const el = document.createElement("div");
+  el.className = (kind === "menu" ? "m3-menu" : "m3-dialog") + (cls ? " " + cls : "");
+  el.setAttribute("role", kind === "menu" ? "menu" : "dialog");
+  if (kind !== "menu") el.setAttribute("aria-modal", "true");
+  if (label) el.setAttribute("aria-label", label);
+  el.tabIndex = -1;
+  el.innerHTML = html;
+  host.append(scrim, el);
+  layerRoot.append(host);
+  const layer = { host, el, kind, onClose, closing: false, after: null, opener: document.activeElement };
+  scrim.addEventListener("click", () => closeLayer(layer));
+  layers.push(layer);
+  try { history.pushState({ compassLayer: layers.length }, ""); } catch { /* sandboxed host */ }
+  syncInert();
+  if (kind === "menu" && anchor) {
+    const r = anchor.getBoundingClientRect();
+    el.style.top = `${Math.round(r.bottom + 4)}px`;
+    el.style.right = `${Math.max(8, Math.round(innerWidth - r.right))}px`;
+    el.style.transformOrigin = "top right";
+  }
+  enterLayer(el, kind);
+  if (onMount) onMount(el, layer);
+  const first = el.querySelector("[autofocus], input:not([type=hidden]), button:not([disabled])");
+  (first || el).focus({ preventScroll: true });
+  return layer;
+}
+
+export function closeLayer(layer, after) {
+  if (!layer || layer.closing) return;
+  layer.closing = true;
+  layer.after = after || null;
+  if (layers[layers.length - 1] === layer) back();
+}
+
+function teardownLayer(layer) {
+  layer.host.inert = true;
+  const done = () => layer.host.remove();
+  exitLayer(layer.el, layer.kind).then(done);
+}
+
+function finishLayer(layer) {
+  const i = layers.indexOf(layer);
+  if (i < 0) return;
+  layers.splice(i, 1);
+  layer.closing = true;
+  closing.delete(layer);
+  teardownLayer(layer);
+  syncInert();
+  const o = layer.opener;
+  if (o && o.isConnected && o.offsetParent !== null) { try { o.focus({ preventScroll: true }); } catch { /* gone */ } }
+  if (layer.onClose) layer.onClose();
+  if (layer.after) layer.after();
+}
+
+/* A snackbar over everything, one at a time (the kit closes the last). */
+export function snack(text, action, onAction) {
+  return showSnackbar(document.body, { text, action, onAction });
+}
+
+/* ---------- wiring ---------- */
 export function initSheet() {
   root = document.getElementById("sheetRoot");
+  layerRoot = document.createElement("div");
+  layerRoot.id = "layerRoot";
+  document.body.append(layerRoot);
   window.addEventListener("popstate", () => {
     if (pops.take()) return;
-    if (stack.length) up();
+    popTop();
   });
+  /* the window crossed a size class: a sheet is a bottom or side sheet, a
+     form a page or a dialog, so draw them again in the other shape */
+  let size = document.documentElement.dataset.size;
+  window.addEventListener("resize", () => {
+    const now = document.documentElement.dataset.size;
+    if (now === size) return;
+    size = now;
+    const s = shown, f = formShown;
+    if (s) { s.host.remove(); shown = null; }
+    if (f) { f.host.remove(); formShown = null; }
+    const top = topLevel();
+    const sheetLv = sheetLevels().pop();
+    if (sheetLv) mountSheet(sheetLv, null);
+    if (isForm(top)) mountForm(top);
+    syncInert();
+  });
+
   root.addEventListener("click", (e) => {
-    /* F21: the day level's own "+" is a .bar-acts button carrying
-       data-sact, unlike every registered level's own bar buttons (they
-       dispatch through onAction below by data-act instead) -- caught here,
-       ahead of that split, or the .bar-acts branch below would swallow it
-       looking for an onAction "day" never registers. */
-    if (e.target.closest("a.dlink")) return;
-    const newDayBtn = e.target.closest('[data-sact="newday"]');
-    if (newDayBtn) { const l = stack[stack.length - 1]; if (dayAdd && l) dayAdd(l.d); return; }
-    const barBtn = e.target.closest(".bar-acts button");
-    const b = barBtn ? null : e.target.closest("[data-sact]");
-    if (!b) {
-      /* a registered level's own buttons go to its handler */
-      const l = stack[stack.length - 1], btn = e.target.closest("button");
-      if (btn && l && custom[l.kind] && custom[l.kind].onAction) {
-        custom[l.kind].onAction(btn);
-        /* opening another level has drawn it with its own animation already (M2) */
-        if (stack[stack.length - 1] === l) draw("");
-      }
+    const fromForm = !!e.target.closest(".form-host");
+    const view = fromForm ? formShown : shown;
+    const l = view && view.lv;
+    if (e.target.closest("a")) return;
+    const s = e.target.closest("[data-sact]");
+    if (s && !s.disabled) {
+      const a = s.dataset.sact;
+      if (a === "scrim" || a === "close") { if (a === "scrim" && fromForm) back(); else closeAll(); }
+      else if (a === "back") back();
+      else if (a === "newday") { if (dayAdd && l) dayAdd(l.d); }
+      else if (a === "prev" || a === "next") stepDay(a);
+      else if (a === "event") openLevel({ kind: "event", id: s.dataset.id });
       return;
     }
-    const a = b.dataset.sact;
-    if (a === "close") closeAll();
-    else if (a === "event") openLevel({ kind: "event", id: b.dataset.id });
+    /* a registered level's own buttons go to its handler */
+    const btn = e.target.closest("button");
+    if (btn && !btn.disabled && l && custom[l.kind] && custom[l.kind].onAction) {
+      const depth = layers.length;
+      custom[l.kind].onAction(btn);
+      /* a layer opened, or another level: it has drawn itself already (M2) */
+      if (layers.length === depth && view && view.lv === l && (shown === view || formShown === view)) paint(view, l, "");
+    }
   });
   const onField = (e) => {
-    const l = stack[stack.length - 1];
+    const view = e.target.closest(".form-host") ? formShown : shown;
+    const l = view && view.lv;
     if (l && custom[l.kind] && custom[l.kind].onInput) custom[l.kind].onInput(e.target, e);
   };
   root.addEventListener("input", onField);
@@ -269,37 +503,21 @@ export function initSheet() {
   root.addEventListener("keydown", (e) => {
     if ((e.key === "Enter" || e.key === " ") && e.target.matches("[data-sact][role=button]")) { e.preventDefault(); e.target.click(); }
   });
-  /* swipe the header down to close */
-  let y0 = null;
-  root.addEventListener("pointerdown", (e) => { y0 = e.target.closest("[data-swipe]") ? e.clientY : null; });
-  root.addEventListener("pointerup", (e) => {
-    if (y0 != null && e.clientY - y0 > 60) {
-      swallowSheetClick();
-      closeAll();
-    }
-    y0 = null;
-  });
 
   /* The single day level: swipe anywhere in the body sideways to step to
      the previous or next day, one at a time -- replaceTop, not openLevel,
-     so repeated swipes never pile up history entries (final review I6's
-     one gesture rule, reused rather than re-derived). Previous is left
-     (swipe right, dx > 0), next is right (swipe left, dx < 0), matching
-     calendar.js's own view-swipe direction. */
+     so repeated swipes never pile up history entries. Previous is a swipe
+     right (dx > 0), next a swipe left, matching the calendar's own. */
   let d0 = null;
   const dayStart = (x, y) => {
-    const l = stack[stack.length - 1];
-    d0 = l && l.kind === "day" ? { x, y, d: l.d, archive: l.archive } : null;
+    const l = topLevel();
+    d0 = l && l.kind === "day" && !layers.length ? { x, y, d: l.d, archive: l.archive } : null;
   };
   const dayEnd = (x, y) => {
     if (!d0) return;
     const act = gesture({ dx: x - d0.x, dy: y - d0.y, top: false, searching: false });
-    const { d: from, archive } = d0;
     d0 = null;
-    if (act === "next" || act === "prev") {
-      swallowSheetClick();
-      replaceTop({ kind: "day", d: addDays(from, act === "next" ? 1 : -1), archive }, act);
-    }
+    if (act === "next" || act === "prev") { swallowSheetClick(); stepDay(act); }
   };
   root.addEventListener("pointerdown", (e) => {
     if (e.pointerType !== "touch" && e.target.closest(".sbody")) dayStart(e.clientX, e.clientY);
@@ -311,9 +529,20 @@ export function initSheet() {
   root.addEventListener("touchend", (e) => { const t = e.changedTouches[0]; if (t) dayEnd(t.clientX, t.clientY); }, { passive: true });
 }
 
+/* The previous or next day, along the shared axis. Stops at either end of
+   the calendar's range: no empty day beyond it. */
+function stepDay(dir) {
+  const l = topLevel();
+  if (!l || l.kind !== "day" || layers.length) return;
+  const f = frameNow(), r = f && f.range;
+  const d = addDays(l.d, dir === "next" ? 1 : -1);
+  if (r && (d < r.min || d > r.max)) return;
+  replaceTop({ kind: "day", d, archive: l.archive }, dir);
+}
+
 /* A swipe ends in a click on whatever was under the finger (a day row, an
-   event strip): eat that one click, the same trick calendar.js uses for
-   its own view swipe. */
+   event card): eat that one click, the same trick calendar.js uses for its
+   own view swipe. */
 function swallowSheetClick() {
   const eat = (e) => { e.stopPropagation(); e.preventDefault(); };
   document.addEventListener("click", eat, { capture: true, once: true });

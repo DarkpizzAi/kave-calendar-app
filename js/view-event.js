@@ -1,371 +1,557 @@
-/* Compass: the event page and the event form (spec section 3, "The event
-   page and the event form"; round 2 prototype). Both are levels of the one
-   sheet: "event" (the page), "edit" (the pencil) and "new" (the + button).
-   Decisions live in event-form.js (tested). Every synced string goes through
-   escapeHtml and every url through safeUrl. */
+/* Compass: the event page and the event form (Material 3, Task 4).
+
+   Both are levels of the one sheet system (sheet.js): "event" (the page, in
+   the sheet) and "edit" / "new" (the form, a full-screen dialog on a phone
+   and a dialog otherwise). Adding a cost, a to-do or a link, the menu, the
+   delete confirmation and the date and time pickers are layers over them.
+   Decisions live in event-form.js (tested). Every synced string goes
+   through escapeHtml and every url through safeUrl. */
 "use strict";
 
 import { escapeHtml as esc, safeUrl, copyText } from "./util.js";
 import { todayKey } from "./dates.js";
-import { newEvent, STATUSES, STATUS_LABEL } from "./model.js";
-import { CATEGORIES as MONEY, formatCents, visibleCosts } from "./money.js";
+import { newEvent, STATUS_LABEL, statusOf } from "./model.js";
+import { CATEGORIES as MONEY, formatCents, visibleCosts, toCents } from "./money.js";
 import { CATEGORIES, GROUPS, iconFor, categoryOf, onlyIcon } from "./icons.js";
-import { readForm, costDefaults, canChangeCost, addTask, addCost, whenLine, mapsUrl, toDraft, costPayerText } from "./event-form.js";
-import { defaultCity, shownStatus, linkTier } from "./cal-model.js";
-import { registerLevel, openLevel, replaceTop, back, closeAll, topLevel } from "./sheet.js";
+import { readForm, costDefaults, canChangeCost, addTask, addCost, addLinkTo, whenParts, mapsUrl, isMapsUrl, toDraft, costPayerText,
+  spanAfterStartChange, spanAfterEndChange, copyToDay } from "./event-form.js";
+import { defaultCity, shownStatus, categoryGroup, iconsOf } from "./cal-model.js";
+import { registerLevel, openLevel, replaceTop, back, closeAll, topLevel, openLayer, closeLayer, snack } from "./sheet.js";
+import { loadRange } from "./views.js";
+import { detailGrey } from "./calendar.js";
+import { openDatePicker, openTimePicker, dateLabel } from "./pickers.js";
 import { store } from "./store.js";
-import { ICON } from "./chrome-icons.js";
+import { ms } from "./chrome-icons.js";
 import { splitLinks, ticketButton } from "./tickets.js";
+import { kaveKey } from "../m3/kave-m3.js";
 
-const MONEY_AZ = MONEY.map((c) => [c.slug, c.label]).sort((a, b) => a[1].localeCompare(b[1]));
-const MONEY_LABEL = Object.fromEntries(MONEY_AZ);
+const MONEY_LABEL = Object.fromEntries(MONEY.map((c) => [c.slug, c.label]));
 const CURRENCIES = [["EUR", "€ EUR"], ["GBP", "£ GBP"], ["USD", "$ USD"], ["CHF", "CHF"], ["CZK", "Kč CZK"], ["MAD", "MAD"], ["MYR", "RM MYR"], ["VND", "₫ VND"]];
 const OWNERS = [["shared", "Both of us"], ["isa", "Isa"], ["hugo", "Hugo"]];
-const RUNG = { estimate: ["estimate", "Estimate", "An estimate"], recorded: ["recorded", "Recorded", "Recorded by hand"],
-  confirmed: ["confirmed", "Email", "Confirmed by the booking email"], locked: ["locked", "Bank", "Locked by the bank extract"] };
-const name = (p) => ({ isa: "Isa", hugo: "Hugo", shared: "Both of us" }[p] || "");
-/* The word before each link, by the Day popup's own tiers (linkTier). */
-const LINK_WORD = ["Ticket", "App", "Website"];
+const STATUS_CHOICES = [["planned", "Planned"], ["booked", "Booked"], ["cancelled", "Cancelled"]];
+const RUNG = { estimate: ["Estimate", "An estimate"], recorded: ["Recorded", "Recorded by hand"],
+  confirmed: ["Email", "Confirmed by the booking email"], locked: ["Bank", "Locked by the bank extract"] };
+const personName = (p) => ({ isa: "Isa", hugo: "Hugo", shared: "Both of you" }[p] || "");
 
 let data = null;
 let draft = null;          // the form's values while "edit" or "new" is open
 let picker = null;         // the activity picker: null, "cat" or a category type
-const pageTask = { text: "", for: "shared" };
-let pageCost = null;       // the "Add a cost" line on the page
-let undoTimer = 0;
-let lastPage = null;       // which event the entry lines belong to
+let needing = null;        // which form field needs attention (drawn with is-error)
 
 const me = () => store.state.settings.me;
 const find = (id) => data.events().find((e) => e.id === id);
 const thisYear = () => todayKey().slice(0, 4);
+const currentId = () => (topLevel() || {}).id;
 
-/* ---- pieces ---- */
-const group = (icon, body, label) => `<section class="grp" aria-label="${label}"><span class="gic">${ICON[icon]}</span><div class="gbody">${body}</div></section>`;
-const section = (title, body) => `<section class="grp sec"><h3 class="sh">${title}</h3><div class="gbody">${body}</div></section>`;
-const choices = (f, opts, cur) => `<div class="choices" role="radiogroup">${opts.map(([v, l]) =>
-  `<button role="radio" aria-checked="${cur === v}" class="${cur === v ? "on" : ""}" data-pick="${f}" data-v="${esc(v)}">${esc(l)}</button>`).join("")}</div>`;
-/* which field needs attention; drawn with the form, so a redraw keeps it */
-let needing = null;
-const input = (f, val, label, type = "text", cls = "") =>
-  `<input class="${cls}${needing === f ? " need" : ""}" data-f="${f}" type="${type}" value="${esc(val)}" placeholder="${esc(label)}" aria-label="${esc(label)}" autocomplete="off">`;
-const select = (f, opts, cur, label) => `<select data-f="${f}" aria-label="${label}">${opts.map(([v, l]) =>
-  `<option value="${esc(v)}"${v === cur ? " selected" : ""}>${esc(l)}</option>`).join("")}</select>`;
+/* ---------- small pieces ---------- */
+const lead = (icon) => `<span class="m3-list-item__lead m3-list-item__lead--plain">${ms(icon)}</span>`;
+/* One list row. text and sub are plain strings (escaped here); lead, trail and
+   attrs are markup built from constants and already-escaped values. */
+function li({ icon = "", leadHtml = "", text, sub = "", trail = "", tag = "div", attrs = "", cls = "" }) {
+  const tap = tag !== "div";
+  return `<${tag}${tag === "button" ? ' type="button"' : ""} class="m3-list-item${tap ? " m3-list-item--tap" : ""}${cls ? " " + cls : ""}"${attrs}>`
+    + `${leadHtml || (icon ? lead(icon) : "")}<div class="m3-list-item__text"><div class="m3-body-l">${esc(text)}</div>`
+    + `${sub ? `<div class="m3-body-m m3-variant">${esc(sub)}</div>` : ""}</div>${trail}</${tag}>`;
+}
+const addRow = (label, act, icon = "add") =>
+  `<button type="button" class="m3-list-item m3-list-item--tap add-row" data-act="${act}">${ms(icon)}<span class="m3-body-l">${label}</span></button>`;
+const grouped = (rows) => `<div class="m3-grouped">${rows.join("")}</div>`;
+const heading = (text) => `<h3 class="m3-list-header m3-title-s">${esc(text)}</h3>`;
+const chips = (key, opts, cur) => `<div class="m3-chips" role="radiogroup">${opts.map(([v, l]) =>
+  `<button type="button" role="radio" aria-checked="${cur === v}" class="m3-chip${cur === v ? " is-selected" : ""}" data-pick="${key}" data-v="${esc(v)}">${cur === v ? ms("check") : ""}${esc(l)}</button>`).join("")}</div>`;
+const field = (f, label, val, extra = "") =>
+  `<label class="m3-field${needing === f ? " is-error" : ""}"><span class="m3-field__label">${esc(label)}</span>`
+  + `<input class="m3-field__input" data-f="${f}" value="${esc(val)}" autocomplete="off"${extra}></label>`;
+const firstType = (e) => (e.activities && e.activities[0] && e.activities[0].type) || "none";
 
-function costLine(k, removable) {
-  /* F41: a cost entirely the viewer's own says nothing about who paid or
-     how it splits; only someone else's payer, or a shared split, is worth
-     a word. */
-  const payerText = costPayerText(k, me());
-  const meta = [MONEY_LABEL[k.category] || k.category, payerText].filter(Boolean).join(" · ");
-  const [icon, word, long] = RUNG[k.state] || RUNG.recorded;
-  return `<div class="cost${canChangeCost(k) ? "" : " fixed"}">`
-    + `<div class="cleft"><p class="cname">${esc(k.name || MONEY_LABEL[k.category] || "Cost")}</p>`
-    + `<p class="cmeta">${esc(meta)}</p></div>`
-    + `<div class="cright"><p class="camt">${esc(formatCents(k.amount, k.currency))}</p><p class="rung" title="${long}">${ICON[icon]}${word}</p></div>`
-    + (removable && canChangeCost(k) ? `<button class="iconbtn" data-act="rmcost" data-k="${esc(k.id)}" aria-label="Remove this cost">${ICON.x}</button>` : "") + "</div>";
+function costRow(k, removable) {
+  const meta = [MONEY_LABEL[k.category] || k.category, costPayerText(k, me())].filter(Boolean).join(" · ");
+  const [word, long] = RUNG[k.state] || RUNG.recorded;
+  const trail = `<span class="cost-amt"><span class="m3-title-m m3-num">${esc(formatCents(k.amount, k.currency))}</span>`
+    + `<span class="m3-label-s m3-variant" title="${esc(long)}">${esc(word)}</span></span>`
+    + (removable && canChangeCost(k) ? `<button type="button" class="m3-icon-btn" data-act="rmcost" data-k="${esc(k.id)}" aria-label="Remove this cost">${ms("close")}</button>` : "");
+  return li({ icon: "payments", text: k.name || MONEY_LABEL[k.category] || "Cost", sub: meta, trail, cls: canChangeCost(k) ? "" : "fixed" });
 }
 
-/* "Add a cost": one line; the fields appear once a name is typed */
-function costEntry(c) {
-  const head = `<div class="newline"><span class="plus" aria-hidden="true">${ICON.plus}</span>${input("cost-name", c.name || "", "Add a cost", "text", "bare")}</div>`;
-  if (!String(c.name || "").trim()) return `<div class="newcost">${head}</div>`;
-  return `<div class="newcost">${head}`
-    + `<div class="line">${input("cost-amount", c.amountText || "", "Amount", "text", "amt")}${select("cost-currency", CURRENCIES, c.currency, "Currency")}`
-    + choices("cost-payer", [["isa", "Isa paid"], ["hugo", "Hugo paid"]], c.payer) + "</div>"
-    + `<div class="line">${choices("cost-scope", [["shared", "Shared"], ["personal", "Personal"]], c.scope)}`
-    + choices("cost-state", [["estimate", "Estimate"], ["recorded", "Recorded"]], c.state)
-    + select("cost-category", MONEY_AZ, c.category, "Category") + "</div>"
-    + `<div class="line"><button class="primary" data-act="addcost">Add</button></div></div>`;
+/* the total only when the visible lines share one currency */
+function costTotal(lines) {
+  if (!lines.length) return "";
+  const cur = lines[0].currency || "EUR";
+  if (lines.some((k) => (k.currency || "EUR") !== cur)) return "";
+  return formatCents(lines.reduce((s, k) => s + k.amount, 0), cur);
+}
+const costsHeading = (lines) => heading(`Costs${costTotal(lines) ? " · " + costTotal(lines) : ""}`);
+
+function linkRow(l, removeIdx = -1) {
+  const u = safeUrl(l.url);
+  const map = isMapsUrl(l.url);
+  const text = l.label && l.label !== "Link" ? l.label : map ? "Directions" : l.url;
+  const trail = removeIdx >= 0
+    ? `<button type="button" class="m3-icon-btn" data-act="rmlink" data-i="${removeIdx}" aria-label="Remove this link">${ms("close")}</button>`
+    : `<span class="m3-list-item__trail">${ms("open_in_new")}</span>`;
+  const sub = String(l.url || "");
+  if (removeIdx >= 0 || !u) return li({ icon: map ? "map" : "link", text, sub, trail });
+  return li({ icon: map ? "map" : "link", text, sub, trail, tag: "a", attrs: ` href="${esc(u)}" target="_blank" rel="noopener noreferrer"` });
 }
 
-/* ---- the page, in Google Calendar's order ---- */
+/* ---------- the event page ---------- */
 function eventPage(e) {
+  const theirs = detailGrey(e);
+  const group = theirs ? "other" : categoryGroup(firstType(e));
   const acts = (e.activities || []).map((a) => categoryOf(a.type).label).join(", then ");
-  /* The date line holds the day, end day and times only. The status is a
-     pill in the sheet's header; the event's type gets its own line. */
-  /* F68: an accent-filled pill, like Spoon's real recipe-page status pill
-     (kave-food-app/styles.css's .detail-tag: accent background,
-     accent-text, r-pill, fs-meta -- Compass's existing .flag.acc is the
-     same construction already) -- not the softer .flag.soft treatment F40
-     gave it. */
-  const when = `<p class="big">${esc(whenLine(e, thisYear()))}</p>`;
-  const place = [e.venue, e.city && e.city[0].toUpperCase() + e.city.slice(1)].filter(Boolean).join(", ");
+  const { date, time } = whenParts(e, thisYear());
+  const status = shownStatus(e);
+  const statusText = status === "idea" ? "Planned" : STATUS_LABEL[statusOf({ status })];
+  const hero = `<section class="ev-hero" style="${kaveKey(group)}" aria-label="${esc(e.title)}">`
+    + `<span class="ev-emo m3-emoji" aria-hidden="true">${iconsOf(e, me()).map(esc).join("")}</span>`
+    + `<h3 class="m3-headline-s ev-title${e.status === "cancelled" ? " cancelled" : ""}">${esc(e.title)}</h3>`
+    + `<p class="m3-body-l">${esc(date)} · ${esc(time)}</p>`
+    + `<p class="ev-meta">${acts ? `<span class="m3-label-l">${esc(acts)}</span>` : ""}<span class="m3-tag ev-status">${esc(statusText)}</span></p></section>`;
+
+  const rows = [];
+  const venueIsMap = isMapsUrl(e.venue);
+  const city = e.city ? e.city[0].toUpperCase() + e.city.slice(1) : "";
+  const place = (venueIsMap ? [city] : [e.venue, city]).filter(Boolean).join(", ");
   const maps = mapsUrl(e.venue, e.city);
-  const where = place ? `<p>${esc(place)}</p>${maps && e.venue ? `<a class="maps" href="${esc(maps)}" target="_blank" rel="noopener noreferrer">Open in Maps</a>` : ""}` : "";
-  const who = `<p>${esc(name(e.owner))}</p>${e.guests ? `<p class="dim">With ${esc(e.guests)}</p>` : ""}`;
-  /* Stored tickets open the phone's copy; the Drive ticket link stays as
-     "Open in Drive" (ticket-view.js catches the data-tk taps). */
+  if (place || (venueIsMap && maps)) {
+    rows.push(li({ icon: "place", text: place || "On the map", sub: "Where",
+      trail: maps && e.venue ? `<a class="m3-btn m3-btn--text" href="${esc(maps)}" target="_blank" rel="noopener noreferrer">${ms("near_me")}Directions</a>` : "" }));
+  }
+  rows.push(li({ icon: "group", text: e.owner === "shared" ? "Isa and Hugo" : personName(e.owner), sub: e.guests ? `With ${e.guests}` : "Who" }));
+  /* Stored tickets open the phone's copy, offline too (ticket-view.js catches
+     the data-tk taps); a Drive link stays as "Open in Drive". */
   const sp = splitLinks(e);
-  const driveLines = sp.drives.map((l) => ({ l, u: safeUrl(l.url) })).filter((x) => x.u);
-  const links = [...sp.tickets.map((t) => `<p class="ref"><span class="dim">Ticket</span> ${ticketButton(e, t, "ticket", esc(t.name || "Ticket"))}</p>`),
-    ...driveLines.map((x) => `<p class="ref"><span class="dim">Drive</span> <a class="ticket" href="${esc(x.u)}" target="_blank" rel="noopener noreferrer">Open in Drive${driveLines.length > 1 ? `, ${esc(x.l.label)}` : ""}${ICON.ext}</a></p>`),
-    ...sp.links.map((l) => { const u = safeUrl(l.url); return u
-      ? `<p class="ref"><span class="dim">${LINK_WORD[linkTier(l)]}</span> <a class="ticket" href="${esc(u)}" target="_blank" rel="noopener noreferrer">${esc(l.label)}${ICON.ext}</a></p>` : ""; }),
-    ...(e.bookingRefs || []).map((r) => `<p class="ref"><span class="dim">Booking</span> <span class="refv">${esc(r)}</span>`
-      + `<button class="copy" data-act="copy" data-v="${esc(r)}" aria-label="Copy ${esc(r)}">${ICON.copy}<span class="cl">Copy</span></button></p>`)].join("");
-  const todos = (e.checklist || []).map((c) => `<button class="todo${c.done ? " done" : ""}" data-act="tick" data-c="${esc(c.id)}" role="checkbox" aria-checked="${!!c.done}">`
-    + `<span class="box">${c.done ? ICON.check : ""}</span><span class="tt">${esc(c.text)}</span>${c.assignee ? `<span class="who">${name(c.assignee)}</span>` : ""}</button>`).join("");
-  const addT = `<div class="newtodo"><span class="box empty" aria-hidden="true"></span>${input("task", pageTask.text, "Add a task", "text", "bare")}`
-    + (pageTask.text.trim() ? `${choices("task-for", [["isa", "Isa"], ["hugo", "Hugo"], ["shared", "Both"]], pageTask.for)}<button class="primary" data-act="addtask">Add</button>` : "") + "</div>";
-  const costs = visibleCosts(e.costs, me()).map((k) => costLine(k, false)).join("") + costEntry(pageCost || costDefaults(e, me()));
-  return group("clock", when, "When") + (acts ? group("tag", `<p>${esc(acts)}</p>`, "Type") : "")
-    + (where ? group("pin", where, "Where") : "") + group("people", who, "Who")
-    + (links ? group("link", links, "Tickets and links") : "")
-    + section("To do", todos + addT) + section("Costs", costs)
-    + (e.notes ? group("note", `<p>${esc(e.notes)}</p>`, "Notes") : "");
+  for (const t of sp.tickets) {
+    const pdf = t.ext === "pdf";
+    rows.push(ticketButton(e, t, "m3-list-item m3-list-item--tap",
+      `${lead("confirmation_number")}<div class="m3-list-item__text"><div class="m3-body-l">${esc(sp.tickets.length > 1 ? (t.name || "Ticket") : "Ticket")}</div>`
+      + `<div class="m3-body-m m3-variant">${pdf ? "Open the ticket PDF" : "Open the ticket"}</div></div><span class="m3-list-item__trail">${ms("chevron_right")}</span>`));
+  }
+  for (const l of sp.drives) {
+    const u = safeUrl(l.url);
+    if (u) rows.push(li({ icon: "folder_open", text: "Open in Drive", sub: sp.drives.length > 1 ? l.label : "Ticket", tag: "a",
+      attrs: ` href="${esc(u)}" target="_blank" rel="noopener noreferrer"`, trail: `<span class="m3-list-item__trail">${ms("open_in_new")}</span>` }));
+  }
+  for (const r of e.bookingRefs || []) {
+    rows.push(li({ icon: "confirmation_number", text: r, sub: "Booking reference",
+      trail: `<button type="button" class="m3-icon-btn" data-act="copyref" data-v="${esc(r)}" aria-label="Copy ${esc(r)}">${ms("content_copy")}</button>` }));
+  }
+  if (e.notes) rows.push(li({ icon: "notes", text: e.notes, sub: "Notes", cls: "notes-row" }));
+
+  const costs = visibleCosts(e.costs, me());
+  const todos = (e.checklist || []).map((c) =>
+    `<button type="button" class="m3-list-item m3-list-item--tap todo${c.done ? " done" : ""}" data-act="tick" data-c="${esc(c.id)}" role="checkbox" aria-checked="${!!c.done}">`
+    + `<span class="cb${c.done ? " on" : ""}" aria-hidden="true">${c.done ? ms("check") : ""}</span>`
+    + `<div class="m3-list-item__text"><div class="m3-body-l">${esc(c.text)}</div><div class="m3-body-m m3-variant">${esc(personName(c.assignee || "shared"))}</div></div></button>`);
+  const links = sp.links.filter((l) => l && safeUrl(l.url));
+
+  return hero + grouped(rows)
+    + costsHeading(costs) + grouped([...costs.map((k) => costRow(k, false)), addRow("Add a cost", "addcost")])
+    + heading("To-dos") + grouped([...todos, addRow("Add a to-do", "addtodo")])
+    + heading("Links") + grouped([...links.map((l) => linkRow(l)), addRow("Add a link", "addlink", "link")]);
 }
 
-/* ---- the form: the same groups and icons ---- */
+/* ---------- the form ---------- */
 /* F22: a new event defaults its city to Barcelona, unless its day falls
-   inside a trip already on the calendar (tripCityFor, cal-model.js), in
-   which case that trip's city wins instead. `date` lets the day-level
-   sheet's own "+" (F21) default to the day it was opened from. */
+   inside a trip already on the calendar (tripCityFor, cal-model.js). `date`
+   lets the day sheet's own "+" default to the day it was opened from. */
 function blank(date) {
   const start = date || todayKey();
   const city = defaultCity(data.events(), start);
   return { title: "", start, end: "", startTime: "", endTime: "", owner: "shared", status: "planned", activities: [],
     city: city[0].toUpperCase() + city.slice(1), venue: "", guests: "", notes: "", refs: "", links: [], checklist: [], costs: [], newCost: null };
 }
-function activityForm(d) {
-  const chips = d.activities.map((a, i) => `<span class="act">${esc(iconFor(a, d, me()))} ${esc(categoryOf(a.type).label)}`
-    + `<button class="iconbtn" data-act="rmact" data-i="${i}" aria-label="Remove">${ICON.x}</button></span>`).join('<span class="then">then</span>');
-  let pick = "";
-  if (picker === "cat") pick = `<p class="sub">Pick a category</p>${GROUPS.map((g) => {
-    const cats = CATEGORIES.filter((c) => c.group === g);
-    if (!cats.length) return "";
-    return `<p class="catgroup">${esc(g)}</p><div class="catgrid">${cats.map((c) =>
-      `<button data-act="pickcat" data-c="${c.type}"><span class="ci">${esc(iconFor({ type: c.type }, d, me()))}</span>${esc(c.label)}</button>`).join("")}</div>`;
-  }).join("")}`;
-  else if (picker) pick = `<p class="sub">${esc(categoryOf(picker).label)}: pick its icon</p><div class="choices">${categoryOf(picker).icons.map((ic, i) =>
-    `<button class="big" data-act="pickicon" data-i="${i}">${esc(iconFor({ type: picker, icon: ic.icon }, d, me()))}</button>`).join("")}</div>`;
-  return (chips ? `<div class="acts">${chips}</div>` : "")
-    + (picker ? pick : `<button class="add" data-act="addact">${ICON.plus} ${d.activities.length ? "Add what happens next" : "Add an activity"}</button>`);
-}
-/* F51: adding a to-do follows the same reveal pattern as "Add a cost" --
-   the dotted-plus icon on the left, the input in place, the rest (assignee,
-   Add) only once there is text. */
-function todoEntry(d) {
-  const text = d.newTodoText || "";
-  const head = `<div class="newline"><span class="plus" aria-hidden="true">${ICON.plus}</span>${input("todo-new", text, "Add a to-do", "text", "bare")}</div>`;
-  if (!text.trim()) return `<div class="newcost">${head}</div>`;
-  return `<div class="newcost">${head}<div class="line">${choices("todo-new-assignee", [["isa", "Isa"], ["hugo", "Hugo"]], d.newTodoAssignee)}`
-    + `<button class="primary" data-act="addtodo">Add</button></div></div>`;
-}
-function formPage(d) {
-  return group("title", input("title", d.title, "Title", "text", "titlein"), "Title")
-    /* F45: one "to" label between the two rows, vertically centred, rather
-       than one repeated per row. */
-    + group("clock", `<div class="dt-row"><div class="dt-col">${input("start", d.start, "Day", "date")}${input("startTime", d.startTime || "", "Start time", "time")}</div>`
-      + `<span class="dt-to dim">to</span><div class="dt-col">${input("end", d.end || "", "End day", "date")}${input("endTime", d.endTime || "", "End time", "time")}</div></div>`
-      + `<p class="fhint">The end day and the times are optional.</p>${choices("status", STATUSES.map((s) => [s, STATUS_LABEL[s]]), d.status)}`, "When")
-    + group("tag", activityForm(d), "What")
-    + group("pin", `${input("venue", d.venue, "Venue")}${input("city", d.city, "City")}`, "Where")
-    + group("people", `${choices("owner", OWNERS, d.owner)}${input("guests", d.guests, "Guests, first names")}`, "Who")
-    + group("link", d.links.map((l, i) => `<div class="line">${input("link-label-" + i, l.label, "Label, e.g. Resident Advisor")}${input("link-url-" + i, l.url, "https://...")}</div>`).join("")
-      + `<button class="add" data-act="addlink">${ICON.plus} Add a link</button>${input("refs", d.refs, "Booking references, separated by commas")}`, "Tickets and links")
-    + section("To do", d.checklist.map((c, i) => `<div class="line">${input("todo-" + i, c.text, "Something to do")}${choices("assignee-" + i, [["isa", "Isa"], ["hugo", "Hugo"]], c.assignee)}</div>`).join("")
-      + todoEntry(d))
-    + section("Costs", visibleCosts(d.costs, me()).map((k) => costLine(k, true)).join("") + costEntry(d.newCost || costDefaults(d, me())))
-    + group("note", `<textarea data-f="notes" rows="3" placeholder="Notes" aria-label="Notes">${esc(d.notes)}</textarea>`, "Notes");
+
+const dtField = (label, icon, text, empty, act, which, clearable) =>
+  `<div class="m3-field fld"><span class="m3-field__label">${label}</span>`
+  + `<button type="button" class="fld-main${text ? "" : " is-empty"}" data-act="${act}" data-w="${which}" aria-label="${label}, ${esc(text || empty)}">${esc(text || empty)}</button>`
+  + (clearable && text ? `<button type="button" class="m3-icon-btn m3-icon-btn--small" data-act="cleartime" data-w="${which}" aria-label="Clear the time (all day)">${ms("close")}</button>` : "")
+  + `<span class="m3-icon fld-ic" aria-hidden="true">${icon}</span></div>`;
+const when = (label, which, day, time) =>
+  `<div class="fsec"><p class="m3-label-l m3-variant fsec-h">${label}</p><div class="fgrid">`
+  + dtField("Date", "calendar_today", dateLabel(day), "Choose a day", "pickdate", which, false)
+  + dtField("Time", "schedule", time, "All day", "picktime", which, true) + "</div></div>";
+
+function activityBlock(d) {
+  const rows = d.activities.map((a, i) => {
+    const g = categoryGroup(a.type);
+    return li({ leadHtml: `<span class="m3-list-item__lead m3-list-item__lead--square m3-emoji" style="${kaveKey(g)}" aria-hidden="true">${esc(iconFor(a, d, me()))}</span>`,
+      text: categoryOf(a.type).label, sub: i ? "Then" : "",
+      trail: `<button type="button" class="m3-icon-btn" data-act="rmact" data-i="${i}" aria-label="Remove ${esc(categoryOf(a.type).label)}">${ms("close")}</button>` });
+  });
+  if (!picker) return grouped([...rows, addRow(d.activities.length ? "Add what happens next" : "Add an activity", "addact")]);
+  let pick;
+  if (picker === "cat") {
+    pick = `<div class="m3-stack picker">${GROUPS.map((g) => {
+      const cats = CATEGORIES.filter((c) => c.group === g);
+      if (!cats.length) return "";
+      return `<p class="m3-label-l m3-variant catgroup">${esc(g)}</p><div class="m3-chips">${cats.map((c) =>
+        `<button type="button" class="m3-chip cat-chip" style="${kaveKey(categoryGroup(c.type))}" data-act="pickcat" data-c="${esc(c.type)}">`
+        + `<span class="m3-emoji">${esc(iconFor({ type: c.type }, d, me()))}</span>${esc(c.label)}</button>`).join("")}</div>`;
+    }).join("")}<button type="button" class="m3-btn m3-btn--text picker-x" data-act="pickclose">Cancel</button></div>`;
+  } else {
+    const g = categoryGroup(picker);
+    pick = `<div class="m3-stack picker"><p class="m3-label-l m3-variant">${esc(categoryOf(picker).label)}: pick its emoji</p><div class="emogrid">${categoryOf(picker).icons.map((ic, i) =>
+      `<button type="button" class="emobtn m3-emoji" style="${kaveKey(g)}" data-act="pickicon" data-i="${i}" aria-label="${esc(ic.icon)}">${esc(iconFor({ type: picker, icon: ic.icon }, d, me()))}</button>`).join("")}</div>`
+      + `<button type="button" class="m3-btn m3-btn--text picker-x" data-act="pickback">${ms("arrow_back")}Back to categories</button></div>`;
+  }
+  return (rows.length ? grouped(rows) : "") + pick;
 }
 
-/* ---- saving ---- */
-function banner(msg, undo) {
-  let b = document.getElementById("undoBanner");
-  if (!b) { b = document.createElement("div"); b.id = "undoBanner"; b.className = "banner undo"; b.setAttribute("role", "status"); document.body.append(b); }
-  b.innerHTML = `<span>${esc(msg)}</span>${undo ? '<button id="undoBtn">Undo</button>' : ""}`;
-  b.hidden = false;
-  if (undo) b.querySelector("#undoBtn").addEventListener("click", () => { undo(); b.hidden = true; });
-  clearTimeout(undoTimer);
-  undoTimer = setTimeout(() => { b.hidden = true; }, 6000);
+function formPage(d) {
+  const costs = visibleCosts(d.costs, me());
+  const todos = d.checklist.map((c, i) => li({ leadHtml: '<span class="cb" aria-hidden="true"></span>', text: c.text, sub: personName(c.assignee || "shared"),
+    trail: `<button type="button" class="m3-icon-btn" data-act="rmtodo" data-i="${i}" aria-label="Remove this to-do">${ms("close")}</button>` }));
+  const status = d.status === "idea" ? "planned" : d.status;
+  return field("title", "Title", d.title, ' placeholder="What is it?" aria-label="Title"')
+    + when("Starts", "start", d.start, d.startTime)
+    + when("Ends", "end", d.end || d.start, d.endTime)
+    + heading("Activity") + activityBlock(d)
+    + heading("Where") + `<div class="fcol">${field("venue", "Venue", d.venue)}${field("city", "City", d.city)}</div>`
+    + heading("Who") + `<div class="fcol">${chips("owner", OWNERS, d.owner)}${field("guests", "Guests, first names", d.guests)}</div>`
+    + heading("Status") + chips("status", STATUS_CHOICES, status)
+    + costsHeading(costs) + grouped([...costs.map((k) => costRow(k, true)), addRow("Add a cost", "addcost")])
+    + heading("To-dos") + grouped([...todos, addRow("Add a to-do for Isa, Hugo or both", "addtodo")])
+    + heading("Links") + grouped([...d.links.map((l, i) => linkRow(l, i)), addRow("Add a link (tickets, maps, booking)", "addlink", "link")])
+    + heading("Notes") + `<label class="m3-field"><span class="m3-field__label">Notes</span><textarea class="m3-field__input" data-f="notes" rows="3" aria-label="Notes">${esc(d.notes)}</textarea></label>`
+    + `<div class="fcol">${field("refs", "Booking references, separated by commas", d.refs)}</div>`
+    + (draft && draft.id ? `<button type="button" class="m3-btn m3-btn--outlined m3-btn--danger form-del" data-act="deleteform">${ms("delete")}Delete event</button>` : "");
 }
+
+/* ---------- small dialogs: a cost, a to-do, a link ---------- */
+/* spec: [{ type: "text", key, label, placeholder, inputmode, trail }, { type: "chips", key, label, options, wrap }, { type: "note", id }]
+   state holds the values; isValid(state) enables the button; submit(state)
+   returns an error message, or nothing when it worked (the dialog then
+   closes). */
+function smallDialog({ title, fields, state, okLabel = "Add", isValid, submit, onChange }) {
+  const chipHtml = (f) => `<div class="m3-chips dlg-chips" role="radiogroup" aria-label="${esc(f.label)}">${f.options.map(([v, l]) =>
+    `<button type="button" role="radio" aria-checked="${state[f.key] === v}" class="m3-chip${state[f.key] === v ? " is-selected" : ""}" data-chip="${f.key}" data-v="${esc(v)}">${state[f.key] === v ? ms("check") : ""}${esc(l)}</button>`).join("")}</div>`;
+  const fieldHtml = (f) => {
+    if (f.type === "chips") return `<div class="dlg-grp" data-grp="${f.key}"><p class="m3-label-l m3-variant">${esc(f.label)}</p>${chipHtml(f)}</div>`;
+    if (f.type === "note") return `<p class="m3-body-s m3-variant" data-note="${f.id}">${esc(f.text(state))}</p>`;
+    return `<label class="m3-field"><span class="m3-field__label">${esc(f.label)}</span>`
+      + `<input class="m3-field__input" data-d="${f.key}" value="${esc(state[f.key] || "")}" placeholder="${esc(f.placeholder || "")}"${f.inputmode ? ` inputmode="${f.inputmode}"` : ""} autocomplete="off">`
+      + (f.trail || "") + "</label>";
+  };
+  const html = `<h2 class="m3-headline-s dlg-title">${esc(title)}</h2><div class="dlg-body">${fields.map(fieldHtml).join("")}`
+    + '<p class="m3-body-s dlg-err" role="alert" hidden></p></div>'
+    + `<div class="m3-dialog__actions"><button type="button" class="m3-btn m3-btn--text" data-dlg="cancel">Cancel</button>`
+    + `<button type="button" class="m3-btn m3-btn--filled" data-dlg="ok"${isValid(state) ? "" : " disabled"}>${esc(okLabel)}</button></div>`;
+  let layer = null;
+  const ok = () => layer.el.querySelector('[data-dlg="ok"]');
+  const showErr = (msg) => { const n = layer.el.querySelector(".dlg-err"); n.textContent = msg || ""; n.hidden = !msg; };
+  layer = openLayer({
+    kind: "dialog", html, label: title, cls: "m3-dialog--basic add-dialog",
+    onMount: (el) => {
+      const submitNow = () => {
+        if (!isValid(state)) return;
+        const err = submit(state);
+        if (err) showErr(err); else closeLayer(layer);
+      };
+      el.addEventListener("input", (e) => {
+        const k = e.target.dataset && e.target.dataset.d;
+        if (!k) return;
+        state[k] = e.target.value;
+        ok().disabled = !isValid(state);
+        showErr("");
+        if (onChange) onChange(state, el);
+      });
+      el.addEventListener("change", (e) => {
+        const k = e.target.dataset && e.target.dataset.d;
+        if (k) { state[k] = e.target.value; }
+      });
+      el.addEventListener("click", (e) => {
+        const c = e.target.closest("[data-chip]");
+        if (c) {
+          state[c.dataset.chip] = c.dataset.v;
+          const f = fields.find((x) => x.key === c.dataset.chip);
+          const g = el.querySelector(`[data-grp="${f.key}"]`);
+          g.querySelector(".dlg-chips").outerHTML = chipHtml(f);
+          g.querySelector(`[data-v="${CSS.escape(c.dataset.v)}"]`).focus({ preventScroll: true });
+          ok().disabled = !isValid(state);
+          if (onChange) onChange(state, el);
+          return;
+        }
+        const b = e.target.closest("[data-dlg]");
+        if (!b) return;
+        if (b.dataset.dlg === "cancel") closeLayer(layer);
+        else submitNow();
+      });
+      el.addEventListener("keydown", (e) => {
+        if (e.key === "Enter" && e.target.matches("input")) { e.preventDefault(); submitNow(); }
+      });
+    },
+  });
+  return layer;
+}
+
+/* "Add a cost": amount, what for, a category, who paid. `target` is the event
+   (or the form's draft) the defaults come from; onAdd gets the new cost
+   fields and returns an error message or nothing. */
+function costDialog(target, onAdd) {
+  const def = costDefaults(target, me());
+  const state = { amount: "", name: "", category: def.category, payer: def.payer === "hugo" ? "hugo" : "isa", currency: "EUR" };
+  const cur = `<select class="cur-select" data-d="currency" aria-label="Currency">${CURRENCIES.map(([v, l]) =>
+    `<option value="${v}">${esc(l)}</option>`).join("")}</select>`;
+  smallDialog({
+    title: "Add a cost", state, isValid: (s) => { const c = toCents(s.amount); return c != null && c > 0; },
+    fields: [
+      { type: "text", key: "amount", label: "Amount", placeholder: "0,00", inputmode: "decimal", trail: cur },
+      { type: "text", key: "name", label: "What for", placeholder: "Tickets, dinner..." },
+      { type: "chips", key: "category", label: "Category", options: MONEY.map((c) => [c.slug, c.label]) },
+      { type: "chips", key: "payer", label: "Paid by", options: [["isa", "Isa"], ["hugo", "Hugo"]] },
+    ],
+    submit: (s) => onAdd({ name: s.name, amountText: s.amount, currency: s.currency, payer: s.payer, scope: def.scope, state: "recorded", category: s.category }),
+  });
+}
+
+function todoDialog(onAdd) {
+  const state = { text: "", forWho: "shared" };
+  smallDialog({
+    title: "Add a to-do", state, isValid: (s) => !!s.text.trim(),
+    fields: [
+      { type: "text", key: "text", label: "To-do", placeholder: "Buy a present, print the tickets..." },
+      { type: "chips", key: "forWho", label: "For", options: [["isa", "Isa"], ["hugo", "Hugo"], ["shared", "Both"]] },
+    ],
+    submit: (s) => onAdd(s.text, s.forWho),
+  });
+}
+
+function linkDialog(onAdd) {
+  const state = { url: "", label: "" };
+  smallDialog({
+    title: "Add a link", state, isValid: (s) => !!s.url.trim(),
+    fields: [
+      { type: "text", key: "url", label: "Link", placeholder: "https://", inputmode: "url" },
+      { type: "text", key: "label", label: "Name (optional)", placeholder: "Booking, menu..." },
+      { type: "note", id: "map", text: (s) => (isMapsUrl(s.url) ? "A Maps link: it shows as Directions on the event." : "Paste a ticket, booking or Maps link.") },
+    ],
+    onChange: (s, el) => { const n = el.querySelector('[data-note="map"]'); if (n) n.textContent = isMapsUrl(s.url) ? "A Maps link: it shows as Directions on the event." : "Paste a ticket, booking or Maps link."; },
+    submit: (s) => onAdd(s.url, s.label),
+  });
+}
+
+/* ---------- saving ---------- */
 function save(prev, next) {
   try { return data.save(prev, next); }
-  catch (err) { banner(String(err.message || err)); return null; }
+  catch (err) { snack(String(err.message || err)); return null; }
 }
-function need(sel) {
-  needing = sel.match(/data-f="([^"]+)"/)[1];
-  refresh();
-  /* after the sheet's own redraw for this tap */
-  setTimeout(() => { const el = document.querySelector(`#sheetRoot ${sel}`); if (el) el.focus(); }, 0);
+
+function need(f) {
+  needing = f;
+  redraw();
+  setTimeout(() => { const el = document.querySelector(`#sheetRoot [data-f="${f}"]`); if (el) el.focus(); }, 0);
+}
+
+/* Draw the open level again in place (the form after a picker or a dialog). */
+function redraw(focusSel) {
+  const l = topLevel();
+  if (!l) return;
+  replaceTop(l);
+  if (focusSel) { const n = document.querySelector(`#sheetRoot ${focusSel}`); if (n) n.focus({ preventScroll: true }); }
 }
 
 function saveForm(l) {
-  /* A to-do or cost typed but never added is kept, not silently dropped. */
-  if (String(draft.newTodoText || "").trim()) {
-    draft.checklist = addTask(draft, draft.newTodoText, draft.newTodoAssignee).checklist;
-    draft.newTodoText = ""; draft.newTodoAssignee = null;
-  }
-  if (draft.newCost && String(draft.newCost.name || "").trim()) {
-    try { draft.costs = addCost(draft, draft.newCost, me(), new Date()).costs; draft.newCost = null; }
-    catch { need('[data-f="cost-amount"]'); banner("The new cost needs an amount."); return; }
-  }
+  if (draft.end && draft.end === draft.start) draft.end = "";
   const { fields, errors } = readForm(draft);
-  if (errors.length) { need(!fields.title ? '[data-f="title"]' : '[data-f="start"]'); banner(errors[0][0].toUpperCase() + errors[0].slice(1) + "."); return; }
+  if (errors.length) {
+    if (!fields.title) need("title");
+    snack(errors[0][0].toUpperCase() + errors[0].slice(1) + ".");
+    return;
+  }
   if (l.kind === "new") {
     let ev;
-    try { ev = newEvent(fields, { me: me(), now: new Date() }); } catch (err) { banner(String(err.message || err)); return; }
+    try { ev = newEvent(fields, { me: me(), now: new Date() }); } catch (err) { snack(String(err.message || err)); return; }
     const saved = save(null, { ...ev, costs: draft.costs });
-    if (saved) { draft = null; replaceTop({ kind: "event", id: saved.id }); }
+    if (saved) { draft = null; picker = null; replaceTop({ kind: "event", id: saved.id }, "deeper"); }
   } else {
     const prev = find(l.id);
-    if (save(prev, { ...prev, ...fields, costs: draft.costs })) { draft = null; back(); }
+    if (!prev) { snack("This event is no longer here."); return; }
+    if (save(prev, { ...prev, ...fields, costs: draft.costs })) { draft = null; picker = null; back(); }
   }
 }
 
-/* ---- typing: values go into the draft (or the page's entry lines) ---- */
-function onInput(t, l) {
-  const f = t.dataset.f; if (!f) return;
-  const v = t.value;
-  if (needing === f) { needing = null; t.classList.remove("need"); }
-  const onPage = l.kind === "event";
-  /* refresh() (refreshSheet) never redraws an open form, so a background
-     sync cannot close the keyboard mid-word. Typing the first character of
-     a name is a reveal the person asked for, so it redraws unconditionally,
-     in place and with no history entry (replaceTop). */
-  const redraw = (sel) => { const l = topLevel(); if (l) replaceTop(l); const i = document.querySelector(`#sheetRoot [data-f="${sel}"]`); if (i) { i.focus(); i.setSelectionRange(i.value.length, i.value.length); } };
-  if (f === "task") {
-    const had = !!pageTask.text.trim(); pageTask.text = v;
-    if (had !== !!v.trim()) redraw("task");
-    return;
-  }
-  if (f.startsWith("cost-")) {
-    const holder = onPage ? null : draft;
-    let c = onPage ? pageCost : draft.newCost;
-    if (!c) c = { ...costDefaults(onPage ? find(l.id) : draft, me()) };
-    const had = !!String(c.name || "").trim();
-    const k = f.slice(5);
-    if (k === "amount") c.amountText = v; else c[k] = v;
-    if (holder) holder.newCost = c; else pageCost = c;
-    if (k === "name" && had !== !!v.trim()) redraw("cost-name");
-    return;
-  }
-  if (!draft) return;
-  if (f === "todo-new") {
-    const had = !!(draft.newTodoText || "").trim();
-    draft.newTodoText = v;
-    if (had !== !!v.trim()) redraw("todo-new");
-    return;
-  }
-  if (f.startsWith("link-label-")) draft.links[Number(f.slice(11))].label = v;
-  else if (f.startsWith("link-url-")) draft.links[Number(f.slice(9))].url = v;
-  else if (f.startsWith("todo-")) draft.checklist[Number(f.slice(5))].text = v;
-  else draft[f] = v;
+/* ---------- typing: values go into the draft ---------- */
+function onInput(t) {
+  const f = t.dataset.f; if (!f || !draft) return;
+  if (needing === f) { needing = null; const w = t.closest(".m3-field"); if (w) w.classList.remove("is-error"); }
+  draft[f] = t.value;
 }
 
-let refresh = () => {};
+/* ---------- the menu, copy and delete ---------- */
+function openMenu(anchor, e) {
+  const layer = openLayer({
+    kind: "menu", anchor, label: "More",
+    html: `<button type="button" role="menuitem" data-m="copy">${ms("content_copy")}<span class="m3-body-l">Copy to another day</span></button>`
+      + `<button type="button" role="menuitem" data-m="delete">${ms("delete")}<span class="m3-body-l">Delete</span></button>`,
+    onMount: (el) => el.addEventListener("click", (ev) => {
+      const b = ev.target.closest("[data-m]");
+      if (!b) return;
+      if (b.dataset.m === "copy") closeLayer(layer, () => copyFlow(e.id));
+      else closeLayer(layer, () => confirmDelete(e.id));
+    }),
+  });
+}
 
-/* ---- taps ---- */
-function onAction(b, l) {
-  const a = b.dataset.act, pick = b.dataset.pick;
-  const e = l.kind === "event" ? find(l.id) : null;
-  if (a === "edit") { draft = toDraft(e); picker = null; barOpen = false; openLevel({ kind: "edit", id: e.id }); return; }
-  if (a === "save") { saveForm(l); return; }
-  if (a === "cancel") { draft = null; picker = null; back(); return; }
-  if (a === "delete") {
-    const prev = find(l.id);
-    let gone;
-    try { gone = data.remove(prev); } catch (err) { banner(String(err.message || err)); return; }
-    draft = null; closeAll();
-    banner(`Deleted ${prev.title}.`, () => { try { data.undoRemove(gone); } catch (err) { banner(String(err.message || err)); } });
+async function copyFlow(id) {
+  const e = find(id);
+  if (!e) return;
+  const rng = loadRange(todayKey());
+  const day = await openDatePicker({ value: e.start, min: rng.min, max: rng.max, title: `Copy ${e.title} to` });
+  if (!day) return;
+  let saved;
+  try { saved = data.save(null, copyToDay(e, day, { me: me(), now: new Date() })); }
+  catch (err) { snack(String(err.message || err)); return; }
+  /* Undo is a normal change: the copy is marked deleted through the store,
+     so the sync merge sees it like any other delete */
+  snack(`Copied to ${dateLabel(day)}`, "Undo", () => {
+    try { data.remove(find(saved.id) || saved); } catch (err) { snack(String(err.message || err)); }
+  });
+}
+
+function confirmDelete(id) {
+  const e = find(id);
+  if (!e) return;
+  const layer = openLayer({
+    kind: "dialog", label: `Delete ${e.title}`, cls: "m3-dialog--basic",
+    html: `<span class="m3-empty-state__icon dlg-ic" aria-hidden="true">${ms("delete")}</span><h2 class="m3-headline-s dlg-title dlg-center">Delete ${esc(e.title)}?</h2>`
+      + '<p class="m3-body-m m3-variant">It goes for both of you, with its costs and to-dos. You can undo it straight after.</p>'
+      + '<div class="m3-dialog__actions"><button type="button" class="m3-btn m3-btn--text" data-dlg="cancel">Cancel</button>'
+      + '<button type="button" class="m3-btn m3-btn--filled" data-dlg="ok">Delete</button></div>',
+    onMount: (el) => el.addEventListener("click", (ev) => {
+      const b = ev.target.closest("[data-dlg]");
+      if (!b) return;
+      if (b.dataset.dlg === "cancel") { closeLayer(layer); return; }
+      closeLayer(layer, () => {
+        const prev = find(id);
+        if (!prev) return;
+        let gone;
+        try { gone = data.remove(prev); } catch (err) { snack(String(err.message || err)); return; }
+        draft = null; picker = null;
+        closeAll();
+        snack(`Deleted ${prev.title}`, "Undo", () => { try { data.undoRemove(gone); } catch (err) { snack(String(err.message || err)); } });
+      });
+    }),
+  });
+}
+
+/* ---------- taps ---------- */
+async function pickDate(which) {
+  const d = draft, rng = loadRange(todayKey());
+  const day = await openDatePicker({ value: which === "start" ? d.start : d.end || d.start, min: rng.min, max: rng.max,
+    title: which === "start" ? "Starts on" : "Ends on" });
+  if (!day || draft !== d) return;
+  const r = which === "start" ? spanAfterStartChange(d.start, d.end, day) : spanAfterEndChange(d.start, d.end || d.start, day);
+  d.start = r.start; d.end = r.end;
+  redraw(`[data-act="pickdate"][data-w="${which}"]`);
+}
+async function pickTime(which) {
+  const d = draft;
+  const key = which === "start" ? "startTime" : "endTime";
+  const t = await openTimePicker({ value: d[key] || d.startTime || "", title: which === "start" ? "Starts at" : "Ends at" });
+  if (!t || draft !== d) return;
+  d[key] = t;
+  redraw(`[data-act="picktime"][data-w="${which}"]`);
+}
+
+function onPageAction(b, e) {
+  const a = b.dataset.act;
+  if (a === "edit") { draft = toDraft(e); picker = null; needing = null; openLevel({ kind: "edit", id: e.id }); return; }
+  if (a === "menu") { openMenu(b, e); return; }
+  if (a === "copyref") {
+    copyText(b.dataset.v).then((ok) => { if (ok) snack("Copied " + b.dataset.v); });
     return;
   }
-  if (a === "copy") {
-    const done = () => { const s = b.querySelector(".cl"); s.textContent = "Copied"; setTimeout(() => { s.textContent = "Copy"; }, 1500); };
-    copyText(b.dataset.v).then(done);
-    return;
-  }
-  if (e) {
-    if (a === "tick") save(e, { ...e, checklist: e.checklist.map((c) => (c.id === b.dataset.c ? { ...c, done: !c.done } : c)) });
-    else if (pick === "task-for") pageTask.for = b.dataset.v;
-    /* an empty task is nothing to add: saving it would still commit */
-    else if (a === "addtask") { if (pageTask.text.trim() && save(e, addTask(e, pageTask.text, pageTask.for))) { pageTask.text = ""; pageTask.for = "shared"; } }
-    else if (pick && pick.startsWith("cost-")) { pageCost = pageCost || { ...costDefaults(e, me()) }; pageCost[pick.slice(5)] = b.dataset.v; }
-    else if (a === "addcost") {
+  if (a === "tick") { save(e, { ...e, checklist: e.checklist.map((c) => (c.id === b.dataset.c ? { ...c, done: !c.done } : c)) }); return; }
+  if (a === "addcost") {
+    costDialog(e, (c) => {
+      const cur = find(e.id);
+      if (!cur) return "This event is no longer here.";
       let next;
-      try { next = addCost(e, pageCost || costDefaults(e, me()), me(), new Date()); } catch { need('[data-f="cost-amount"]'); return; }
-      if (save(e, next)) pageCost = null;
-    }
-    return;
+      try { next = addCost(cur, c, me(), new Date()); } catch { return "The amount is not a number."; }
+      return save(cur, next) ? undefined : "The cost could not be saved.";
+    });
+  } else if (a === "addtodo") {
+    todoDialog((text, forWho) => {
+      const cur = find(e.id);
+      return cur && save(cur, addTask(cur, text, forWho)) ? undefined : "The to-do could not be saved.";
+    });
+  } else if (a === "addlink") {
+    linkDialog((url, label) => {
+      const cur = find(e.id);
+      if (!cur) return "This event is no longer here.";
+      const next = addLinkTo(cur, { url, label });
+      if (next === cur) return "That link is not valid, or it is already there.";
+      return save(cur, next) ? undefined : "The link could not be saved.";
+    });
   }
+}
+
+function onFormAction(b, l) {
   const d = draft;
   if (!d) return;
-  if (pick) {
-    if (pick.startsWith("assignee-")) { const c = d.checklist[Number(pick.slice(9))]; c.assignee = c.assignee === b.dataset.v ? null : b.dataset.v; }
-    else if (pick === "todo-new-assignee") d.newTodoAssignee = d.newTodoAssignee === b.dataset.v ? null : b.dataset.v;
-    else if (pick.startsWith("cost-")) { d.newCost = d.newCost || { ...costDefaults(d, me()) }; d.newCost[pick.slice(5)] = b.dataset.v; }
-    else d[pick] = b.dataset.v;
-  }
-  else if (a === "addact") picker = "cat";
+  const a = b.dataset.act, pick = b.dataset.pick;
+  if (a === "save") { saveForm(l); return; }
+  if (a === "pickdate") { pickDate(b.dataset.w); return; }
+  if (a === "picktime") { pickTime(b.dataset.w); return; }
+  if (a === "cleartime") { d[b.dataset.w === "start" ? "startTime" : "endTime"] = ""; return; }
+  if (a === "deleteform") { confirmDelete(l.id); return; }
+  if (pick) { d[pick] = b.dataset.v; return; }
+  if (a === "addact") picker = "cat";
+  else if (a === "pickclose") picker = null;
+  else if (a === "pickback") picker = "cat";
   else if (a === "pickcat") {
     const only = onlyIcon(b.dataset.c);
-    if (only) d.activities.push({ type: b.dataset.c, icon: only }); else picker = b.dataset.c;
-  }
-  else if (a === "pickicon") { d.activities.push({ type: picker, icon: categoryOf(picker).icons[Number(b.dataset.i)].icon }); picker = null; }
+    if (only) { d.activities.push({ type: b.dataset.c, icon: only }); picker = null; } else picker = b.dataset.c;
+  } else if (a === "pickicon") { d.activities.push({ type: picker, icon: categoryOf(picker).icons[Number(b.dataset.i)].icon }); picker = null; }
   else if (a === "rmact") d.activities.splice(Number(b.dataset.i), 1);
-  else if (a === "addlink") d.links.push({ label: "", url: "" });
-  else if (a === "addtodo") {
-    /* the same addTask as the page's "Add a task" (and Save's half-typed
-       to-do): one way to make a to-do, ids and all; empty text adds nothing */
-    d.checklist = addTask(d, d.newTodoText, d.newTodoAssignee).checklist;
-    d.newTodoText = ""; d.newTodoAssignee = null;
-  }
+  else if (a === "rmtodo") d.checklist.splice(Number(b.dataset.i), 1);
+  else if (a === "rmlink") d.links.splice(Number(b.dataset.i), 1);
   else if (a === "rmcost") d.costs = d.costs.filter((k) => k.id !== b.dataset.k || !canChangeCost(k));
   else if (a === "addcost") {
-    try { d.costs = addCost(d, d.newCost || costDefaults(d, me()), me(), new Date()).costs; d.newCost = null; }
-    catch { need('[data-f="cost-amount"]'); }
+    costDialog(d, (c) => {
+      if (draft !== d) return "";
+      try { d.costs = addCost(d, c, me(), new Date()).costs; } catch { return "The amount is not a number."; }
+      redraw();
+    });
+  } else if (a === "addtodo") {
+    todoDialog((text, forWho) => { if (draft === d) { d.checklist = addTask(d, text, forWho).checklist; redraw(); } });
+  } else if (a === "addlink") {
+    linkDialog((url, label) => {
+      if (draft !== d) return "";
+      const next = addLinkTo(d, { url, label });
+      if (next === d) return "That link is not valid, or it is already there.";
+      d.links = next.links; redraw();
+    });
   }
-  else if (a === "barmore") barOpen = !barOpen;
 }
-
-/* F46: the bar collapses to Save plus a small reveal arrow; Cancel and
-   Delete stay hidden until it is tapped. */
-let barOpen = false;
-const formBar = (l) => '<button class="act-btn primary" data-act="save">' + (l.kind === "new" ? "Add" : "Save") + "</button>"
-  + `<button class="sbtn reveal${barOpen ? " on" : ""}" data-act="barmore" aria-expanded="${barOpen}" aria-label="${barOpen ? "Hide more actions" : "More actions"}">${ICON.chev}</button>`
-  + `<span class="bar-more"${barOpen ? "" : " hidden"}><button class="act-btn" data-act="cancel">Cancel</button>`
-  + (l.kind === "edit" ? '<button class="act-btn" data-act="delete">Delete</button>' : "") + "</span>";
 
 export function initEvent(ctx) {
   data = ctx.data;
-  refresh = ctx.refresh;
   registerLevel("event", {
     title: (l) => { const e = find(l.id); return e ? e.title : "Event"; },
-    /* F68 continued: the status pill moved into the sheet's own header,
-       Spoon's recipe popup's own .detail-tags row under the name, instead
-       of living as the page's first line. */
-    /* shownStatus, like the Day popup: a ticket link reads as Booked */
-    tags: (l) => { const e = find(l.id); return e ? `<span class="flag acc status-pill">${esc(STATUS_LABEL[shownStatus(e)])}</span>` : ""; },
-    body: (l) => {
-      /* the entry lines belong to one event: a different event starts them empty */
-      if (l.id !== lastPage) { lastPage = l.id; pageCost = null; pageTask.text = ""; pageTask.for = "shared"; }
-      const e = find(l.id); return e ? eventPage(e) : '<p class="hint pad">This event is no longer here.</p>';
-    },
-    bar: () => `<button class="sbtn" data-act="edit" aria-label="Edit this event">${ICON.pen}</button>`,
-    onAction: (b) => onAction(b, { kind: "event", id: currentId() }),
-    onInput: (t, ev) => { if (ev.type === "input" || t.tagName === "SELECT") onInput(t, { kind: "event", id: currentId() }); },
+    body: (l) => { const e = find(l.id); return e ? eventPage(e) : '<p class="m3-body-m m3-variant pad">This event is no longer here.</p>'; },
+    bar: () => `<button type="button" class="m3-icon-btn" data-act="edit" aria-label="Edit this event">${ms("edit")}</button>`
+      + `<button type="button" class="m3-icon-btn" data-act="menu" aria-label="More">${ms("more_vert")}</button>`,
+    onAction: (b) => { const e = find(currentId()); if (e) onPageAction(b, e); },
   });
   for (const kind of ["edit", "new"]) {
     registerLevel(kind, {
+      layer: "form",
       title: () => (kind === "new" ? "New event" : "Edit event"),
       body: () => (draft ? formPage(draft) : ""),
-      bar: (l) => formBar(l),
-      onAction: (b) => onAction(b, { kind, id: currentId() }),
-      onInput: (t, ev) => { if (ev.type === "input" || t.tagName === "SELECT") onInput(t, { kind, id: currentId() }); },
+      bar: () => `<button type="button" class="m3-btn m3-btn--filled" data-act="save">${kind === "new" ? "Add" : "Save"}</button>`,
+      onAction: (b) => onFormAction(b, topLevel()),
+      onInput: (t) => onInput(t),
     });
   }
-  /* Enter in "Add a task" adds it */
-  document.getElementById("sheetRoot").addEventListener("keydown", (e) => {
-    if (e.key === "Enter" && e.target.dataset && e.target.dataset.f === "task") { e.preventDefault(); onAction({ dataset: { act: "addtask" } }, { kind: "event", id: currentId() }); refresh(); }
-  });
 }
 
-const currentId = () => (topLevel() || {}).id;
-
-/* The + button: an empty form. F21: the day-level sheet's own "+" passes
-   that day, so the form (and F22's trip-aware default city) starts there. */
+/* The + button: an empty form. F21: the day sheet's own "+" passes that day,
+   so the form (and F22's trip-aware default city) starts there. */
 export function newEventForm(date) {
-  if (!me()) { banner("Choose who you are in Settings first."); return; }
-  draft = blank(date); picker = null; barOpen = false;
+  if (!me()) { snack("Choose who you are in Settings first."); return; }
+  draft = blank(date); picker = null; needing = null;
   openLevel({ kind: "new" });
+  setTimeout(() => { const t = document.querySelector('#sheetRoot [data-f="title"]'); if (t) t.focus({ preventScroll: true }); }, 60);
 }
