@@ -34,6 +34,8 @@ export function wire() {
   window.addEventListener("popstate", onShellPop);
   document.addEventListener("keydown", (e) => {
     if (e.key !== "Escape") return;
+    /* a sheet, dialog, picker or menu above a page owns this Escape (js/boot.js) */
+    if (sheetOpen()) return;
     if (pageIsOpen()) { e.preventDefault(); closePage(); }
     else if (drawerIsOpen()) { e.preventDefault(); closeDrawer(); }
   });
