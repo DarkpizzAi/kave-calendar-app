@@ -47,4 +47,11 @@ export const ICON = {
 
 /* Material Symbols for the shell (the font is loaded in index.html). The name
    is always a constant from this app's own code, never data. */
+/* Shown at the top of each tab while the phone has no network; render() draws
+   it again when the connection comes or goes (wire.js). */
+export const offlineCardHtml = () => (navigator.onLine === false
+  ? `<div class="m3-card m3-card--filled offline-card" role="status"><span class="m3-icon m3-variant" aria-hidden="true">cloud_off</span>`
+    + `<div class="offline-card__text"><span class="m3-title-s">You're offline</span>`
+    + `<span class="m3-body-s m3-variant">Changes are saved on this phone and sync when you're back.</span></div></div>`
+  : "");
 export const ms = (name, cls = "") => `<span class="m3-icon${cls ? " " + cls : ""}" aria-hidden="true">${name}</span>`;

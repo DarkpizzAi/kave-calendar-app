@@ -179,7 +179,7 @@ Native ES modules, no bundler, no build step.
 | `js/util.js` | `escapeHtml`, `safeUrl`, `uid`, `own` |
 | `js/store.js` | persisted state, `localStorage` under `compass.*` |
 | `js/theme.js` | palette selection, colour-scheme, CSP-boot diagnostic |
-| `js/sync.js` | sync status and the token check |
+| `js/sync.js` | sync status (what each sync announces, never what it does) and the token check |
 | `js/local.js`, `js/merge.js` | local cache/queue, per-event merge |
 | `js/model.js`, `js/dates.js`, `js/money.js` | the event record, dates, costs |
 | `js/data.js` | the app's data instance over sync + local |
@@ -190,10 +190,11 @@ Native ES modules, no bundler, no build step.
 | `js/sheet.js` | levels, history, the sheet's depth animation |
 | `js/view-event.js`, `js/event-form.js` | the event page and form |
 | `js/prefs.js` | Calendar defaults and free-time blocking |
-| `js/updates.js` | check-for-updates, ported from Spoon |
+| `js/updates.js` | check-for-updates and the sticky "A new version is ready" snackbar |
+| `js/search.js` | the whole-app search page: events, tickets, categories |
 | `js/gate.js` | the first-run gate: token, who, theme (the hub site's screen) |
 | `js/render.js` | the frame and Settings |
-| `js/wire.js` | one-time listeners, the banner |
+| `js/wire.js` | one-time listeners, sync snackbars, pull to refresh, the banner |
 | `js/boot.js` | entry point, service-worker registration |
 | `github.js` | Contents API client, carried over from Spoon |
 

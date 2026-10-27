@@ -211,8 +211,14 @@ function syncInert() {
   layers.forEach((l) => hosts.push(l.host));
   hosts.forEach((h, i) => { h.inert = i < hosts.length - 1; });
   const shell = document.querySelector(".shell");
-  if (shell) shell.inert = hosts.length > 0;
+  const covers = coverPages();
+  /* a page (Settings, the Archive, search) under the sheet is out of reach
+     while the sheet is up, and the shell stays inert behind it after */
+  covers.forEach((p) => { p.inert = hosts.length > 0; });
+  if (shell) shell.inert = hosts.length > 0 || covers.some((p) => !p.hidden);
 }
+/* the full-screen pages a sheet can open over */
+const coverPages = () => ["page", "searchPage"].map((id) => document.getElementById(id)).filter(Boolean);
 
 function restoreFocus() {
   const o = opener; opener = null;
@@ -315,8 +321,9 @@ export function openLevel(l, opts = {}) {
   const deeper = stack.length > 0;
   /* never over the menu drawer or a page: while one is up the shell is inert
      and nothing of ours is open */
-  const shell = document.querySelector(".shell");
-  if (!deeper && shell && shell.inert) return;
+  const drawer = document.getElementById("drawer");
+  if (!deeper && drawer && !drawer.hidden) return;
+  if (!deeper && !coverPages().some((p) => !p.hidden) && document.querySelector(".shell").inert) return;
   if (layers.length) return;
   if (!deeper) opener = document.activeElement;
   stack.push(l);
@@ -362,9 +369,12 @@ export function back() {
    one by one, never more than were caused (final review M3). */
 export function createPopGate() {
   let pending = 0;
-  return { expect(n) { pending += n; }, take() { if (pending > 0) { pending--; return true; } return false; }, reset() { pending = 0; } };
+  return { expect(n) { pending += n; }, take() { if (pending > 0) { pending--; return true; } return false; }, pending() { return pending; }, reset() { pending = 0; } };
 }
 const pops = createPopGate();
+/* The sheet's own history entries are about to be popped (or just were): the
+   shell's handlers (pages, search) must leave this popstate alone. */
+export const sheetOwnsPop = () => stack.length > 0 || layers.length > 0 || pops.pending() > 0;
 
 export function closeAll() {
   const n = layers.length + stack.length;
@@ -448,7 +458,7 @@ function finishLayer(layer) {
 
 /* A snackbar over everything, one at a time (the kit closes the last). */
 export function snack(text, action, onAction) {
-  return showSnackbar(document.body, { text, action, onAction });
+  return showSnackbar(document.getElementById("snackHost") || document.body, { text, action, onAction });
 }
 
 /* ---------- wiring ---------- */

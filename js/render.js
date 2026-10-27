@@ -22,13 +22,15 @@ import { escapeHtml, copyText, markJump } from "./util.js";
 import { PALETTES, SEED_HEX, toSeed, applyPalette, themeBootRan } from "./theme.js";
 import { status as syncStatus, checkToken } from "./sync.js";
 import { ms, ICON } from "./chrome-icons.js";
-import { calendarHtml, afterCalendar, backToToday, todaysCount } from "./calendar.js";
-import { refreshSheet } from "./sheet.js";
+import { calendarHtml, afterCalendar, backToToday, todaysCount, archiveHtml, archiveOpened, archivePickYear } from "./calendar.js";
+import { refreshSheet, sheetOwnsPop, openLevel } from "./sheet.js";
+import { openSearch, onSearchPop, searchIsOpen, refreshSearch } from "./search.js";
+import { syncBarOn } from "./sync.js";
 import { readPrefs, defaultsSummary, VIEW_NAMES, DETAIL_NAMES } from "./prefs.js";
 import { CATEGORIES, iconFor } from "./icons.js";
 import { DAY_PRIORITY } from "./cal-model.js";
 import { resetCalendarDefaults } from "./calendar.js";
-import { checkForUpdate, ensureVersionAsked, updateStatusLines, updateBusy, updateButtonText, updateReady } from "./updates.js";
+import { checkForUpdate, ensureVersionAsked, updateStatusLines, updateBusy, updateButtonText, updateReady, restartForUpdate } from "./updates.js";
 import { gateStep, gateHtml, bindGate } from "./gate.js";
 import { insightsHtml, bindInsights, newVisit } from "./view-insights.js";
 import { roadmapHtml } from "./view-roadmap.js";
@@ -89,8 +91,16 @@ export function setView(name) {
   }
 }
 
-/* The search magnifier on every tab. Task 6 builds the search page; until then it does nothing (the Calendar's own search went with the old views). */
-export function openSearch() { /* placeholder for Task 6 */ }
+/* The search magnifier on every tab opens js/search.js's page. */
+export { openSearch };
+
+/* The indeterminate bar under the header: only while Sync now runs (a pull has
+   its own spinner, a background sync shows nothing). Toggled in place, never
+   by a render, so a sync does not redraw the Calendar. */
+export function paintSyncBar() {
+  const b = $("syncBar");
+  if (b) b.hidden = !syncBarOn();
+}
 
 export function showTopBar() { const b = $("topBar"); if (b) b.classList.remove("is-hidden"); }
 export function hideTopBar() { const b = $("topBar"); if (b) b.classList.add("is-hidden"); }
@@ -186,12 +196,6 @@ function emorderHtml() {
     + hint("Always, whatever the order: a visitor's arrival day shows first; a hotel shows only on check-in day; Other is last.")
     + `</div>`;
 }
-/* Task 6 builds the Archive; the route and the page exist now. */
-function archiveHtml() {
-  return `<div class="page-col"><div class="m3-empty-state"><div class="m3-empty-state__icon">${ms("inventory_2")}</div>`
-    + `<p class="m3-title-m">The archive is moving here</p><p class="m3-body-m m3-variant">Look back before this year, in Grid or Agenda. It opens on this page soon.</p></div></div>`;
-}
-
 /* Dragging a row by its handle (pointer events, so mouse and touch alike).
    The rows move in the DOM while the finger is down; the order is saved
    once, on release (a save redraws the page, which would drop the drag). */
@@ -275,6 +279,8 @@ export function render() {
   if (current === "calendar") { afterCalendar(main, before); firstDraw = false; }
   refreshSheet();
   refreshPage();
+  refreshSearch();
+  paintSyncBar();
   bindView();
   if (current === "insights") bindInsights(main);
 }
@@ -295,7 +301,7 @@ let opener = null; // the control that opened the drawer or a page: closing hand
    reader stay inside. The drawer and the page sit outside .shell on purpose. */
 function syncInert() {
   const shell = document.querySelector(".shell");
-  if (shell) shell.inert = drawerOpen || pages.length > 0;
+  if (shell) shell.inert = drawerOpen || pages.length > 0 || searchIsOpen();
 }
 function restoreFocus() {
   syncInert(); // focus can only return to a control that is no longer inert
@@ -398,6 +404,7 @@ export function openPage(name) {
   if (first) { hostToken++; host.hidden = false; sharedAxisIn(host, 1); }
   else sharedAxisIn($("pageBody"), 1);
   $("pageBack").focus({ preventScroll: true });
+  if (name === "archive") archiveOpened();
 }
 function popPageNow() {
   const gone = pages.pop();
@@ -428,6 +435,9 @@ export function closePage() {
 }
 /* wire.js: the browser went back one entry */
 export function onShellPop() {
+  /* a sheet over a page or over search owns this pop: that layer stays */
+  if (sheetOwnsPop()) return false;
+  if (onSearchPop()) return true;
   const t = topPage();
   if (t) { t.hist = false; popPageNow(); return true; }
   if (drawerOpen) { drawerHist = false; hideDrawer(); return true; }
@@ -448,6 +458,12 @@ export function onPageClick(e) {
   if (!b || b.disabled) return;
   const d = b.dataset;
   if (d.pageOpen) { openPage(d.pageOpen); return; }
+  if (d.archYear) { archivePickYear(d.archYear); drawPage("archive", false); const c = document.querySelector(`#pageBody [data-arch-year="${CSS.escape(d.archYear)}"]`); if (c) c.focus({ preventScroll: true }); return; }
+  if (d.archEv) {
+    const r = b.getBoundingClientRect();
+    openLevel({ kind: "event", id: d.archEv }, { from: { x: r.left, y: r.top, w: r.width, h: r.height } });
+    return;
+  }
   const key = Object.keys(d)[0];
   const again = () => { // the page redraws on a save: put the keyboard back on the same control
     if (!key) return;
@@ -473,7 +489,7 @@ export function onPageClick(e) {
     });
     return;
   }
-  if (b.id === "syncNow") { if (actions.sync) actions.sync(); return; }
+  if (b.id === "syncNow") { if (actions.sync) actions.sync({ manual: true, bar: true }); return; }
   if (b.id === "clearToken") { store.setSetting("token", ""); return; }
   if (b.id === "copyAppLink") {
     const input = $("appLink");
@@ -488,7 +504,7 @@ export function onPageClick(e) {
     return;
   }
   if (b.id === "updateBtn") {
-    if (updateReady()) { location.reload(); return; }
+    if (updateReady()) { restartForUpdate(); return; }
     checkForUpdate(render);
   }
 }

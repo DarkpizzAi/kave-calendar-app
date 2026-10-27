@@ -373,3 +373,25 @@ button.m3-list-item, a.m3-list-item { width: 100%; text-align: left; text-decora
 /* a row whose text is tappable while its end holds its own buttons (fix round 1) */
 .m3-list-item > .row-main { display: flex; align-items: center; gap: 16px; flex: 1; min-width: 0; align-self: stretch; margin: -8px 0 -8px -16px; padding: 8px 0 8px 16px; text-align: left; text-decoration: none; color: inherit; border-radius: inherit; }
 .m3-list-item > .row-main:hover { box-shadow: inset 0 0 0 100vmax color-mix(in srgb, currentColor 8%, transparent); }
+
+/* ---------- search, Archive and status (Task 6) ---------- */
+/* a sheet that opens over a full-screen page (an event from search or the
+   Archive) must sit above it: the page drops under the sheet's scrim while a
+   sheet host exists */
+body:has(.layer-host) #page, body:has(.layer-host) #searchPage { z-index: 19; }
+.srch-group { margin-bottom: 8px; }
+.srch-row { width: 100%; text-align: left; }
+.srch-em { flex: none; width: 40px; min-width: 40px; display: grid; place-items: center; font-size: 20px; white-space: nowrap; }
+.srch-em .m3-icon { color: var(--md-sys-color-on-surface-variant); }
+.srch-more { display: block; padding: 8px 16px; }
+.offline-card { flex-direction: row; align-items: center; gap: 16px; margin: 8px 0 4px; }
+.offline-card__text { display: flex; flex-direction: column; gap: 2px; min-width: 0; flex: 1; }
+.sync-bar { position: absolute; left: 0; right: 0; bottom: 0; }
+.sync-bar[hidden] { display: none; }
+.ar-years { padding: 0 4px; }
+.ar-card { background: var(--md-sys-color-surface-container-low); color: var(--md-sys-color-on-surface); border-radius: 24px; padding: 16px; display: flex; flex-direction: column; gap: 12px; min-width: 0; }
+.ar-head { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; }
+.ar-head h2 { margin: 0; }
+.ar-d { pointer-events: none; min-height: 52px; }
+.ar-d:hover { box-shadow: none; }
+.ar-list { display: flex; flex-direction: column; gap: 6px; }

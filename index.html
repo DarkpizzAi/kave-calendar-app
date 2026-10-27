@@ -109,6 +109,7 @@
         <button type="button" id="menuBtn" class="m3-icon-btn app-menu-btn" aria-label="Menu"><span class="m3-icon" aria-hidden="true">menu</span></button>
         <h1 id="tabName" class="m3-top-bar__title m3-title-l">Calendar</h1>
         <button type="button" id="searchBtn" class="m3-icon-btn" aria-label="Search"><span class="m3-icon" aria-hidden="true">search</span></button>
+        <div id="syncBar" class="m3-progress-linear sync-bar" role="progressbar" aria-label="Syncing" hidden><i></i></div>
       </header>
       <main id="view" class="mn"></main>
       <nav class="m3-nav-bar app-nav-bar" id="nav" aria-label="Sections"></nav>
@@ -141,6 +142,20 @@
     </header>
     <div class="m3-sheet__body page-body" id="pageBody"></div>
   </div>
+
+  <!-- Whole-app search: a full-screen page, one history entry (js/search.js) -->
+  <div id="searchPage" class="m3-search-view" role="dialog" aria-modal="true" aria-label="Search Kave Compass" hidden>
+    <div class="m3-search-view__bar">
+      <button type="button" id="searchBack" class="m3-icon-btn" aria-label="Back"><span class="m3-icon" aria-hidden="true">arrow_back</span></button>
+      <input id="searchInput" class="m3-search-view__input" type="text" placeholder="Search Kave Compass" autocomplete="off"
+             autocapitalize="off" autocorrect="off" spellcheck="false" enterkeyhint="search" aria-label="Search Kave Compass" />
+      <button type="button" id="searchClear" class="m3-icon-btn" aria-label="Clear" hidden><span class="m3-icon" aria-hidden="true">close</span></button>
+    </div>
+    <div id="searchResults" class="m3-search-view__body"></div>
+  </div>
+
+  <!-- the one snackbar host: sync status, Undo, and the sticky update line -->
+  <div id="snackHost"></div>
 
   <script type="module" src="js/boot.js"></script>
 </body>

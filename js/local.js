@@ -19,6 +19,16 @@ export function createLocal(storage) {
   return {
     getYear: (y) => read(yearKey(y), null),
     setYear: (y, rec) => write(yearKey(y), rec),
+    /* Years with a cached file on this phone (the Archive and search read
+       these without asking the network). */
+    cachedYears() {
+      let keys = [];
+      try {
+        keys = typeof storage.keys === "function" ? storage.keys()
+          : Array.from({ length: storage.length || 0 }, (_, i) => storage.key(i));
+      } catch { /* blocked storage */ }
+      return keys.map((k) => /^compass\.events\.(\d{4})$/.exec(k || "")).filter(Boolean).map((m) => m[1]).sort();
+    },
     enqueue(year, record) {
       const q = read(Q, {});
       q[year] = q[year] || {};

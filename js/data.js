@@ -36,11 +36,36 @@ export function createData({ sync, local, now, me }) {
       if (!years[y]) { refresh(y); notify(); }
       try { await sync.loadYear(y); } finally { refresh(y); notify(); }
     },
-    async sync(ys = Object.keys(years)) {
-      const r = await sync.syncNow(ys);
+    async sync(ys = Object.keys(years), opts = {}) {
+      const r = await sync.syncNow(ys, opts);
       ys.forEach(refresh);
       notify();
       return r;
+    },
+    /* Everything there is, for the Archive and search: the cached years first
+       (offline too), then, if online, one year at a time past either edge
+       until a year comes back empty. Reads only. */
+    async loadAllYears({ online = true, probe = 12 } = {}) {
+      const have = (y) => this.events().some((e) => !e.deleted && e.start && e.start.startsWith(y + "-"));
+      const cached = local.cachedYears ? local.cachedYears() : [];
+      for (const y of cached) {
+        if (years[y]) continue;
+        /* offline, or not asked: the phone's copy is the answer, no request */
+        if (!online) { refresh(y); notify(); continue; }
+        try { await this.ensureYear(y); } catch { /* the cache is what shows */ }
+      }
+      if (!online) return;
+      const known = [...new Set([...Object.keys(years), ...cached])].filter(have).sort();
+      if (!known.length) return;
+      for (const dir of [-1, 1]) {
+        let y = Number(dir < 0 ? known[0] : known[known.length - 1]);
+        for (let i = 0; i < probe; i++) {
+          y += dir;
+          if (years[String(y)]) { if (!have(String(y))) break; continue; }
+          try { await this.ensureYear(String(y)); } catch { break; }
+          if (!have(String(y))) break;
+        }
+      }
     },
     save(prev, next) {
       const who = requireMe();

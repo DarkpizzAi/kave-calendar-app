@@ -22,7 +22,7 @@ import { indexByDay, eventsOn, pickDayIcon, iconsOf, todaysCount as cmTodaysCoun
   agendaDays, stripWeek, monthCells, firstFullyVisible, clampDay, clampMonth, addMonths,
   categoryGroup, stripGesture, rowMeta } from "./cal-model.js";
 import { openLevel } from "./sheet.js";
-import { ms } from "./chrome-icons.js";
+import { ms, offlineCardHtml } from "./chrome-icons.js";
 import { iconFor } from "./icons.js";
 import { play, EASE, motionFactor } from "../m3/kave-m3.js";
 
@@ -118,7 +118,7 @@ function stripInner() {
   }
   const handle = wide ? ""
     : `<button type="button" class="lc-handle" data-act="toggle" aria-label="${open ? "Show one week" : "Show the month"}"><span></span></button>`;
-  return `<div class="lc-in">${head}${body}${handle}</div>`;
+  return `<div class="lc-in">${offlineCardHtml()}${head}${body}${handle}</div>`;
 }
 
 /* Redraw the strip in place. When its height changes (the month opens or
@@ -399,6 +399,71 @@ export function todaysCount() {
 /* Things the sheet needs to draw its levels, from the same frame. */
 export const frameNow = () => frame;
 export const detailGrey = (e) => !!frame && frame.grey(e);
+
+/* ---- the Archive (Settings > Archive) ----
+   Every year the phone has data for, not only the calendar's range: a chip
+   per year, then a card per month holding its emoji grid (one emoji a day, the
+   Grid emoji order's winner, the same pick as the strip) and that month's
+   events. It reads only: nothing here writes, and a tap on an event opens its
+   page. Older years load when the page opens (cached ones first, offline too;
+   one year at a time past the edges when online). */
+const AR = { year: null, loading: false };
+
+export function archiveOpened() {
+  AR.year = null;
+  if (!ctx) return;
+  AR.loading = true;
+  const done = () => { AR.loading = false; ctx.render(); };
+  ctx.data.loadAllYears({ online: navigator.onLine !== false }).then(done, done);
+}
+export function archivePickYear(y) { AR.year = String(y); }
+
+function archiveCard(ym, evs, idx, me, order) {
+  const cells = monthCells(ym).map((c) => {
+    const here = c.inMonth ? (idx.get(c.day) || []).filter((e) => e.status !== "cancelled") : [];
+    const best = here.length ? pickDayIcon(here, c.day, { order, me }) : null;
+    const grey = best && isTheirs(best.e, me);
+    return `<div class="lc-d mc ar-d${c.inMonth ? "" : " out"}${c.day === todayKey() ? " today" : ""}">`
+      + `<span class="dn m3-label-l">${Number(c.day.slice(8))}</span>`
+      + `<span class="emos m3-emoji${grey ? " grey" : ""}" aria-hidden="true">${best ? esc(iconFor(best.a, best.e, me)) : ""}</span></div>`;
+  }).join("");
+  const rows = evs.map((e) => {
+    const theirs = isTheirs(e, me);
+    const cls = ["evc", "g-" + (theirs ? "other" : categoryGroup(firstType(e))), theirs ? "grey" : "", e.status === "idea" ? "idea" : "", e.status === "cancelled" ? "cancelled" : ""].filter(Boolean).join(" ");
+    const sub = [theirs ? who(e.owner) : "", rowMeta(e, e.start), e.venue || ""].filter(Boolean).map(esc).join(" · ");
+    return `<button type="button" class="${cls}" data-arch-ev="${esc(e.id)}">`
+      + `<span class="evc-em m3-emoji" aria-hidden="true">${iconsOf(e, me).map(esc).join("")}</span>`
+      + `<span class="evc-t"><span class="evc-name m3-body-l">${esc(e.title)}</span><span class="m3-body-s">${esc(longDay(e.start))}${sub ? " · " + sub : ""}</span></span></button>`;
+  }).join("");
+  const label = `${monthName(ym)} ${ym.slice(0, 4)}`;
+  return `<section class="ar-card" aria-label="${esc(label)}"><div class="ar-head"><h2 class="m3-title-m">${esc(label)}</h2>`
+    + `<span class="m3-label-m m3-variant">${evs.length} event${evs.length === 1 ? "" : "s"}</span></div>`
+    + `<div class="lc-grid ar-grid">${LETTERS.map((w) => `<span class="lc-wd m3-label-s">${w}</span>`).join("")}${cells}</div>`
+    + `<div class="ar-list">${rows}</div></section>`;
+}
+
+export function archiveHtml() {
+  const s = store.state.settings, me = s.me, order = readPrefs(s).gridOrder;
+  const all = ctx ? ctx.data.events().filter((e) => !e.deleted && typeof e.start === "string" && e.start.length === 10) : [];
+  const years = [...new Set(all.map((e) => e.start.slice(0, 4)))].sort();
+  const intro = '<p class="m3-body-m m3-variant page-intro">Everything in the calendar, a year at a time. Tap an event to open it.</p>';
+  if (!years.length) {
+    return `<div class="page-col">${intro}<div class="m3-empty-state"><div class="m3-empty-state__icon">${ms("inventory_2")}</div>`
+      + `<p class="m3-title-m">${AR.loading ? "Looking for older years" : "Nothing archived yet"}</p>`
+      + `<p class="m3-body-m m3-variant">${AR.loading ? "One moment." : "Events from earlier years show here once the phone has them."}</p></div></div>`;
+  }
+  const thisYear = todayKey().slice(0, 4);
+  const y = years.includes(AR.year) ? AR.year : years.includes(thisYear) ? thisYear : years[years.length - 1];
+  const inYear = all.filter((e) => e.start.slice(0, 4) === y)
+    .sort((a, b) => (a.start + (a.startTime || "")).localeCompare(b.start + (b.startTime || "")));
+  const idx = indexByDay(all);
+  const months = [...new Set(inYear.map((e) => e.start.slice(0, 7)))];
+  const chips = `<div class="m3-chips ar-years" role="radiogroup" aria-label="Year">${years.map((yy) =>
+    `<button type="button" role="radio" aria-checked="${yy === y}" class="m3-chip${yy === y ? " is-selected" : ""}" data-arch-year="${esc(yy)}">${yy === y ? ms("check") : ""}${esc(yy)}</button>`).join("")}</div>`;
+  return `<div class="page-col">${intro}${chips}`
+    + `<p class="m3-label-l m3-variant page-intro">${inYear.length} event${inYear.length === 1 ? "" : "s"} in ${esc(y)}, in ${months.length} month${months.length === 1 ? "" : "s"}${AR.loading ? " (looking for older years)" : ""}</p>`
+    + months.map((ym) => archiveCard(ym, inYear.filter((e) => e.start.startsWith(ym)), idx, me, order)).join("") + `</div>`;
+}
 
 /* Settings changed a default: the Calendar opens on it next time it draws. */
 export function resetCalendarDefaults() { S.open = null; S.detail = null; }

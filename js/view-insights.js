@@ -20,7 +20,7 @@ import { todayKey, dayOfWeek } from "./dates.js";
 import { store } from "./store.js";
 import { github } from "../github.js";
 import { registerLevel, openLevel, replaceTop, topLevel, sheetOpen } from "./sheet.js";
-import { ms } from "./chrome-icons.js";
+import { ms, offlineCardHtml } from "./chrome-icons.js";
 import { ticketsOf, ticketButton } from "./tickets.js";
 import { categoryGroup } from "./cal-model.js";
 import { kaveKey } from "../m3/kave-m3.js";
@@ -88,9 +88,14 @@ function redraw() {
 
 /* ---------------- older years, once per session ---------------- */
 
-let olderState = 0;
+let olderState = 0, olderLocal = false;
 async function loadOlder() {
   if (olderState) return;
+  /* offline: the phone's own copies only, no request; the full pass waits for a connection */
+  if (navigator.onLine === false) {
+    if (!olderLocal) { olderLocal = true; ctx.data.loadAllYears({ online: false }).catch(() => { /* cache only */ }); }
+    return;
+  }
   olderState = 1;
   try {
     let y = Number(todayKey().slice(0, 4)) - 1;
@@ -195,7 +200,7 @@ export function insightsHtml() {
   const events = ctx.data.events(), today = todayKey(), who = me(), year = Number(today.slice(0, 4));
   const cu = comingUp(events, today);
   const fact = didYouKnow(events, year, seed);
-  return '<div class="ins">' + heroHtml(cu)
+  return '<div class="ins">' + offlineCardHtml() + heroHtml(cu)
     + '<div class="ins-panes">'
     + `<div class="ins-col ins-col--a">${numbersHtml(yearCounts(events, year), year)}${factHtml(fact)}</div>`
     + `<div class="ins-col ins-col--b">${wallHtml(ticketWall(events, today, who), wallTakenOff(events, today, who).length > 0)}</div>`

@@ -16,6 +16,44 @@ import { mergeEvents } from "./merge.js";
 export const pathFor = (y) => `calendar/data/compass/events-${y}.json`;
 const isConflict = (e) => e && (e.gh === "conflict" || (e.gh === "http" && e.status === 422));
 
+/* ---------- state reporting (read-only for the engine) ----------
+   The UI learns about a sync here and nowhere else: "syncing" | "ok" |
+   "failed" | "offline", plus { manual, unsent }. `manual` is a sync the person
+   started (pull, Sync now, Retry); every other sync is background and the UI
+   stays silent about it. Nothing below changes what a sync does, only what it
+   announces. */
+const listeners = [];
+let cycle = null;       // the sync currently reporting, if any
+let barOn = false;      // the indeterminate bar under the header: Sync now only, not a pull
+export function onSyncState(cb) { listeners.push(cb); }
+export const syncBarOn = () => barOn;
+
+function emit(state, meta) {
+  for (const cb of listeners) {
+    try { cb(state, meta || {}); } catch (err) { console.warn("sync listener:", err); }
+  }
+}
+function reportStart(manual, bar) {
+  cycle = { manual: !!manual };
+  barOn = !!(manual && bar);
+  emit("syncing", { manual: !!manual });
+}
+/* A manual sync asked for while another runs does not start a second one: it
+   joins the running one, which becomes manual so its result announces itself. */
+function reportJoin(bar) {
+  if (!cycle) return;
+  cycle.manual = true;
+  if (bar) barOn = true;
+  emit("syncing", { manual: true, joined: true });
+}
+function reportEnd(r, unsent) {
+  const c = cycle || { manual: false };
+  cycle = null;
+  barOn = false;
+  const kind = r && r.error && r.error.gh;
+  emit(r && r.ok ? "ok" : kind === "offline" ? "offline" : "failed", { manual: c.manual, unsent: !!unsent });
+}
+
 export function createSync({ gh, local }) {
   let syncing = false;
   const lanes = { near: 0, far: 0 };
@@ -69,15 +107,18 @@ export function createSync({ gh, local }) {
      running sync runs once more when it finishes, with the union of the
      years, and the skipped caller waits for that. */
   let running = null, again = null;
-  function syncNow(years) {
+  function syncNow(years, opts = {}) {
     if (syncing) {
       again = [...new Set([...(again || []), ...years])];
+      if (opts.manual) reportJoin(opts.bar);
       return running.then((r) => ({ ...r, skipped: true }));
     }
     syncing = true;
+    reportStart(opts.manual, opts.bar);
     running = (async () => {
+      let r = { ok: false, error: new Error("sync did not finish") };
       try {
-        let r = await syncOnce(years);
+        r = await syncOnce(years);
         while (again) {
           const ys = again; again = null;
           const r2 = await syncOnce(ys);
@@ -86,6 +127,7 @@ export function createSync({ gh, local }) {
         return r;
       } finally {
         syncing = false;   // the latch covers the rerun too, and is always cleared
+        reportEnd(r, !r.ok && local.pendingYears().length > 0);
       }
     })();
     return running;

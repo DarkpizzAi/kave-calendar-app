@@ -10,7 +10,7 @@
 import { sizeClass } from "../m3/kave-m3.js";
 import { initTheme } from "./theme.js";
 import { render, isCalendar, dataSync, actions, currentView } from "./render.js";
-import { wire, showBanner } from "./wire.js";
+import { wire, showBanner, initStatusUi } from "./wire.js";
 import { appData } from "./data.js";
 import { store } from "./store.js";
 import { initCalendar, closeMenus } from "./calendar.js";
@@ -20,6 +20,8 @@ import { initInsights, syncCleanup } from "./view-insights.js";
 import { initTicketView } from "./ticket-view.js";
 import { keepTickets } from "./tickets.js";
 import { github } from "../github.js";
+import { initSearch } from "./search.js";
+import { watchRegistration, watchTakeover } from "./updates.js";
 
 initTheme();
 /* the kit's layout rules key off <html data-size>, so it follows the window */
@@ -33,10 +35,16 @@ data.subscribe(render);
 
 /* Sync on open and whenever the app comes back into view. The status goes
    to Settings only; the Calendar never shows it. */
-async function syncNow() {
+/* opts.manual: the person asked (pull, Sync now, Retry); opts.bar: Sync now's
+   progress bar. Anything else is background. A background sync does not start
+   offline: the app opens, shows what is stored, and asks for nothing until a
+   pull (final rule of the offline start). */
+async function syncNow(opts) {
+  const manual = !!(opts && opts.manual === true), bar = !!(opts && opts.bar === true);
   if (!store.state.settings.token) return;
+  if (!manual && navigator.onLine === false) return;
   dataSync.state = "working"; dataSync.message = "Syncing...";
-  const r = await data.sync([...new Set([...data.loadedYears(), String(new Date().getFullYear()), String(new Date().getFullYear() + 1)])]);
+  const r = await data.sync([...new Set([...data.loadedYears(), String(new Date().getFullYear()), String(new Date().getFullYear() + 1)])], { manual, bar });
   const kind = r.error && r.error.gh;
   Object.assign(dataSync, r.ok ? { state: "ok", message: "Synced" }
     : { state: kind === "offline" ? "offline" : "failed",
@@ -49,7 +57,7 @@ async function syncNow() {
   /* every future ticket on the phone: only after a good sync, so a failed one
      can never look like "no future events" and empty the cache */
   if (r.ok) keepTickets(data.events(), github, data.loadedYears()).catch(() => { /* offline or no cache: next sync */ });
-  syncCleanup().catch(() => { /* offline: the cache and the outbox stay as they are */ });
+  if (!(r.error && r.error.gh === "offline")) syncCleanup().catch(() => { /* the cache and the outbox stay as they are */ });
 }
 
 actions.sync = syncNow;
@@ -58,12 +66,14 @@ initSheet();
 initEvent({ data, refresh: refreshSheet });
 initInsights({ data, render, view: currentView, banner: showBanner });
 initTicketView({ data, banner: showBanner });
+initSearch({ data });
+initStatusUi();
 setDayAdd(newEventForm); // F21: the day-level sheet's own "+"
 initCalendar({ data, render, isCalendar, sync: syncNow, add: newEventForm });
 render();
 syncNow();
 document.addEventListener("visibilitychange", () => { if (document.visibilityState === "visible") syncNow(); });
-window.addEventListener("online", syncNow);
+window.addEventListener("online", () => syncNow());
 
 /* Backspace = Back on a computer (except while typing), like the phone's
    Back; Escape too. Up one sheet level, else close a menu or search. */
@@ -99,19 +109,13 @@ const IS_LOCAL_DEV = ["localhost", "127.0.0.1"].includes(location.hostname);
    service-worker.js straight out of the HTTP cache and never see a new
    version to install. */
 if ("serviceWorker" in navigator && !IS_LOCAL_DEV) {
+  watchTakeover();
   navigator.serviceWorker
     .register("service-worker.js", { updateViaCache: "none" })
     .then((reg) => {
-      /* A new worker took over: the shell on screen is the old one. Say so
-         rather than leaving the user on a stale app that looks current. */
-      reg.addEventListener("updatefound", () => {
-        const sw = reg.installing;
-        if (!sw) return;
-        sw.addEventListener("statechange", () => {
-          if (sw.state === "installed" && navigator.serviceWorker.controller) {
-            showBanner("New version ready. Close and reopen Compass.", 8000);
-          }
-        });
-      });
+      /* An update (a worker waiting, installing or just taken over) offers the
+         sticky "A new version is ready" snackbar; a first install offers
+         nothing (updates.js). */
+      watchRegistration(reg);
     }).catch(() => { /* registration is an enhancement, never a hard failure */ });
 }
