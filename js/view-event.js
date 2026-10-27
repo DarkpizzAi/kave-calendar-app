@@ -14,7 +14,7 @@ import { newEvent, STATUS_LABEL, statusOf } from "./model.js";
 import { CATEGORIES as MONEY, formatCents, visibleCosts, toCents } from "./money.js";
 import { CATEGORIES, GROUPS, iconFor, categoryOf, onlyIcon } from "./icons.js";
 import { readForm, costDefaults, canChangeCost, addTask, addCost, addLinkTo, whenParts, mapsUrl, isMapsUrl, toDraft, costPayerText,
-  spanAfterStartChange, spanAfterEndChange, copyToDay, replaceCost, replaceTask, replaceLink, statusChoice, draftKey, isDirty } from "./event-form.js";
+  spanAfterStartChange, spanAfterEndChange, copyToDay, replaceCost, replaceTask, replaceLink, findLinkIndex, statusChoice, draftKey, isDirty } from "./event-form.js";
 import { defaultCity, shownStatus, categoryGroup, iconsOf } from "./cal-model.js";
 import { registerLevel, openLevel, replaceTop, back, closeAll, topLevel, openLayer, closeLayer, snack } from "./sheet.js";
 import { loadRange } from "./views.js";
@@ -535,7 +535,10 @@ function onPageAction(b, e) {
     linkDialog((url, label) => {
       const cur = find(e.id);
       if (!cur) return "This event is no longer here.";
-      const next = old ? replaceLink(cur, i, { url, label }) : addLinkTo(cur, { url, label });
+      /* a sync may have moved or removed it while the dialog was open */
+      const at = old ? findLinkIndex(cur, old) : -1;
+      if (old && at < 0) { snack("This link is no longer here"); return ""; }
+      const next = old ? replaceLink(cur, at, { url, label }) : addLinkTo(cur, { url, label });
       if (next === cur) return "That link is not valid, or it is already there.";
       return save(cur, next) ? undefined : "The link could not be saved.";
     }, old);

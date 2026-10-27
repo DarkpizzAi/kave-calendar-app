@@ -1,7 +1,7 @@
 import { test, eq, ok, throws } from "./run.js";
 import { readForm, costDefaults, canChangeCost, addTask, addCost, whenLine, whenParts, mapsUrl, toDraft, isMapsUrl, costPayerText,
   spanAfterStartChange, spanAfterEndChange, copyToDay, addLinkTo,
-  replaceCost, replaceTask, replaceLink, statusChoice, draftKey, isDirty } from "../js/event-form.js";
+  replaceCost, replaceTask, replaceLink, statusChoice, draftKey, isDirty, findLinkIndex } from "../js/event-form.js";
 import { newEvent, validateEvent } from "../js/model.js";
 import { newCostLine } from "../js/money.js";
 
@@ -219,4 +219,15 @@ test("dirty form: a draft differs from its opening key only after a change", () 
   d.title = "Changed";
   eq(isDirty(d, key), true);
   eq(isDirty(null, key), false);
+});
+
+test("find link: found by what it is after a reorder, an insert or a removal; gone is -1", () => {
+  const a = { label: "RA", url: "https://ra.co/x" }, b = { label: "Menu", url: "https://menu.example/" };
+  eq(findLinkIndex({ links: [b, a] }, a), 1, "reordered");
+  eq(findLinkIndex({ links: [{ label: "New", url: "https://n.example/" }, a, b] }, a), 1, "inserted before");
+  eq(findLinkIndex({ links: [b] }, a), -1, "removed");
+  eq(findLinkIndex({}, a), -1);
+  const d1 = { label: "One", url: "https://same.example/" }, d2 = { label: "Two", url: "https://same.example/" };
+  eq(findLinkIndex({ links: [d2, d1] }, d1), 1, "a repeated address is told apart by its name");
+  eq(findLinkIndex({ links: [d2] }, d1), 0, "a lone link at that address is the same link, renamed");
 });

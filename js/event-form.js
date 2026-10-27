@@ -225,3 +225,15 @@ export function statusChoice(d) {
 /* A form is dirty when its draft differs from how it opened. */
 export const draftKey = (d) => JSON.stringify(d);
 export const isDirty = (d, key) => !!d && JSON.stringify(d) !== key;
+
+/* Where a link is now in the live event, found by what it is (its address, and
+   its name when the address repeats), not where it was when a dialog opened:
+   a sync can insert, remove or reorder links meanwhile. -1 when it is gone. */
+export function findLinkIndex(e, old) {
+  const list = e.links || [];
+  const same = list.map((l, i) => [l, i]).filter(([l]) => l && old && l.url === old.url);
+  if (!same.length) return -1;
+  if (same.length === 1) return same[0][1];
+  const named = same.find(([l]) => l.label === old.label);
+  return named ? named[1] : -1;
+}
