@@ -124,11 +124,13 @@ self.addEventListener("install", (e) => {
    stale-while-revalidate does caches.open(<its own CACHE>), which recreates
    the cache just deleted. Spoon watched kave-food-v7 come back from the dead
    moments after activate cleaned it up. */
+/* Only Compass's own old shells: Cache Storage is shared with the food app and
+   the hub on this origin, so deleting "everything else" would wipe theirs. */
 self.addEventListener("activate", (e) => {
   e.waitUntil(
     self.clients.claim()
       .then(() => caches.keys())
-      .then((keys) => Promise.all(keys.filter((k) => k !== CACHE && k !== TICKET_CACHE).map((k) => caches.delete(k))))
+      .then((keys) => Promise.all(keys.filter((k) => k.startsWith("kave-compass-") && k !== CACHE && k !== TICKET_CACHE).map((k) => caches.delete(k))))
   );
 });
 
