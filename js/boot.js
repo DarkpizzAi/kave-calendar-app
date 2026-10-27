@@ -44,7 +44,7 @@ async function syncNow(opts) {
   if (!store.state.settings.token) return;
   if (!manual && navigator.onLine === false) return;
   dataSync.state = "working"; dataSync.message = "Syncing...";
-  const r = await data.sync([...new Set([...data.loadedYears(), String(new Date().getFullYear()), String(new Date().getFullYear() + 1)])], { manual, bar });
+  const r = await data.sync([...new Set([...data.syncYears(), String(new Date().getFullYear()), String(new Date().getFullYear() + 1)])], { manual, bar });
   const kind = r.error && r.error.gh;
   Object.assign(dataSync, r.ok ? { state: "ok", message: "Synced" }
     : { state: kind === "offline" ? "offline" : "failed",

@@ -105,8 +105,41 @@ test("data.loadAllYears: online it walks back past the edge until a year is empt
   const data = createData({ sync: createSync({ gh, local }), local, now: () => new Date(), me: () => "isa" });
   await data.loadAllYears({ online: true });
   eq(data.events().map((e) => e.id).sort(), ["e2022", "e2023", "e2024"]);
-  ok(data.loadedYears().includes("2021"), "the empty year past the edge ends the walk");
+  ok(!data.loadedYears().includes("2021"), "the missing year that ends the walk is not kept");
   ok(!data.loadedYears().includes("2020"));
+  eq(local.getYear("2021"), null, "and nothing is cached for it");
+  eq(data.syncYears(), ["2022", "2023", "2024"]);
+});
+
+test("data.loadAllYears: a 404 probe does not grow loadedYears, and is not asked again", async () => {
+  const gh = fakeGh({});
+  let asked = 0;
+  const get = gh.getFile; gh.getFile = async (p, o) => { asked++; return get(p, o); };
+  const local = createLocal(memStorage());
+  local.setYear("2025", { events: [ev("e", "1", { start: "2025-02-02" })], sha: "s", etag: "t" });
+  const data = createData({ sync: createSync({ gh, local }), local, now: () => new Date(), me: () => "isa" });
+  await data.ensureYear("2025");
+  const before = data.loadedYears();
+  await data.loadAllYears({ online: true });
+  eq(data.loadedYears(), before);
+  eq(local.cachedYears(), ["2025"]);
+  const n = asked;
+  await data.loadAllYears({ online: true });
+  eq(asked, n, "known-empty years are not probed on every open");
+});
+
+test("data: an empty year cached by an earlier run is not in the sync list; concurrent loads share one request", async () => {
+  const gh = fakeGh({ [pathFor("2026")]: file([ev("a", "1")]) });
+  let asked = 0;
+  const get = gh.getFile; gh.getFile = async (p, o) => { asked++; await sleep(10); return get(p, o); };
+  const local = createLocal(memStorage());
+  local.setYear("2028", { events: [], sha: null, etag: null });
+  const data = createData({ sync: createSync({ gh, local }), local, now: () => new Date(), me: () => "isa" });
+  await data.ensureYear("2028");
+  await Promise.all([data.ensureYear("2026"), data.ensureYear("2026")]);
+  eq(asked, 2, "one request for 2026 and one for 2028");
+  ok(data.loadedYears().includes("2028"));
+  eq(data.syncYears(), ["2026"]);
 });
 
 /* ---------- the update flow, against a mocked service worker ---------- */

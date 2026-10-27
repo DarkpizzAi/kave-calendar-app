@@ -8,6 +8,8 @@ import { touch, writesFor, markDeleted, restore, PEOPLE } from "./model.js";
 export function createData({ sync, local, now, me }) {
   const years = {};
   const listeners = [];
+  const yearFlight = {}, knownEmpty = new Set();
+  let allFlight = null;
   const notify = () => listeners.forEach((fn) => fn());
 
   /* A cached year's `events` must be an array. Anything else (a stale or
@@ -32,10 +34,18 @@ export function createData({ sync, local, now, me }) {
     subscribe: (fn) => listeners.push(fn),
     events: () => collectYears(years),
     loadedYears: () => Object.keys(years).sort(),
-    async ensureYear(y) {
+    /* one load per year at a time: a second ask shares the first */
+    ensureYear(y) {
+      if (yearFlight[y]) return yearFlight[y];
       if (!years[y]) { refresh(y); notify(); }
-      try { await sync.loadYear(y); } finally { refresh(y); notify(); }
+      const p = (async () => {
+        try { await sync.loadYear(y); } finally { refresh(y); notify(); }
+      })().finally(() => { delete yearFlight[y]; });
+      return (yearFlight[y] = p);
     },
+    /* the years a sync asks for: a year with no events and no file behind it
+       (an empty one an earlier run cached) is not worth a request */
+    syncYears: () => Object.keys(years).filter((y) => years[y].length || (local.getYear(y) || {}).sha).sort(),
     async sync(ys = Object.keys(years), opts = {}) {
       const r = await sync.syncNow(ys, opts);
       ys.forEach(refresh);
@@ -45,11 +55,17 @@ export function createData({ sync, local, now, me }) {
     /* Everything there is, for the Archive and search: the cached years first
        (offline too), then, if online, one year at a time past either edge
        until a year comes back empty. Reads only. */
-    async loadAllYears({ online = true, probe = 12 } = {}) {
+    loadAllYears(opts = {}) {
+      if (allFlight) return allFlight;
+      return (allFlight = this._loadAllYears(opts).finally(() => { allFlight = null; }));
+    },
+    async _loadAllYears({ online = true, probe = 12 } = {}) {
       const have = (y) => this.events().some((e) => !e.deleted && e.start && e.start.startsWith(y + "-"));
       const cached = local.cachedYears ? local.cachedYears() : [];
       for (const y of cached) {
         if (years[y]) continue;
+        const rec = local.getYear(y);
+        if (rec && !(Array.isArray(rec.events) ? rec.events.length : rec.events) && !rec.sha) continue; // an old empty entry
         /* offline, or not asked: the phone's copy is the answer, no request */
         if (!online) { refresh(y); notify(); continue; }
         try { await this.ensureYear(y); } catch { /* the cache is what shows */ }
@@ -61,9 +77,15 @@ export function createData({ sync, local, now, me }) {
         let y = Number(dir < 0 ? known[0] : known[known.length - 1]);
         for (let i = 0; i < probe; i++) {
           y += dir;
-          if (years[String(y)]) { if (!have(String(y))) break; continue; }
-          try { await this.ensureYear(String(y)); } catch { break; }
-          if (!have(String(y))) break;
+          const k = String(y);
+          if (years[k]) { if (!have(k)) break; continue; }
+          if (knownEmpty.has(k)) break;
+          /* a read that stores nothing for a missing year: only a year with
+             events joins the loaded (and so the synced) set */
+          let got;
+          try { got = await sync.probeYear(k); } catch { break; }
+          if (!got || !got.length) { knownEmpty.add(k); break; }
+          refresh(k); notify();
         }
       }
     },

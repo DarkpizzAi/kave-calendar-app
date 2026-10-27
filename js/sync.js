@@ -77,6 +77,20 @@ export function createSync({ gh, local }) {
     }
   }
 
+  /* A read for the Archive and search: like loadYear, but a missing year is
+     answered with null and stored nowhere, so probing past the edge of the
+     data never adds a year to the cache or to the synced set. */
+  async function probeYear(y) {
+    const rec = local.getYear(y), gen = writes[y] || 0;
+    let r;
+    try { r = await gh.getFile(pathFor(y), { etag: rec && rec.etag }); }
+    catch (e) { if (e && e.gh === "notFound") return null; throw e; }
+    if ((writes[y] || 0) !== gen) return local.getYear(y).events;
+    if (r.notModified) return rec.events;
+    local.setYear(y, { events: r.json.events || [], sha: r.sha, etag: r.etag });
+    return r.json.events || [];
+  }
+
   async function flushYear(y) {
     const queued = local.pendingFor(y);
     if (!queued.length) return;
@@ -152,7 +166,7 @@ export function createSync({ gh, local }) {
     return firstError ? { ok: false, error: firstError } : { ok: true };
   }
 
-  return { loadYear, flushYear, syncNow, syncing: () => syncing, lanes };
+  return { loadYear, probeYear, flushYear, syncNow, syncing: () => syncing, lanes };
 }
 
 /* Transient, not persisted: a status is about this session. */
