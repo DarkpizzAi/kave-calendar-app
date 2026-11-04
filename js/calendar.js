@@ -19,7 +19,7 @@ import { readPrefs } from "./prefs.js";
 import { applyDetail, isTheirs } from "./filter.js";
 import { store } from "./store.js";
 import { indexByDay, eventsOn, pickDayIcon, iconsOf, todaysCount as cmTodaysCount, hasOpenTodos,
-  agendaDays, stripWeek, monthCells, firstFullyVisible, clampDay, clampMonth, addMonths,
+  agendaDays, stripWeek, monthCells, pinPick, clampDay, clampMonth, addMonths,
   categoryGroup, stripGesture, rowMeta } from "./cal-model.js";
 import { openLevel } from "./sheet.js";
 import { ms, offlineCardHtml } from "./chrome-icons.js";
@@ -30,8 +30,6 @@ const MONTHS = ["January", "February", "March", "April", "May", "June", "July", 
 const LONGDOW = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"];
 const SHORTDOW = ["MON", "TUE", "WED", "THU", "FRI", "SAT", "SUN"];
 const LETTERS = ["M", "T", "W", "T", "F", "S", "S"];
-/* the room the highlighted day keeps below the strip */
-const GAP = 16;
 
 /* Transient UI state: not persisted, reset when the app opens. `open` is null
    until the first draw reads the Settings default (week or month). */
@@ -40,7 +38,8 @@ const S = {
   fx: 0,          // +1 / -1: the body slides in from that side after a swipe
   fresh: true,    // the tab was not on screen before this draw
   touched: false, // the reader has scrolled since the tab appeared
-  tick: 0,
+  box: null,      // the day the agenda's box is on (the rule's, see pinPick)
+  vis: 0,         // that box's height
 };
 
 let ctx = null;          // { data, render, isCalendar, sync, add }
@@ -165,17 +164,20 @@ function card(e, d) {
 
 function agendaRow(d) {
   const evs = frame.on(d), hol = holidayOn(d);
-  const cls = ["ag", d === frame.today ? "today" : "", d === S.sel ? "sel" : "", evs.length || hol ? "" : "empty", d < frame.today ? "past" : ""]
+  const cls = ["ag", d === frame.today ? "today" : "", d === (S.box || S.sel) ? "sel" : "", evs.length || hol ? "" : "empty", d < frame.today ? "past" : ""]
     .filter(Boolean).join(" ");
   const note = d === frame.today && !evs.length ? '<span class="ag-note m3-body-s">Nothing planned today</span>' : "";
   const holiday = hol ? `<span class="ag-note m3-body-s">${esc(hol)}</span>` : "";
-  return `<div class="${cls}" data-row="${d}">`
-    + `<button type="button" class="ag-d" data-act="day" data-d="${d}" aria-label="Open ${esc(longDay(d))}"><span class="ag-lab m3-label-l">${SHORTDOW[dayOfWeek(d)]} ${Number(d.slice(8))}</span></button>`
+  /* the box lives in the row (see .ag-hl in styles.css): sticky, so it moves
+     with the scroll on the compositor and never trails the content */
+  return `<div class="${cls}" data-row="${d}"><div class="ag-hlw" aria-hidden="true"><div class="ag-hl"></div></div>`
+    + `<button type="button" class="ag-d" data-act="day" data-d="${d}" aria-label="Open ${esc(longDay(d))}">`
+    + `<span class="ag-dw m3-label-s">${SHORTDOW[dayOfWeek(d)]}</span><span class="ag-dn m3-title-l">${Number(d.slice(8))}</span></button>`
     + `<div class="ag-evs">${holiday}${evs.map((e) => card(e, d)).join("")}${note}</div></div>`;
 }
 
 function agendaHtml() {
-  const out = [];
+  const out = ['<div class="ag-pin" aria-hidden="true"></div>'];
   let last = "";
   for (const d of agendaDays(frame.range.min, frame.range.max)) {
     const ym = d.slice(0, 7);
@@ -225,6 +227,29 @@ export function afterCalendar(mn, before) {
     mn.scrollTop = before.top;
     markJump(400); // the redraw's scroll event may land after render()'s own mark
   }
+  watchStrip(mn);
+  syncBox();
+}
+
+/* The pin line under the strip, for CSS: --lc-h is the strip's height when it
+   sits above the agenda (0 beside it, expanded), --lc-top its sticky offset
+   (styles.css, it follows the top bar). One observer, moved to each new strip.
+   The line can move with no scroll at all (the month opening, the top bar
+   sliding in or out), so both re-run the rule. */
+let stripObs = null;
+function watchStrip(mn) {
+  const cal = mn.querySelector(".cal"), t = stripEl();
+  if (!cal || !t) return;
+  if (!cal.dataset.pinWired) {
+    cal.dataset.pinWired = "1";
+    cal.addEventListener("transitionend", (e) => { if (e.target === cal && e.propertyName === "--lc-top") pinMoved(); });
+  }
+  if (typeof ResizeObserver !== "function") return;
+  if (stripObs) stripObs.disconnect();
+  const set = () => { cal.style.setProperty("--lc-h", `${expanded() ? 0 : t.offsetHeight}px`); pinMoved(); };
+  stripObs = new ResizeObserver(set);
+  stripObs.observe(t);
+  set();
 }
 
 /* ---- scrolling ---- */
@@ -249,9 +274,12 @@ function rowTop(row) {
   return row.getBoundingClientRect().top - mn.getBoundingClientRect().top + mn.scrollTop;
 }
 
-/* Scroll so the day sits GAP below the strip. Always marked as a jump, so the
-   top bar neither hides for it nor stays hidden after it. `smooth` glides
-   (unless the phone asks for reduced motion). */
+/* Scroll so the day sits on the pin line, under the strip, where the box
+   shows it whole. Always marked as a jump, so the top bar neither hides for
+   it nor stays hidden after it. `smooth` glides (unless the phone asks for
+   reduced motion). When the next day is taller the rule hands the box to it
+   as soon as this day is fully in, so the glide stops one pixel short. */
+let settleTimer = 0;
 function goTo(d, smooth) {
   const mn = view(), row = mn && mn.querySelector(`[data-row="${d}"]`);
   if (!row) return;
@@ -260,12 +288,18 @@ function goTo(d, smooth) {
      difference; take it back off */
   const t = stripEl(), inner = t && t.firstElementChild;
   const moving = !expanded() && t && inner ? t.offsetHeight - inner.offsetHeight : 0;
-  const top = Math.max(0, rowTop(row) - moving - edgeY(true) - GAP);
+  const next = row.nextElementSibling && row.nextElementSibling.matches(".ag") ? row.nextElementSibling : null;
+  const short = next && next.offsetHeight > row.offsetHeight ? 1 : 0;
+  const top = Math.max(0, rowTop(row) - moving - edgeY(true) - short);
   const ms = glide ? Math.min(600, 250 + Math.abs(top - mn.scrollTop) / 20) : 0;
   /* marked after the measuring: a big layout can take longer than the mark */
   markJump(ms + 400);
   showBar();
   glideTo(mn, top, ms);
+  /* once the jump mark is over the box and the strip agree again, whatever
+     moved meanwhile (the top bar's slide, a late font) */
+  clearTimeout(settleTimer);
+  settleTimer = setTimeout(pinMoved, ms + 450);
 }
 
 /* The agenda glides to a day: emphasized easing, 250 to 600ms by distance. Our
@@ -302,54 +336,116 @@ function glideTo(mn, top, ms) {
   glideEnd = setTimeout(() => { stopGlide(); mn.scrollTop = top; }, ms + 100);
 }
 
-function markSel() {
-  const mn = view();
-  if (!mn) return;
-  mn.querySelectorAll(".ag.sel").forEach((r) => r.classList.remove("sel"));
-  const row = mn.querySelector(`[data-row="${S.sel}"]`);
-  if (row) row.classList.add("sel");
+/* Row tops and heights within the agenda, read once per draw (a draw, a
+   resize or the fonts arriving drops them), never per scroll frame. */
+let rowCache = null;
+function rows() {
+  if (rowCache) return rowCache;
+  const ag = view() && view().querySelector(".cal-agenda");
+  rowCache = ag ? [...ag.querySelectorAll(".ag[data-row]")].map((el) => ({ day: el.dataset.row, top: el.offsetTop, h: el.offsetHeight, el })) : [];
+  return rowCache;
 }
 
-/* Row tops, cached after each draw; a draw, a resize or the fonts arriving
-   drops it. */
-let rowCache = null;
+/* The pin line in the agenda's coordinates. A zero-height sticky probe sits
+   on it (styles.css .ag-pin), so this is the line the CSS is really using,
+   the top bar's slide and the strip's height animation included. */
+function pinY() {
+  const ag = view() && view().querySelector(".cal-agenda"), probe = ag && ag.querySelector(".ag-pin");
+  return probe ? probe.getBoundingClientRect().top - ag.getBoundingClientRect().top : 0;
+}
 
-/* The reader scrolls the agenda: the highlight follows, and the strip's
-   month follows it into another month, open or closed (Isa, 04/11/2026). An
-   open month browsed with a swipe stays put while the agenda scrolls within
-   one month. A scroll the app caused is not the reader's. */
+/* Put the agenda's box where the rule says. Its height only changes at a
+   hand-over: a box that has to grow is revealed with a clip (paint only, no
+   layout), and going back up the list a box that has to shrink is clipped
+   down; the sticky CSS does all the rest, so no frame of scrolling runs any. */
+function setBox(res) {
+  if (!res) return;
+  if (S.box === res.day) { S.vis = res.vis; return; }
+  const list = rows(), from = S.vis, to = res.vis;
+  const old = S.box && list.find((r) => r.day === S.box), now = list[res.i];
+  const hlOf = (r) => r.el.querySelector(".ag-hl");
+  if (old) { old.el.classList.remove("sel"); hlOf(old).getAnimations().forEach((a) => a.cancel()); }
+  if (now) {
+    now.el.classList.add("sel");
+    hlOf(now).getAnimations().forEach((a) => a.cancel());
+    if (old && to > from + 2) {
+      play(hlOf(now), [{ clipPath: `inset(0 0 ${to - from}px 0 round 12px)` }, { clipPath: "inset(0 0 0 0 round 12px)" }], 300, EASE.decelerate);
+    } else if (old && from > to + 2) {
+      old.el.classList.add("leaving");
+      play(hlOf(old), [{ clipPath: "inset(0 0 0 0 round 12px)" }, { clipPath: `inset(0 0 ${from - to}px 0 round 12px)` }], 300, EASE.decelerate, { fill: "forwards" })
+        .then(() => { old.el.classList.remove("leaving"); hlOf(old).getAnimations().forEach((a) => a.cancel()); });
+    }
+  }
+  S.box = res.day;
+  S.vis = to;
+}
+function syncBox() {
+  if (!frame || !view() || !view().querySelector(".cal-agenda")) return;
+  setBox(pinPick(rows(), pinY()));
+}
+
+/* The reader scrolls the agenda: the box follows the rule on every scroll
+   event (cheap: two rects and a binary search over cached rows), and the
+   strip follows the box, its month too when the day crosses into another
+   one, open or closed (Isa, 04/11/2026). A scroll the app caused (a tap's
+   glide, back to today) moves the box but leaves the strip on the day the
+   app went to. */
 function onScroll() {
   if (!ctx.isCalendar() || !frame) return;
+  syncBox();
   if (isJumping()) return;
   S.touched = true;
-  if (S.tick) return;
-  S.tick = setTimeout(() => {
-    S.tick = 0;
-    const mn = view(), agenda = mn && mn.querySelector(".cal-agenda");
-    if (!agenda) return;
-    const base = agenda.getBoundingClientRect().top - mn.getBoundingClientRect().top + mn.scrollTop;
-    /* row tops within the agenda, read once per draw (see rowCache) */
-    rowCache = rowCache || [...agenda.querySelectorAll("[data-row]")].map((r) => ({ day: r.dataset.row, top: r.offsetTop }));
-    /* a day the app scrolled to sits exactly GAP below the edge; allow 4px more */
-    const cur = firstFullyVisible(rowCache, mn.scrollTop + edgeY(false) - base, GAP + 4);
-    if (cur && cur !== S.sel) {
-      const crossed = cur.slice(0, 7) !== S.sel.slice(0, 7);
-      S.sel = cur;
-      if (!S.open || expanded() || crossed) S.month = cur.slice(0, 7);
-      markSel();
-      redrawStrip();
-    }
-  }, 16);
+  followBox();
+}
+/* the pin line moved under a still list: the same rule, but not the reader's scroll */
+function pinMoved() {
+  if (!ctx.isCalendar() || !frame) return;
+  syncBox();
+  if (!isJumping()) followBox();
+}
+function followBox() {
+  const cur = S.box;
+  if (cur && cur !== S.sel) {
+    const prev = S.sel, crossed = cur.slice(0, 7) !== prev.slice(0, 7);
+    S.sel = cur;
+    if (!S.open || expanded() || crossed) S.month = cur.slice(0, 7);
+    moveStripSel(prev);
+  }
+}
+
+/* The strip's box moves to S.sel. In the same week or month it glides there
+   (a ghost box, transform only, then the cell takes the colour back);
+   anything else redraws the strip, with its own slide. */
+let ghost = null;
+function moveStripSel(prev) {
+  const t = stripEl(), body = t && t.querySelector(".lc-week, .lc-grid");
+  const from = body && body.querySelector(`[data-day="${prev}"]`), to = body && body.querySelector(`[data-day="${S.sel}"]`);
+  const title = t && t.querySelector(".lc-head .m3-title-m");
+  const want = monthTitle(S.open || expanded() ? S.month : S.sel.slice(0, 7));
+  if (!from || !to || to.disabled || !title || title.textContent !== want || (S.open || expanded()) && to.classList.contains("out")) { redrawStrip(); return; }
+  if (ghost) { ghost.remove(); ghost = null; }
+  body.querySelectorAll(".lc-d.arriving").forEach((c) => c.classList.remove("arriving"));
+  from.classList.remove("sel");
+  to.classList.add("sel");
+  if (!motionFactor()) return;
+  const g = document.createElement("span");
+  g.className = "lc-ghost";
+  g.style.cssText = `left:${from.offsetLeft}px;top:${from.offsetTop}px;width:${from.offsetWidth}px;height:${from.offsetHeight}px`;
+  body.append(g);
+  ghost = g;
+  to.classList.add("arriving");
+  play(g, [{ transform: "none" }, { transform: `translate(${to.offsetLeft - from.offsetLeft}px, ${to.offsetTop - from.offsetTop}px)` }], 300, EASE.decelerate, { fill: "forwards" })
+    .then(() => { to.classList.remove("arriving"); g.remove(); if (ghost === g) ghost = null; });
 }
 
 /* ---- taps ---- */
 function pickDay(d) {
+  const prev = S.sel;
   S.sel = clampDay(d, frame.range.min, frame.range.max);
   S.month = S.sel.slice(0, 7);
   /* an open month stays open (Isa, 04/11/2026): only the handle, the month
      name or a swipe up closes it */
-  markSel();
-  redrawStrip();
+  moveStripSel(prev);
   goTo(S.sel, true);
 }
 
@@ -367,18 +463,18 @@ function stepMonth(s) {
   const today = todayKey();
   S.sel = clampDay(today.slice(0, 7) === m ? today : `${m}-01`, frame.range.min, frame.range.max);
   S.month = S.sel.slice(0, 7);
-  markSel();
   redrawStrip();
   goTo(S.sel, true);
 }
 
-/* Back to today: select it and glide there. */
+/* Back to today: select it and glide there (the strip's box glides too when
+   today is in the week or month on show). */
 export function backToToday() {
   if (!frame) return;
+  const prev = S.sel;
   S.sel = clampDay(todayKey(), frame.range.min, frame.range.max);
   S.month = S.sel.slice(0, 7);
-  markSel();
-  redrawStrip();
+  moveStripSel(prev);
   goTo(S.sel, true);
 }
 
@@ -543,7 +639,6 @@ function stripGestures(mn) {
         if (d === S.sel) return;
         S.sel = d;
         S.month = d.slice(0, 7);
-        markSel();
         goTo(S.sel, true);
       }
       S.fx = s;

@@ -310,19 +310,25 @@ export function clampMonth(ym, min, max) {
   return m < lo ? lo : m > hi ? hi : m;
 }
 
-/* The day the agenda highlights while it scrolls: the first row sitting fully
-   below the strip with room to spare, so it is never half hidden under the
-   edge. `rows` are in order with `top` in the scroller's own coordinates,
-   `scrollTop` is the coordinate of the strip's lower edge, `gap` the room the
-   highlighted day is given below it. A row 8px short of the full gap still
-   counts, which is how a day the app itself scrolled to (exactly `gap` below
-   the edge, the caller allows 4px more) is always picked. */
-export function firstFullyVisible(rows, scrollTop, gap) {
-  const from = scrollTop + gap - 8;
-  /* rows run in order, so the first one at or below `from` is a binary search */
-  let lo = 0, hi = rows.length;
-  while (lo < hi) { const mid = (lo + hi) >> 1; if (rows[mid].top >= from) hi = mid; else lo = mid + 1; }
-  return lo < rows.length ? rows[lo].day : null;
+/* The day the agenda highlights, for the pin line y (the strip's lower edge),
+   "next day waits" (Isa, 05/11/2026). rows: in order, { day, top, h } in one
+   coordinate space with y. c is the day under the line, r what is left of it
+   below the line, n the day after:
+   - r at least n's height: c is highlighted, its box r tall (it shrinks with
+     c's content) and n waits right below it;
+   - r below n's height: n is highlighted, its box n's height, and n slides up
+     into it.
+   At the change r equals n's height, so a shrinking box hands over without a
+   jump; only a taller next day makes the box grow. vis is the box's height.
+   Above the first row the first row is the day. Empty rows give null. */
+export function pinPick(rows, y) {
+  if (!rows.length) return null;
+  let lo = 0, hi = rows.length - 1, i = 0;
+  while (lo <= hi) { const mid = (lo + hi) >> 1; if (rows[mid].top <= y + 0.5) { i = mid; lo = mid + 1; } else hi = mid - 1; }
+  const c = rows[i], n = rows[i + 1];
+  const r = c.top + c.h - y;
+  if (n && r < n.h) return { day: n.day, vis: n.h, i: i + 1 };
+  return { day: c.day, vis: Math.max(0, Math.min(r, c.h)), i };
 }
 
 /* One finished drag on the strip: sideways moves a week (a month when open),

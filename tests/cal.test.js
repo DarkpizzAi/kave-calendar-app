@@ -267,7 +267,7 @@ test("cal: gridDots fits the top edge: up to 3 dots, past that 2 and a plus", ()
 });
 
 /* ---- Task 3: the Interactive calendar (week strip, month, agenda) ---- */
-import { agendaDays, stripWeek, monthCells, firstFullyVisible, clampDay, clampMonth, addMonths,
+import { agendaDays, stripWeek, monthCells, pinPick, clampDay, clampMonth, addMonths,
   categoryGroup, stripGesture, rowMeta, GROUP_OF } from "../js/cal-model.js";
 import { addDays as addDays_ } from "../js/dates.js";
 import { CATEGORIES } from "../js/icons.js";
@@ -291,10 +291,18 @@ test("agenda keeps the empty days", () => {
   eq(agendaDays("2026-10-30", "2026-11-02"), ["2026-10-30", "2026-10-31", "2026-11-01", "2026-11-02"]);
   eq(agendaDays("2026-11-02", "2026-10-30"), [], "a backwards range is empty");
 });
-test("highlight is the first row fully below the strip", () => {
-  eq(firstFullyVisible([{ day: "a", top: 0 }, { day: "b", top: 40 }, { day: "c", top: 90 }], 30, 16), "b");
-  eq(firstFullyVisible([{ day: "a", top: 0 }, { day: "b", top: 40 }], 100, 16), null, "nothing below the edge");
-  eq(firstFullyVisible([{ day: "a", top: 20 }, { day: "b", top: 60 }], 30, 16), "b", "a row half under the strip is skipped");
+test("pinPick: next day waits below a shrinking box, then takes over at its own height", () => {
+  /* a: 200 tall, b: 50, c: 120 */
+  const rows = [{ day: "a", top: 0, h: 200 }, { day: "b", top: 200, h: 50 }, { day: "c", top: 250, h: 120 }];
+  eq(pinPick(rows, 0), { day: "a", vis: 200, i: 0 }, "a at the line, whole");
+  eq(pinPick(rows, 100), { day: "a", vis: 100, i: 0 }, "the box shrinks with a; b waits below");
+  eq(pinPick(rows, 150), { day: "a", vis: 50, i: 0 }, "down to b's height, a still holds it");
+  eq(pinPick(rows, 151), { day: "b", vis: 50, i: 1 }, "then b takes over, same height: no jump");
+  eq(pinPick(rows, 199), { day: "b", vis: 50, i: 1 }, "b slides into its box");
+  eq(pinPick(rows, 200), { day: "c", vis: 120, i: 2 }, "b fully in: a taller c takes over at once (the box grows)");
+  eq(pinPick(rows, -40), { day: "a", vis: 200, i: 0 }, "above the first row: the first row");
+  eq(pinPick(rows, 400), { day: "c", vis: 0, i: 2 }, "past the last row: the last row, nothing left");
+  eq(pinPick([], 10), null);
 });
 test("clamping", () => {
   eq(clampDay("2028-11-01", "2025-10-26", "2028-10-26"), "2028-10-26");

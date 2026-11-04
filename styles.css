@@ -120,7 +120,14 @@ body.gated .app-header, body.gated .app-nav-bar, body.gated .app-rail, body.gate
    one row per day. Colour is tokens only: the selected day is the secondary
    container, an event takes its category group's container. */
 #view.is-cal { overflow-anchor: none; padding-bottom: 112px; }
-.cal { position: relative; }
+/* The pin line under the strip, where the agenda's box and dates stick:
+   --lc-h is the strip's height (calendar.js, 0 when the strip is beside the
+   agenda), --lc-top follows the strip's own sticky offset as the top bar
+   slides away. --lc-top is a registered length so it can transition once
+   here instead of on every row. */
+@property --lc-top { syntax: "<length>"; inherits: true; initial-value: 0px; }
+.cal { position: relative; --pin: calc(var(--lc-top) + var(--lc-h, 0px)); transition: --lc-top 250ms cubic-bezier(.2, 0, 0, 1); }
+.app-col:has(.app-header.is-hidden) .cal { --lc-top: calc(var(--header-h, 64px) * -1); }
 .lc {
   position: sticky; top: 0; z-index: 1; overflow: hidden;
   margin: 0 -16px; border-radius: 0 0 24px 24px;
@@ -150,9 +157,9 @@ body.gated .app-header, body.gated .app-nav-bar, body.gated .app-rail, body.gate
 .lc-head > .lc-title:last-child { margin-left: 0; margin-right: -4px; }
 span.lc-title { padding-left: 8px; }
 .lc-title:hover, .lc-d:hover, .lc-handle:hover, .ag-d:hover { box-shadow: inset 0 0 0 100vmax color-mix(in srgb, currentColor 8%, transparent); }
-.lc-week, .lc-grid { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 4px; }
+.lc-week, .lc-grid { position: relative; display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 4px; }
 .lc-wd { text-align: center; color: var(--md-sys-color-on-surface-variant); padding: 0 0 4px; }
-.lc-d { display: flex; flex-direction: column; align-items: center; gap: 4px; padding: 6px 0 10px; border-radius: 12px; min-width: 0; }
+.lc-d { position: relative; z-index: 1; display: flex; flex-direction: column; align-items: center; gap: 4px; padding: 6px 0 10px; border-radius: 12px; min-width: 0; }
 .lc-d:disabled { cursor: default; pointer-events: none; }
 .lc-d:disabled .wd, .lc-d:disabled .dn { opacity: .35; }
 .lc-d.wc { gap: 6px; padding: 10px 0 12px; }
@@ -165,24 +172,45 @@ span.lc-title { padding-left: 8px; }
 .lc-d.past:not(.today):not(.sel) .emos { opacity: .8; }
 .lc-d.sel { background: var(--md-sys-color-secondary-container); color: var(--md-sys-color-on-secondary-container); }
 .lc-d.sel .wd, .lc-d.sel .dn { color: inherit; }
+/* the strip's box gliding to a new day: a ghost moves (transform only) and
+   the day takes the colour back when it lands */
+.lc-ghost { position: absolute; z-index: 0; border-radius: 12px; background: var(--md-sys-color-secondary-container); pointer-events: none; will-change: transform; }
+.lc-d.sel.arriving { background: none; }
 .lc-d.today .wd, .lc-d.today .dn { color: var(--kave-today); font-weight: 700; }
 .lc-handle { display: flex; justify-content: center; align-items: center; width: 100%; height: 20px; border-radius: 10px; }
 .lc-handle span { width: 32px; height: 4px; border-radius: 2px; background: var(--md-sys-color-on-surface-variant); opacity: .4; }
 [data-size="expanded"] .lc-d.mc { min-height: 72px; }
 [data-size="expanded"] .lc-d .emos { font-size: 18px; height: 22px; }
 
-.cal-agenda { position: relative; padding-top: 16px; max-width: 720px; margin: 0 auto; width: 100%; }
-.mhead { padding: 16px 0 4px; margin: 0; }
-.ag { display: flex; align-items: flex-start; gap: 8px; padding: 8px; border-radius: 12px; min-width: 0; }
-.ag.empty { padding: 2px 8px; }
-.ag.past { opacity: .8; }
-.ag.sel { background: var(--md-sys-color-secondary-container); color: var(--md-sys-color-on-secondary-container); opacity: 1; }
-.ag-d { flex: none; width: 76px; height: 36px; display: flex; align-items: center; padding: 0 0 0 8px; border-radius: 12px; text-align: left; }
-.ag:not(.empty) .ag-d { height: 56px; }
-.ag-lab { white-space: nowrap; font-variant-numeric: tabular-nums; }
-.ag.today .ag-lab { color: var(--kave-today); font-weight: 700; }
-.ag-evs { flex: 1; display: flex; flex-direction: column; gap: 6px; min-width: 0; }
-.ag.empty .ag-evs { min-height: 36px; justify-content: center; }
+/* The agenda is one stacking context, so every day's box sits under every
+   day's content (a box reaches over the day before it, see .ag-hlw). */
+.cal-agenda { position: relative; isolation: isolate; padding-top: 16px; max-width: 720px; margin: 0 auto; width: 100%; }
+.ag-pin { position: sticky; top: var(--pin); height: 0; }
+.mhead { position: relative; z-index: 1; padding: 16px 0 4px; margin: 0; }
+.ag { position: relative; display: flex; align-items: flex-start; gap: 8px; padding: 8px; border-radius: 12px; min-width: 0; }
+.ag.empty { padding: 4px 8px; }
+/* dimmed by its contents, not the row: opacity on the row would make it a
+   stacking context and lift its box over the day above */
+.ag.past > .ag-d, .ag.past > .ag-evs { opacity: .8; }
+.ag.sel > .ag-d, .ag.sel > .ag-evs { opacity: 1; }
+.ag.sel { color: var(--md-sys-color-on-secondary-container); }
+/* "Next day waits" (pinPick in cal-model.js). Each day carries its box. The
+   wrapper reaches one day-height above the day, so the sticky box (one day
+   tall) holds under the strip while the day slides up into it, then the day's
+   end pushes it up and it shrinks with the content. Scrolling moves it on the
+   compositor; calendar.js only says which day has it. */
+.ag-hlw { position: absolute; left: 0; right: 0; bottom: 0; height: 200%; z-index: 0; pointer-events: none; }
+.ag-hl { position: sticky; top: var(--pin); height: 50%; border-radius: 12px; }
+.ag.sel .ag-hl, .ag.leaving .ag-hl { background: var(--md-sys-color-secondary-container); }
+/* the date: day of the week small, the number under it, one size for every day */
+.ag-d { position: sticky; top: calc(var(--pin) + 8px); z-index: 1; flex: none; width: 56px; display: flex; flex-direction: column; align-items: center; padding: 4px 0 6px; border-radius: 12px; }
+.ag-dw { color: var(--md-sys-color-on-surface-variant); }
+.ag-dn { font-variant-numeric: tabular-nums; }
+.ag-dw, .ag-dn { transition: color 150ms linear; }
+.ag.sel .ag-dw { color: inherit; }
+.ag.today .ag-dw, .ag.today .ag-dn { color: var(--kave-today); font-weight: 700; }
+.ag-evs { position: relative; z-index: 1; flex: 1; display: flex; flex-direction: column; gap: 6px; min-width: 0; }
+.ag.empty .ag-evs { min-height: 48px; justify-content: center; }
 .ag-note { color: var(--md-sys-color-on-surface-variant); }
 .ag.sel .ag-note { color: inherit; }
 
