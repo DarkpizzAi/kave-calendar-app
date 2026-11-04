@@ -303,6 +303,10 @@ test("pinPick: next day waits below a shrinking box, then takes over at its own 
   eq(pinPick(rows, -40), { day: "a", vis: 200, i: 0 }, "above the first row: the first row");
   eq(pinPick(rows, 400), { day: "c", vis: 0, i: 2 }, "past the last row: the last row, nothing left");
   eq(pinPick([], 10), null);
+  /* a month header (40px) between b and c: c takes over when its own top is within its height of the line */
+  const hdr = [{ day: "a", top: 0, h: 100 }, { day: "b", top: 140, h: 60 }];
+  eq(pinPick(hdr, 70), { day: "a", vis: 30, i: 0 }, "a shrinks; the header and b wait below");
+  eq(pinPick(hdr, 81), { day: "b", vis: 60, i: 1 }, "b's top 59px below the line: b takes over (the box grows from a's 19px)");
 });
 test("clamping", () => {
   eq(clampDay("2028-11-01", "2025-10-26", "2028-10-26"), "2028-10-26");

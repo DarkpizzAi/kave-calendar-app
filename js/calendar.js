@@ -277,8 +277,7 @@ function rowTop(row) {
 /* Scroll so the day sits on the pin line, under the strip, where the box
    shows it whole. Always marked as a jump, so the top bar neither hides for
    it nor stays hidden after it. `smooth` glides (unless the phone asks for
-   reduced motion). When the next day is taller the rule hands the box to it
-   as soon as this day is fully in, so the glide stops one pixel short. */
+   reduced motion). */
 let settleTimer = 0;
 function goTo(d, smooth) {
   const mn = view(), row = mn && mn.querySelector(`[data-row="${d}"]`);
@@ -288,8 +287,10 @@ function goTo(d, smooth) {
      difference; take it back off */
   const t = stripEl(), inner = t && t.firstElementChild;
   const moving = !expanded() && t && inner ? t.offsetHeight - inner.offsetHeight : 0;
-  const next = row.nextElementSibling && row.nextElementSibling.matches(".ag") ? row.nextElementSibling : null;
-  const short = next && next.offsetHeight > row.offsetHeight ? 1 : 0;
+  /* landed, the line is at the row's top; if the rule would already give the
+     box to the next day there, stop one pixel short */
+  const res = pinPick(rows(), row.offsetTop);
+  const short = res && res.day !== d ? 1 : 0;
   const top = Math.max(0, rowTop(row) - moving - edgeY(true) - short);
   const ms = glide ? Math.min(600, 250 + Math.abs(top - mn.scrollTop) / 20) : 0;
   /* marked after the measuring: a big layout can take longer than the mark */
