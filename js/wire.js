@@ -9,7 +9,7 @@
 import { store } from "./store.js";
 import { sheetOpen } from "./sheet.js";
 import { render, openDrawer, closeDrawer, openPage, closePage, openSearch, onPageClick, onPageChange, onShellPop,
-  pageIsOpen, drawerIsOpen, showTopBar, hideTopBar, actions, paintSyncBar } from "./render.js";
+  pageIsOpen, drawerIsOpen, showTopBar, hideTopBar, actions, paintSyncBar, currentView } from "./render.js";
 import { isJumping } from "./util.js";
 import { attachPullToRefresh, showSnackbar } from "../m3/kave-m3.js";
 import { onSyncState } from "./sync.js";
@@ -120,12 +120,13 @@ function pullRefresh() {
    #view: same scrollTop, the indicator parked under the header, and every
    touchstart and pointerdown run through the guards first, so a pull never
    arms under the drawer, a page, a sheet, search or a dialog, from more than
-   one finger, from a form control, or from the Calendar's strip (whose own
-   vertical swipe opens and closes the month). */
+   one finger, from a form control, or anywhere on the Calendar tab (retired
+   04/11/2026: its swipe down opens the month; sync there is Sync now in
+   Settings, or the background sync). */
 function viewScroller(view) {
   const canPull = () => {
     const shell = document.querySelector(".shell");
-    return !document.body.classList.contains("gated") && !(shell && shell.inert) && !sheetOpen();
+    return currentView() !== "calendar" && !document.body.classList.contains("gated") && !(shell && shell.inert) && !sheetOpen();
   };
   const ok = (e) => (e.type !== "touchstart" || (e.touches && e.touches.length === 1))
     && !(e.target.closest && e.target.closest("input, textarea, select, [contenteditable], [data-live]"));

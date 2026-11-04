@@ -24,7 +24,7 @@ import { ms, offlineCardHtml } from "./chrome-icons.js";
 import { ticketsOf, ticketButton } from "./tickets.js";
 import { categoryGroup } from "./cal-model.js";
 import { kaveKey } from "../m3/kave-m3.js";
-import { TILES, yearCounts, history, comingUp, nextHero, ticketWall, wallTakenOff, wallTap, didYouKnow } from "./insights-data.js";
+import { TILES, yearCounts, history, yearlyCharts, comingUp, nextHero, ticketWall, wallTakenOff, wallTap, didYouKnow } from "./insights-data.js";
 import { QUEUE_PATH, LOG_PATH, answerKey, mergeOutbox, cleanupCounts, pruneIfFresh, compactStamp, flushOutbox } from "./cleanup.js";
 
 let ctx = null;            // { data, render, view, banner }
@@ -112,19 +112,19 @@ async function loadOlder() {
 const cardHead = (id, title, aside) =>
   `<div class="m3-card__head"><h2 class="m3-title-m" id="${id}">${esc(title)}</h2><span class="m3-spacer"></span>${aside || ""}</div>`;
 
-/* The hero: the next flight or the next stay, whichever comes first. */
+/* The hero: the next transport (plane, train, bus...) or the next stay, whichever comes first. */
 function heroHtml(cu) {
   const h = nextHero(cu);
   if (!h) {
     return '<section class="ins-hero ins-hero--empty" aria-label="Next transport or accommodation">'
       + `<span class="ins-hero__icon">${ms("event_upcoming")}</span>`
       + '<p class="m3-title-m ins-hero__t">Nothing booked soon</p>'
-      + '<p class="m3-body-m ins-hero__m">The next flight or stay shows here once it is within a month.</p></section>';
+      + '<p class="m3-body-m ins-hero__m">The next trip or stay shows here once it is within a month.</p></section>';
   }
-  const f = cu.flight, s = cu.stay;
+  const f = cu.transport, s = cu.stay;
   let emoji, label, title, meta;
   if (h.kind === "transport") {
-    emoji = "✈️"; label = "Next transport"; title = f.title;
+    emoji = f.icon; label = "Next transport"; title = f.title;
     meta = `${DOW[dayOfWeek(f.date)]} ${fmt(f.date)}${f.time ? `, ${f.time}` : ""}`;
   } else {
     emoji = "🏨"; label = "Next accommodation"; title = [s.title, s.city].filter(Boolean).join(", ");
@@ -141,7 +141,7 @@ function heroHtml(cu) {
    with the count under it. The shape alternates round, rounded and scallop. */
 function numbersHtml(counts, year) {
   const history = counts.length
-    ? `<button type="button" class="m3-btn m3-btn--text" data-ins="cat" data-key="${esc(counts[0].key)}">History</button>` : "";
+    ? `<button type="button" class="m3-btn m3-btn--text" data-ins="charts">History</button>` : "";
   const body = counts.length
     ? `<div class="ins-shapes">${counts.map((c, i) =>
       `<button type="button" class="ins-shape" data-ins="cat" data-key="${esc(c.key)}" aria-label="${esc(`${c.label}, ${c.count}. Open its history`)}">`
@@ -232,10 +232,41 @@ export function bindInsights(main) {
     const a = b.dataset.ins;
     openedBy = { a, key: b.dataset.key || "", id: b.dataset.id || "" };
     if (a === "cat") openLevel({ kind: "ins-hist", key: b.dataset.key });
+    else if (a === "charts") openLevel({ kind: "ins-charts" });
     else if (a === "event") openLevel({ kind: "event", id: b.dataset.id });
     else if (a === "wall-all") { wallFilter = "all"; wallEdit = false; openLevel({ kind: "ins-wall" }); }
     else if (a === "cleanup") openLevel({ kind: "ins-clean" });
   });
+}
+
+/* ---------------- sheet: History, one bar chart per category ---------------- */
+
+/* A vertical bar chart: one bar per year, the count right above it, the year
+   under it (Label small), no legend. Hand-built SVG per the kave chart rules;
+   the bar colour is the tile's data hue, set on the card by hue(). */
+function barsSvg(years, counts, label) {
+  const W = 320, H = 132, TOP = 18, BASE = H - 20, n = years.length;
+  const slot = W / n, bw = Math.min(40, slot * 0.6), max = Math.max(1, ...counts);
+  const short = n > 6; // many years: '24 instead of 2024
+  let svg = `<svg class="hc-svg" viewBox="0 0 ${W} ${H}" role="img" aria-label="${esc(`${label} per year: ${years.map((y, i) => `${y} ${counts[i]}`).join(", ")}`)}">`
+    + `<line class="hc-base" x1="0" x2="${W}" y1="${BASE + 0.5}" y2="${BASE + 0.5}"/>`;
+  years.forEach((y, i) => {
+    const cx = slot * i + slot / 2, c = counts[i], h = c ? Math.max(4, (c / max) * (BASE - TOP)) : 0;
+    if (c) svg += `<rect class="hc-bar" x="${(cx - bw / 2).toFixed(1)}" y="${(BASE - h).toFixed(1)}" width="${bw.toFixed(1)}" height="${h.toFixed(1)}" rx="4"/>`
+      + `<text class="hc-n" x="${cx.toFixed(1)}" y="${(BASE - h - 5).toFixed(1)}">${c}</text>`;
+    svg += `<text class="hc-y" x="${cx.toFixed(1)}" y="${H - 4}">${short ? "’" + String(y).slice(2) : y}</text>`;
+  });
+  return svg + "</svg>";
+}
+
+function chartsBody() {
+  const { years, charts } = yearlyCharts(ctx.data.events(), todayKey());
+  if (!charts.length) return '<div class="m3-empty-state"><p class="m3-title-m">Nothing here yet</p><p class="m3-body-m m3-variant">Events appear here as they happen.</p></div>';
+  return `<p class="m3-body-m m3-variant ins-hint">Each category per year. Tap one to see its events.</p>`
+    + charts.map((c) => `<button type="button" class="ins-card hc-card" data-ia="cat" data-key="${esc(c.key)}" style="${hue(c.key)}">`
+      + `<span class="hc-head"><span class="m3-emoji" aria-hidden="true">${esc(c.emoji)}</span><span class="m3-title-m">${esc(c.label)}</span>`
+      + `<span class="m3-spacer"></span><span class="m3-label-l m3-variant">${c.total} in all</span></span>`
+      + barsSvg(years, c.counts, c.label) + "</button>").join("");
 }
 
 /* ---------------- sheet: a category's history (spec 7.1) ---------------- */
@@ -413,6 +444,11 @@ export async function syncCleanup() {
 
 export function initInsights(c) {
   ctx = c;
+  registerLevel("ins-charts", {
+    title: () => "History",
+    body: chartsBody,
+    onAction: (b) => { if (b.dataset.ia === "cat") openLevel({ kind: "ins-hist", key: b.dataset.key }); },
+  });
   registerLevel("ins-hist", {
     title: (l) => {
       const t = TILE[l.key];

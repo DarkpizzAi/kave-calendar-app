@@ -1,5 +1,5 @@
 import { test, eq, ok } from "./run.js";
-import { TILES, countable, yearCounts, history, comingUp, nextHero, ticketWall, wallTakenOff, wallTap, didYouKnow } from "../js/insights-data.js";
+import { TILES, countable, yearCounts, history, comingUp, nextHero, yearlyCharts, ticketWall, wallTakenOff, wallTap, didYouKnow } from "../js/insights-data.js";
 
 let n = 0;
 const ev = (type, start, o = {}) => ({
@@ -94,14 +94,14 @@ test("history: ignores cancelled, deleted and unknown keys", () => {
   eq(history(events, "nope", "2026-10-25"), []);
 });
 
-test("comingUp: next flight and next stay within 31 days", () => {
+test("comingUp: next transport and next stay within 31 days", () => {
   const events = [
     ev("transport", "2026-11-10", { icon: "✈️", title: "Flight to Porto", extra: { startTime: "07:30" } }),
     ev("transport", "2026-11-05", { icon: "✈️", title: "Flight to Rome", extra: { startTime: "09:00" } }),
     ev("accommodation", "2026-11-05", { end: "2026-11-08", title: "Hotel Sol", extra: { city: "rome" } }),
   ];
   const c = comingUp(events, "2026-10-25");
-  eq([c.flight.title, c.flight.date, c.flight.time, c.flight.days], ["Flight to Rome", "2026-11-05", "09:00", 11]);
+  eq([c.transport.title, c.transport.icon, c.transport.date, c.transport.time, c.transport.days], ["Flight to Rome", "✈️", "2026-11-05", "09:00", 11]);
   eq([c.stay.title, c.stay.city, c.stay.start, c.stay.end, c.stay.nights, c.stay.days], ["Hotel Sol", "Rome", "2026-11-05", "2026-11-08", 3, 11]);
 });
 
@@ -109,28 +109,45 @@ test("comingUp: today counts, 31 days counts, 32 days and past do not", () => {
   const today = "2026-10-25";
   const events = [ev("transport", today, { icon: "✈️" }), ev("accommodation", "2026-11-25"), ev("accommodation", "2026-10-24")];
   const c = comingUp(events, today);
-  eq(c.flight.days, 0);
+  eq(c.transport.days, 0);
   eq(c.stay.days, 31);
-  eq(comingUp([ev("accommodation", "2026-11-26"), ev("transport", "2026-10-24", { icon: "✈️" })], today), { flight: null, stay: null });
+  eq(comingUp([ev("accommodation", "2026-11-26"), ev("transport", "2026-10-24", { icon: "✈️" })], today), { transport: null, stay: null });
 });
 
-test("comingUp: cancelled, idea and non-plane transport are skipped", () => {
+test("comingUp: a train counts as the next transport", () => {
+  const c = comingUp([ev("transport", "2026-10-30", { icon: "🚄", title: "Train to Madrid" }), ev("transport", "2026-11-02", { icon: "✈️" })], "2026-10-25");
+  eq([c.transport.title, c.transport.icon, c.transport.days], ["Train to Madrid", "🚄", 5]);
+});
+
+test("comingUp: cancelled and idea are skipped", () => {
   const events = [
-    ev("transport", "2026-10-30", { icon: "🚄" }), ev("transport", "2026-10-31", { icon: "✈️", extra: { status: "cancelled" } }),
+    ev("transport", "2026-10-31", { icon: "✈️", extra: { status: "cancelled" } }),
     ev("accommodation", "2026-11-01", { extra: { status: "idea" } }),
   ];
-  eq(comingUp(events, "2026-10-25"), { flight: null, stay: null });
+  eq(comingUp(events, "2026-10-25"), { transport: null, stay: null });
+});
+
+test("yearlyCharts: one chart per tile with data, shared years with zeros, biggest total first", () => {
+  const events = [
+    ev("eating", "2024-03-01"), ev("eating", "2026-03-01"), ev("eating", "2026-04-01"),
+    ev("live-music", "2025-05-01"), ev("live-music", "2026-05-01", { extra: { status: "idea" } }),
+  ];
+  const r = yearlyCharts(events, "2026-11-04");
+  eq(r.years, [2024, 2025, 2026]);
+  eq(r.charts.map((c) => [c.key, c.counts, c.total]), [["meals", [1, 0, 2], 3], ["concerts", [0, 1, 0], 1]]);
+  eq(yearlyCharts([], "2026-11-04"), { years: [], charts: [] });
+  eq(yearlyCharts([ev("eating", "2027-01-01")], "2026-11-04").years, [2026, 2027]);
 });
 
 test("nextHero: whichever comes first, a tie goes to transport, neither gives null", () => {
   const f = (days) => ({ id: "f1", title: "Fly", date: "x", time: "", days });
   const s = (days) => ({ id: "s1", title: "Stay", city: "", start: "x", end: "x", nights: 1, days });
-  eq(nextHero({ flight: f(11), stay: s(11) }), { kind: "transport", id: "f1", days: 11 });
-  eq(nextHero({ flight: f(11), stay: s(3) }), { kind: "accommodation", id: "s1", days: 3 });
-  eq(nextHero({ flight: f(2), stay: s(3) }), { kind: "transport", id: "f1", days: 2 });
-  eq(nextHero({ flight: null, stay: s(5) }), { kind: "accommodation", id: "s1", days: 5 });
-  eq(nextHero({ flight: f(0), stay: null }), { kind: "transport", id: "f1", days: 0 });
-  eq(nextHero({ flight: null, stay: null }), null);
+  eq(nextHero({ transport: f(11), stay: s(11) }), { kind: "transport", id: "f1", days: 11 });
+  eq(nextHero({ transport: f(11), stay: s(3) }), { kind: "accommodation", id: "s1", days: 3 });
+  eq(nextHero({ transport: f(2), stay: s(3) }), { kind: "transport", id: "f1", days: 2 });
+  eq(nextHero({ transport: null, stay: s(5) }), { kind: "accommodation", id: "s1", days: 5 });
+  eq(nextHero({ transport: f(0), stay: null }), { kind: "transport", id: "f1", days: 0 });
+  eq(nextHero({ transport: null, stay: null }), null);
 });
 
 const concert = (start, o = {}) => ev("live-music", start, { title: o.title, extra: { links: [{ label: "Ticket", url: o.url || DRIVE }], ...(o.extra || {}) } });

@@ -253,6 +253,17 @@ span.lc-title { padding-left: 8px; }
 .ins-fact__head h2, .ins-fact__t { margin: 0; }
 .ins-row { padding-left: 0; padding-right: 0; }
 .ins-hint { margin: 0; }
+/* History: one bar chart card per category, stacked, the sheet scrolls */
+.hc-card { flex: none; width: 100%; text-align: left; border: 0; font: inherit; cursor: pointer; margin-top: 12px; position: relative; overflow: hidden; }
+.hc-card:hover::after, .hc-card:focus-visible::after { content: ""; position: absolute; inset: 0; background: currentColor; opacity: .08; pointer-events: none; }
+.hc-card:active::after { content: ""; position: absolute; inset: 0; background: currentColor; opacity: .10; pointer-events: none; }
+.hc-head { display: flex; align-items: center; gap: 8px; }
+#sheetRoot .hc-svg { width: 100%; height: auto; display: block; overflow: visible; fill: initial; stroke: none; }
+.hc-bar { fill: var(--kave-k); }
+.hc-base { stroke: var(--md-sys-color-outline-variant); stroke-width: 1; }
+.hc-n, .hc-y { text-anchor: middle; font-size: 11px; font-weight: 500; letter-spacing: .5px; }
+.hc-n { fill: var(--md-sys-color-on-surface); }
+.hc-y { fill: var(--md-sys-color-on-surface-variant); }
 .ins-filters { flex: none; }
 /* ticket wall: a stub with a perforation and two notches */
 .ins-wall { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }

@@ -78,9 +78,40 @@ export function history(events, key, today) {
   });
 }
 
+/* The hero's transport: any transport activity (plane, train, bus, car, boat),
+   unlike the Flights tile, which counts planes only. */
+const ANY_TRANSPORT = { key: "transport", types: ["transport"] };
+const transportIcon = (e) => ((e.activities || []).find((a) => a && a.type === "transport" && a.icon) || {}).icon || "✈️";
+
+/* Every tile's count per year, for the History charts: one chart per tile
+   with any events, all on the same run of years (the first year with data to
+   the last, at least this year), zeros kept so the charts line up. Biggest
+   total first, like the numbers card; ties keep TILES order. */
+export function yearlyCharts(events, today) {
+  const thisYear = Number(today.slice(0, 4));
+  const list = events.filter((e) => countable(e) && hasDay(e));
+  const charts = TILES.map((t) => {
+    const by = new Map();
+    list.forEach((e) => { if (inTile(e, t)) { const y = Number(e.start.slice(0, 4)); by.set(y, (by.get(y) || 0) + 1); } });
+    return { key: t.key, emoji: t.emoji, label: t.label, by };
+  }).filter((c) => c.by.size);
+  if (!charts.length) return { years: [], charts: [] };
+  const all = charts.flatMap((c) => [...c.by.keys()]);
+  const first = Math.min(thisYear, ...all), last = Math.max(thisYear, ...all);
+  const years = [];
+  for (let y = first; y <= last; y++) years.push(y);
+  return {
+    years,
+    charts: charts.map((c) => {
+      const counts = years.map((y) => c.by.get(y) || 0);
+      return { key: c.key, emoji: c.emoji, label: c.label, total: counts.reduce((a, b) => a + b, 0), counts };
+    }).sort((a, b) => b.total - a.total),
+  };
+}
+
 /* The next countable event of a tile starting today or later, at most 31 days away. */
 function nextOf(events, tileKey, today) {
-  const tile = TILE_BY_KEY.get(tileKey);
+  const tile = tileKey === "transport" ? ANY_TRANSPORT : TILE_BY_KEY.get(tileKey);
   const limit = addDays(today, 31);
   return events
     .filter((e) => countable(e) && hasDay(e) && e.start >= today && e.start <= limit && inTile(e, tile))
@@ -88,18 +119,18 @@ function nextOf(events, tileKey, today) {
 }
 
 export function comingUp(events, today) {
-  const f = nextOf(events, "flights", today);
+  const f = nextOf(events, "transport", today);
   const s = nextOf(events, "hotels", today);
   return {
-    flight: f ? { id: f.id, title: f.title, date: f.start, time: f.startTime || "", days: dayDiff(today, f.start) } : null,
+    transport: f ? { id: f.id, title: f.title, icon: transportIcon(f), date: f.start, time: f.startTime || "", days: dayDiff(today, f.start) } : null,
     stay: s ? { id: s.id, title: s.title, city: titleCase(s.city), start: s.start, end: lastDay(s), nights: dayDiff(s.start, lastDay(s)), days: dayDiff(today, s.start) } : null,
   };
 }
 
-/* The hero: whichever of the next flight and the next stay comes first. A tie
-   goes to the transport. Neither gives null (a quiet empty state). */
+/* The hero: whichever of the next transport and the next stay comes first. A
+   tie goes to the transport. Neither gives null (a quiet empty state). */
 export function nextHero(cu) {
-  const f = cu && cu.flight, s = cu && cu.stay;
+  const f = cu && cu.transport, s = cu && cu.stay;
   if (f && (!s || f.days <= s.days)) return { kind: "transport", id: f.id, days: f.days };
   if (s) return { kind: "accommodation", id: s.id, days: s.days };
   return null;
