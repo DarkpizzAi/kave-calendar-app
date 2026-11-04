@@ -15,6 +15,7 @@
    button are one path, and a second request for the same close is ignored. */
 "use strict";
 
+import { swipeToClose } from "./sheet-swipe.js";
 import { escapeHtml as esc } from "./util.js";
 import { addDays, dayOfWeek } from "./dates.js";
 import { holidayOn, isProvisional } from "./holidays.js";
@@ -250,46 +251,58 @@ function sync(anim = "", from = null, force = false) {
   if (!stack.length) restoreFocus();
 }
 
-/* ---------- drag to close (a phone's bottom sheet) ---------- */
+/* ---------- drag to close (a phone's bottom sheet) ----------
+   By the handle, or by a swipe down anywhere in the sheet (sheet-swipe.js):
+   both follow the finger, close past a third of the height, else spring back. */
 function bindDrag(view) {
   const { el, host } = view, scrim = host.querySelector(".m3-scrim");
-  let y0 = null, dy = 0, h = 1, id = null;
+  let dy = 0, h = 1, live = false;
+  const begin = () => { el.getAnimations().forEach((a) => a.cancel()); dy = 0; h = el.offsetHeight || 1; live = true; };
+  const move = (d) => {
+    if (!live) return;
+    dy = d;
+    el.style.transform = `translateY(${dy}px)`;
+    if (scrim) scrim.style.opacity = String(Math.max(0, 1 - dy / h));
+  };
+  const end = (cancelled) => {
+    if (!live) return;
+    live = false;
+    const from = dy;
+    const fade = scrim ? Number(scrim.style.opacity || 1) : 1;
+    if (!cancelled && from > h / 3) {
+      /* leave from where the finger let go; the history is walked back at once */
+      const t = Math.max(120, 250 * (1 - from / h));
+      view.dragged = true;
+      if (scrim) play(scrim, [{ opacity: fade }, { opacity: 0 }], t, "linear", { fill: "forwards" });
+      play(el, [{ transform: `translateY(${from}px)` }, { transform: "translateY(100%)" }], t, EASE.accelerate, { fill: "forwards" });
+      closeAll();
+    } else {
+      /* a cancelled gesture is never a close: spring back, scrim back to full */
+      el.style.transform = "";
+      if (scrim) { scrim.style.opacity = ""; if (from > 0) play(scrim, [{ opacity: fade }, { opacity: 1 }], 250, "linear"); }
+      if (from > 0) play(el, [{ transform: `translateY(${from}px)` }, { transform: "none" }], 250, EASE.decelerate);
+    }
+  };
+  let y0 = null, id = null;
   host.querySelectorAll("[data-grip]").forEach((g) => {
     g.style.touchAction = "none";
     g.addEventListener("pointerdown", (e) => {
       if (e.target.closest("button")) return;
-      el.getAnimations().forEach((a) => a.cancel());
-      y0 = e.clientY; dy = 0; h = el.offsetHeight || 1; id = e.pointerId;
+      begin(); y0 = e.clientY; id = e.pointerId;
       try { g.setPointerCapture(e.pointerId); } catch { /* a synthetic pointer */ }
     });
     g.addEventListener("pointermove", (e) => {
       if (y0 == null || e.pointerId !== id) return;
-      dy = Math.max(0, e.clientY - y0);
-      el.style.transform = `translateY(${dy}px)`;
-      if (scrim) scrim.style.opacity = String(Math.max(0, 1 - dy / h));
+      move(Math.max(0, e.clientY - y0));
     });
-    const end = (cancelled) => {
-      if (y0 == null) return;
-      y0 = null;
-      const from = dy;
-      const fade = scrim ? Number(scrim.style.opacity || 1) : 1;
-      if (!cancelled && from > h / 3) {
-        /* leave from where the finger let go; the history is walked back at once */
-        const t = Math.max(120, 250 * (1 - from / h));
-        view.dragged = true;
-        if (scrim) play(scrim, [{ opacity: fade }, { opacity: 0 }], t, "linear", { fill: "forwards" });
-        play(el, [{ transform: `translateY(${from}px)` }, { transform: "translateY(100%)" }], t, EASE.accelerate, { fill: "forwards" });
-        closeAll();
-      } else {
-        /* a cancelled gesture is never a close: spring back, scrim back to full */
-        el.style.transform = "";
-        if (scrim) { scrim.style.opacity = ""; if (from > 0) play(scrim, [{ opacity: fade }, { opacity: 1 }], 250, "linear"); }
-        if (from > 0) play(el, [{ transform: `translateY(${from}px)` }, { transform: "none" }], 250, EASE.decelerate);
-      }
-    };
-    g.addEventListener("pointerup", () => end(false));
-    g.addEventListener("pointercancel", () => end(true));
-    g.addEventListener("lostpointercapture", () => { if (y0 != null) end(true); });
+    const stop = (cancelled) => { if (y0 == null) return; y0 = null; end(cancelled); };
+    g.addEventListener("pointerup", () => stop(false));
+    g.addEventListener("pointercancel", () => stop(true));
+    g.addEventListener("lostpointercapture", () => { if (y0 != null) stop(true); });
+  });
+  swipeToClose(el, {
+    canDrag: () => shown === view && !layers.length && el.isConnected,
+    begin, move, end: (d, cancelled) => end(cancelled),
   });
 }
 

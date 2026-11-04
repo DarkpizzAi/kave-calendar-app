@@ -109,10 +109,6 @@ export function hideTopBar() { const b = $("topBar"); if (b) b.classList.add("is
 const esc = escapeHtml;
 const choices = (attr, opts, cur) => `<div class="m3-chips" role="radiogroup">${opts.map(([v, l]) =>
   `<button type="button" role="radio" aria-checked="${cur === v}" class="m3-chip${cur === v ? " is-selected" : ""}" data-${attr}="${esc(v)}">${cur === v ? ms("check") : ""}${esc(l)}</button>`).join("")}</div>`;
-const navRow = (page, label, summary) =>
-  `<button type="button" class="m3-list-item m3-list-item--tap set-row-btn" data-page-open="${page}">`
-  + `<div class="m3-list-item__text"><div class="m3-title-m">${esc(label)}</div><div class="m3-body-m m3-variant">${esc(summary)}</div></div>`
-  + `<span class="m3-list-item__trail">${ms("chevron_right")}</span></button>`;
 const group = (title, rows) => `<section class="set-group"><h2 class="m3-list-header m3-title-s">${esc(title)}</h2><div class="m3-grouped">${rows}</div></section>`;
 const staticRow = (inner) => `<div class="m3-list-item set-col">${inner}</div>`;
 const hint = (t) => `<p class="m3-body-s m3-variant">${esc(t)}</p>`;
@@ -120,47 +116,98 @@ const hint = (t) => `<p class="m3-body-s m3-variant">${esc(t)}</p>`;
 /* The public address, the same wherever this copy runs (a PC, localhost) */
 const APP_URL = "https://darkpizzai.github.io/kave-calendar-app/";
 
+/* Laid out exactly like Ladle's Settings (Isa, 04/11/2026): Theme as labelled
+   swatches, then grouped rows with a leading icon; what both apps share
+   (Sync, User, App link, GitHub token, Updates, Display) has the same row,
+   words and order, under the same headers. Calendar is Compass's own. */
+const row = (icon, title, body, trail = "") =>
+  `<div class="m3-list-item set-row"><span class="m3-list-item__lead">${ms(icon)}</span>`
+  + `<div class="m3-list-item__text m3-list-item__text--wrap"><div class="m3-title-m">${esc(title)}</div>${body}</div>${trail}</div>`;
+const navIconRow = (page, icon, label, summary) =>
+  `<button type="button" class="m3-list-item m3-list-item--tap set-row-btn" data-page-open="${page}"><span class="m3-list-item__lead">${ms(icon)}</span>`
+  + `<div class="m3-list-item__text"><div class="m3-title-m">${esc(label)}</div><div class="m3-body-m m3-variant">${esc(summary)}</div></div>`
+  + `<span class="m3-list-item__trail">${ms("chevron_right")}</span></button>`;
+const lines = (list) => list.map(([k, t]) => `<span class="sync-line ${k}">${esc(t)}</span>`).join("");
+const head = (t) => `<div class="m3-list-header m3-title-s">${esc(t)}</div>`;
+
+/* The same probe as Ladle's Display row: what the window and the safe area are. */
+function displayLines() {
+  const mode = ["fullscreen", "standalone", "minimal-ui"].find((m) => matchMedia(`(display-mode: ${m})`).matches) || "browser";
+  const probe = document.createElement("div");
+  probe.style.cssText = "position:fixed;left:0;top:0;width:0;visibility:hidden;pointer-events:none;"
+    + "padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px);";
+  document.body.appendChild(probe);
+  const cs = getComputedStyle(probe);
+  const top = Math.round(parseFloat(cs.paddingTop) || 0), bottom = Math.round(parseFloat(cs.paddingBottom) || 0);
+  probe.remove();
+  const vh = Math.round(window.innerHeight), sh = Math.round((screen && screen.height) || 0), edge = top > 0 || bottom > 0;
+  return [
+    ["muted", `Window ${mode}`],
+    [edge ? "ok" : "warn", `Safe area top ${top}px · bottom ${bottom}px`],
+    ["muted", sh > 0 ? `Viewport ${vh}px of ${sh}px screen · ${sh - vh}px is bars` : `Viewport ${vh}px (screen size unavailable)`],
+    [edge ? "ok" : "warn", edge ? "Edge to edge - the page reaches under the bars" : "Not edge to edge - the bars are their own strip"],
+    [themeBootRan() ? "ok" : "error", themeBootRan() ? "Theme preload ran" : "Theme preload BLOCKED - recompute the CSP hash (see README)"],
+  ];
+}
+
 function settingsHtml() {
   const s = store.state.settings;
   const prefs = readPrefs(s);
   const cur = toSeed(s.palette);
   const swatches = Object.entries(PALETTES).map(([id, n]) => {
     const on = cur === id;
-    return `<button type="button" class="m3-swatch${on ? " is-selected" : ""}" aria-pressed="${on}" aria-label="${esc(n)}" title="${esc(n)}" data-palette="${esc(id)}" style="background:${esc(SEED_HEX[id] || "")}">`
-      + `${on ? `<span class="m3-swatch__check">${ms("check")}</span>` : ""}</button>`;
+    return `<button type="button" class="set-swatch" data-palette="${esc(id)}" aria-pressed="${on}" aria-label="${esc(n)}">`
+      + `<span class="m3-swatch${on ? " is-selected" : ""}" style="background:${esc(SEED_HEX[id] || "")}">${on ? `<span class="m3-swatch__check">${ms("check")}</span>` : ""}</span>`
+      + `<span class="m3-label-m">${esc(n)}</span></button>`;
   }).join("");
 
-  const dot = dataSync.state === "ok" ? "ok" : dataSync.state === "failed" ? "error" : dataSync.state === "working" ? "working" : "";
-  const syncLine = dataSync.state === "idle" ? "Not synced yet this session." : dataSync.message;
-  const when = dataSync.at ? `${dataSync.state === "ok" ? "Last synced" : "Last tried"} at ${new Date(dataSync.at).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}.` : "";
-  const tok = syncStatus.state === "idle" ? "" : `<p class="m3-body-s set-error">${esc(syncStatus.message)}</p>`;
-  const diag = themeBootRan() ? "" : '<p class="m3-body-s set-error">Theme preload BLOCKED: recompute the CSP hash (see README)</p>';
+  const syncL = [];
+  if (!s.token) syncL.push(["warn", "No token set"]);
+  else if (dataSync.state === "failed") syncL.push(["error", dataSync.message || "Sync failed"]);
+  else if (dataSync.state === "working") syncL.push(["muted", "Syncing…"]);
+  else if (dataSync.state === "ok") syncL.push(["ok", "Connected"]);
+  else syncL.push(["muted", "Not synced yet this session"]);
+  if (dataSync.at) syncL.push(["muted", `${dataSync.state === "ok" ? "Last synced" : "Last tried"} at ${new Date(dataSync.at).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}`]);
+  const tok = syncStatus.state === "idle" ? "" : `<p class="token-status m3-body-s error">${esc(syncStatus.message)}</p>`;
   /* the version line and the update check: one mechanism (js/updates.js) */
   ensureVersionAsked(render);
-  const updLines = updateStatusLines().map(([k, t]) => `<p class="set-line ${k}"><i></i><span class="m3-body-m">${esc(t)}</span></p>`).join("");
+  const who = [["isa", "Isa"], ["hugo", "Hugo"]].map(([v, l]) =>
+    `<button type="button" class="m3-chip${s.me === v ? " is-selected" : ""}" aria-pressed="${s.me === v}" data-me="${v}">${l}</button>`).join("");
 
-  return `<div class="page-col">
-    ${group("Appearance", staticRow(`<div class="m3-title-m">Theme</div><div class="m3-swatch-row" role="group" aria-label="Theme">${swatches}</div>${hint("Light and dark follow the phone.")}`))}
-    ${group("Calendar",
-      navRow("defaults", "Calendar defaults", defaultsSummary(prefs))
-      + navRow("emorder", "Grid emoji order", orderSummary(prefs.gridOrder))
-      + navRow("archive", "Archive", "Look back before this year"))}
-    ${group("Sync", staticRow(`<p class="set-line ${dot}"><i></i><span class="m3-body-m">${esc(syncLine)}</span></p>${when ? hint(when) : ""}`
-      + `<div class="set-actions"><button type="button" id="syncNow" class="m3-btn m3-btn--tonal"${s.token ? "" : " disabled"}>${ms("sync")}Sync now</button></div>`))}
-    ${group("Who am I", staticRow(`<div class="m3-chips" role="group" aria-label="Who am I">${[["isa", "Isa"], ["hugo", "Hugo"]].map(([v, l]) =>
-      `<button type="button" class="m3-chip${s.me === v ? " is-selected" : ""}" aria-pressed="${s.me === v}" data-me="${v}">${s.me === v ? ms("check") : ""}${l}</button>`).join("")}</div>`
-      + hint("Stamps every edit you make. Nothing is saved until it is set.")))}
-    ${group("This device",
-      staticRow(`<label class="m3-field"><span class="m3-field__label">App link</span><input class="m3-field__input" id="appLink" type="text" value="${esc(APP_URL)}" readonly></label>`
-        + `<div class="set-actions"><button type="button" id="copyAppLink" class="m3-btn m3-btn--tonal">${ms("content_copy")}Copy</button></div>`
-        + hint("Open Kave Compass on another device: copy this and send it to your phone."))
-      + staticRow(`<label class="m3-field"><span class="m3-field__label">GitHub token</span><input class="m3-field__input" id="tokenInput" type="password" placeholder="${s.token ? "Token saved" : "github_pat_..."}"`
-        + ` autocomplete="off" autocapitalize="off" spellcheck="false" enterkeyhint="done"></label>${tok}`
-        + `<div class="set-actions"><button type="button" id="clearToken" class="m3-btn m3-btn--text"${s.token ? "" : " disabled"}>Clear token</button></div>`
-        + hint("Stored on this device only, sent only to GitHub. Fine-grained, Contents: read and write on kave-hub."))
-      + staticRow(`<div class="m3-title-m">About</div>${updLines}`
-        + `<div class="set-actions"><button type="button" id="updateBtn" class="m3-btn m3-btn--tonal"${updateBusy() ? " disabled" : ""}>${esc(updateButtonText())}</button></div>${diag}`
-        + hint("The household planner. Data in kave-hub; the mini PC runs the sweeps.")))}
+  return `<div class="page-col set-page">
+    ${head("Theme")}
+    <div class="set-swatches" role="group" aria-label="Theme colour">${swatches}</div>
+    <p class="m3-body-s m3-variant set-note">Light and dark follow the phone.</p>
+
+    ${head("Calendar")}
+    <div class="m3-grouped">
+      ${navIconRow("defaults", "tune", "Calendar defaults", defaultsSummary(prefs))}
+      ${navIconRow("emorder", "emoji_emotions", "Grid emoji order", orderSummary(prefs.gridOrder))}
+      ${navIconRow("archive", "inventory_2", "Archive", "Look back before this year")}
+    </div>
+
+    ${head("Sync")}
+    <div class="m3-grouped">
+      ${row("sync", "Sync", `<div class="sync-status m3-body-m m3-variant">${lines(syncL)}</div>`,
+        `<button type="button" id="syncNow" class="m3-btn m3-btn--tonal m3-btn--small"${s.token ? "" : " disabled"}>Sync now</button>`)}
+    </div>
+
+    ${head("Advanced")}
+    <div class="m3-grouped">
+      ${row("person", "User", '<div class="m3-body-m m3-variant">Stamps every edit you make</div>'
+        + `<div class="m3-chips set-who" role="group" aria-label="User">${who}</div>`)}
+      ${row("link", "App link",
+        `<input id="appLink" class="set-bare m3-body-m m3-variant" type="text" value="${esc(APP_URL)}" readonly aria-label="App link">`
+        + '<div class="m3-body-s m3-variant">Open Compass on another device: copy this and send it to your phone.</div>',
+        `<button type="button" id="copyAppLink" class="m3-icon-btn" aria-label="Copy link">${ms("content_copy")}</button>`)}
+      ${row("key", "GitHub token",
+        `<input id="tokenInput" class="set-bare m3-body-m" type="password" placeholder="${s.token ? "Token saved" : "github_pat_..."}" autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false" enterkeyhint="done" aria-label="GitHub token">`
+        + tok + '<div class="m3-body-s m3-variant">Stored on this device only, sent only to GitHub. It unlocks your shared calendar.</div>',
+        `<button type="button" id="clearToken" class="m3-btn m3-btn--text"${s.token ? "" : " disabled"}>Clear</button>`)}
+      ${row("system_update", "Updates", `<div class="sync-status m3-body-m m3-variant">${lines(updateStatusLines())}</div>`,
+        `<button type="button" id="updateBtn" class="m3-btn m3-btn--text"${updateBusy() ? " disabled" : ""}>${esc(updateButtonText())}</button>`)}
+      ${row("monitor_heart", "Display", `<div class="sync-status m3-body-m m3-variant">${lines(displayLines())}</div>`)}
+    </div>
   </div>`;
 }
 
@@ -498,8 +545,9 @@ export function onPageClick(e) {
       if (!ok) return;
       const n = $("copyAppLink");
       if (!n) return;
-      n.lastChild.textContent = "Copied";
-      setTimeout(() => { const m = $("copyAppLink"); if (m) m.lastChild.textContent = "Copy"; }, 1500);
+      const i = n.querySelector(".m3-icon");
+      if (i) i.textContent = "check"; // as Ladle: the icon turns into a tick for a moment
+      setTimeout(() => { const m = $("copyAppLink"), j = m && m.querySelector(".m3-icon"); if (j) j.textContent = "content_copy"; }, 1500);
     });
     return;
   }

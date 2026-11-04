@@ -104,9 +104,13 @@ function dayBtn(d, kind, inMonth) {
 function stripInner() {
   const wide = expanded(), open = S.open || wide;
   const label = monthTitle(open ? S.month : S.sel.slice(0, 7));
-  const title = wide
+  const name = wide
     ? `<span class="lc-title"><span class="m3-title-m">${esc(label)}</span></span>`
     : `<button type="button" class="lc-title" data-act="toggle" aria-expanded="${open}" aria-label="${esc(label)}, ${open ? "show one week" : "show the month"}"><span class="m3-title-m">${esc(label)}</span></button>`;
+  /* with a mouse, hovering the month name shows a chevron each side of it
+     (Isa, 04/11/2026); touch swipes instead, so they never show there */
+  const chev = (act, icon, lbl) => `<button type="button" class="m3-icon-btn lc-chev" data-act="${act}" aria-label="${lbl}">${ms(icon)}</button>`;
+  const title = `<span class="lc-name">${chev("mprev", "chevron_left", "Previous month")}${name}${chev("mnext", "chevron_right", "Next month")}</span>`;
   const head = `<div class="lc-head">${title}<span class="sp"></span>`
     + `<button type="button" class="lc-title" data-act="today" aria-label="Back to today"><span class="m3-title-m">Today</span></button></div>`;
   let body;
@@ -310,8 +314,10 @@ function markSel() {
    drops it. */
 let rowCache = null;
 
-/* The reader scrolls the agenda: the highlight follows, the month stays as
-   it is (open or closed). A scroll the app caused is not the reader's. */
+/* The reader scrolls the agenda: the highlight follows, and the strip's
+   month follows it into another month, open or closed (Isa, 04/11/2026). An
+   open month browsed with a swipe stays put while the agenda scrolls within
+   one month. A scroll the app caused is not the reader's. */
 function onScroll() {
   if (!ctx.isCalendar() || !frame) return;
   if (isJumping()) return;
@@ -327,8 +333,9 @@ function onScroll() {
     /* a day the app scrolled to sits exactly GAP below the edge; allow 4px more */
     const cur = firstFullyVisible(rowCache, mn.scrollTop + edgeY(false) - base, GAP + 4);
     if (cur && cur !== S.sel) {
+      const crossed = cur.slice(0, 7) !== S.sel.slice(0, 7);
       S.sel = cur;
-      if (!S.open || expanded()) S.month = cur.slice(0, 7);
+      if (!S.open || expanded() || crossed) S.month = cur.slice(0, 7);
       markSel();
       redrawStrip();
     }
@@ -340,6 +347,25 @@ function pickDay(d) {
   S.sel = clampDay(d, frame.range.min, frame.range.max);
   S.month = S.sel.slice(0, 7);
   if (!expanded()) S.open = false;
+  markSel();
+  redrawStrip();
+  goTo(S.sel, true);
+}
+
+/* The month chevrons. The open month (or the wide grid) shows the next
+   month, as a swipe does; the closed week strip goes to that month's first
+   day (today, for this month) and the agenda glides there. */
+function stepMonth(s) {
+  if (!frame) return;
+  const open = S.open || expanded();
+  const from = open ? S.month : S.sel.slice(0, 7);
+  const m = clampMonth(addMonths(from, s), frame.range.min, frame.range.max);
+  if (m === from) return;
+  S.fx = s;
+  if (open) { S.month = m; redrawStrip(); return; }
+  const today = todayKey();
+  S.sel = clampDay(today.slice(0, 7) === m ? today : `${m}-01`, frame.range.min, frame.range.max);
+  S.month = S.sel.slice(0, 7);
   markSel();
   redrawStrip();
   goTo(S.sel, true);
@@ -368,6 +394,7 @@ function onClick(e) {
     const a = b.dataset.act;
     if (a === "toggle") { S.open = !S.open; S.month = S.sel.slice(0, 7); redrawStrip(); }
     else if (a === "today") backToToday();
+    else if (a === "mprev" || a === "mnext") stepMonth(a === "mnext" ? 1 : -1);
     else if (a === "day") openLevel({ kind: "day", d: b.dataset.d });
     else if (a === "event") {
       e.stopPropagation();

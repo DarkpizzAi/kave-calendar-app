@@ -73,6 +73,7 @@ const SHELL = [
   "js/pickers.js",
   "js/search.js",
   "js/sheet.js",
+  "js/sheet-swipe.js",
   "js/store.js",
   "js/theme.js",
   "js/sync.js",

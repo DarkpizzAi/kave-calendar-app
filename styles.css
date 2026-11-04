@@ -74,6 +74,22 @@ a { color: var(--md-sys-color-primary); }
 .set-line.error i { background: var(--md-sys-color-error); }
 .set-line.working i { background: var(--md-sys-color-tertiary); }
 .set-error { color: var(--md-sys-color-error); }
+/* Settings, the same pieces as Ladle's */
+.set-page { gap: 0; }
+.set-page > .m3-grouped { margin-bottom: 8px; }
+.set-swatches { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 4px; padding: 0 4px; }
+.set-swatch { display: flex; flex-direction: column; align-items: center; gap: 8px; padding: 8px 0; border-radius: 16px; min-width: 0; color: var(--md-sys-color-on-surface-variant); background: none; border: 0; font: inherit; cursor: pointer; }
+.set-swatch[aria-pressed="true"] { color: var(--md-sys-color-on-surface); font-weight: 700; }
+.set-note { margin: 0; padding: 0 16px 8px; }
+.set-row .m3-list-item__text > * { white-space: normal; }
+.set-who { margin-top: 8px; }
+.set-bare { width: 100%; min-width: 0; border: 0; background: none; padding: 0; outline: none; color: inherit; }
+.set-bare:focus-visible { outline: 2px solid var(--md-sys-color-primary); outline-offset: 2px; border-radius: 4px; }
+.sync-line { display: block; }
+.sync-line.ok { color: var(--md-sys-color-primary); }
+.sync-line.warn { color: var(--md-sys-color-tertiary); }
+.sync-line.error, .token-status.error { color: var(--md-sys-color-error); }
+.token-status { margin: 2px 0; }
 
 /* Grid emoji order */
 .og-list { list-style: none; margin: 0; padding: 0; }
@@ -122,6 +138,14 @@ body.gated .app-header, body.gated .app-nav-bar, body.gated .app-rail, body.gate
 
 .lc-head { display: flex; align-items: center; height: 48px; }
 .lc-head .sp { flex: 1; }
+.lc-name { display: flex; align-items: center; }
+.lc-chev { width: 32px; height: 32px; opacity: 0; pointer-events: none; transition: opacity 150ms linear; }
+.lc-chev .m3-icon { font-size: 20px; }
+.lc-name > .lc-chev:first-child { margin-left: -8px; margin-right: 0; }
+@media (hover: hover) and (pointer: fine) {
+  .lc-name:hover .lc-chev, .lc-name:focus-within .lc-chev { opacity: 1; pointer-events: auto; }
+}
+@media not ((hover: hover) and (pointer: fine)) { .lc-chev { display: none; } }
 .lc-title { display: flex; align-items: center; height: 40px; padding: 0 12px; border-radius: 20px; margin-left: -4px; }
 .lc-head > .lc-title:last-child { margin-left: 0; margin-right: -4px; }
 span.lc-title { padding-left: 8px; }
