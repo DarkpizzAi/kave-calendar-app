@@ -346,7 +346,8 @@ function onScroll() {
 function pickDay(d) {
   S.sel = clampDay(d, frame.range.min, frame.range.max);
   S.month = S.sel.slice(0, 7);
-  if (!expanded()) S.open = false;
+  /* an open month stays open (Isa, 04/11/2026): only the handle, the month
+     name or a swipe up closes it */
   markSel();
   redrawStrip();
   goTo(S.sel, true);
