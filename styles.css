@@ -301,7 +301,7 @@ button.lc-title:hover, .lc-d:hover, .lc-handle:hover, .ag-d:hover { box-shadow: 
 .ins-hero__m { display: block; }
 .ins-hero__kicker { display: flex; align-items: center; gap: 8px; }
 .ins-hero__kicker .m3-emoji { font-size: 20px; }
-.ins-hero__t, .ins-hero__m { margin: 0; overflow-wrap: anywhere; }
+.ins-hero__t, .ins-hero__m, .ins-hero__h { margin: 0; overflow-wrap: anywhere; }
 .ins-hero--empty { align-items: flex-start; }
 .ins-hero__icon { width: 48px; height: 48px; border-radius: 50%; display: grid; place-items: center; background: color-mix(in srgb, currentColor 14%, transparent); }
 .ins-card { background: var(--md-sys-color-surface-container-low); color: var(--md-sys-color-on-surface); border-radius: 24px; padding: 16px; display: flex; flex-direction: column; gap: 12px; min-width: 0; --tbg: var(--md-sys-color-surface-container-low); }
@@ -317,9 +317,6 @@ button.lc-title:hover, .lc-d:hover, .lc-handle:hover, .ag-d:hover { box-shadow: 
 .ins-blob { width: 72px; height: 72px; display: grid; place-items: center; background: var(--kave-kc); color: var(--kave-onkc); font-size: 32px; flex: none; }
 .ins-blob.is-round { border-radius: 50%; } .ins-blob.is-soft { border-radius: 24px; }
 .ins-blob.is-scallop { border-radius: 42% 58% 46% 54% / 52% 44% 56% 48%; }
-.ins-fact { background: var(--md-sys-color-secondary-container); color: var(--md-sys-color-on-secondary-container); border-radius: 24px; padding: 16px; display: flex; flex-direction: column; gap: 8px; }
-.ins-fact__head { display: flex; align-items: center; gap: 8px; }
-.ins-fact__head h2, .ins-fact__t { margin: 0; }
 .ins-row { padding-left: 0; padding-right: 0; }
 .ins-hint { margin: 0; }
 /* History: one bar chart card per category, stacked, the sheet scrolls */

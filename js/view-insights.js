@@ -3,8 +3,8 @@
    category's history, the full ticket wall with Edit, and the clean-up cards.
 
    Top to bottom: the hero (the next transport or accommodation, whichever
-   comes first), the year in numbers as emoji shapes, Did you know, the ticket
-   wall (four tickets and See all tickets) and the clean-up card.
+   comes first, or Did you know when neither is coming), the year in numbers
+   as emoji shapes, the ticket wall (four tickets and See all tickets) and the clean-up card.
 
    Decisions live in insights-data.js and cleanup.js (both tested); this file
    draws them. Every synced string goes through escapeHtml and every url
@@ -113,9 +113,16 @@ async function loadOlder() {
 const cardHead = (id, title, aside) =>
   `<div class="m3-card__head"><h2 class="m3-title-m" id="${id}">${esc(title)}</h2><span class="m3-spacer"></span>${aside || ""}</div>`;
 
-/* The hero: the next transport (plane, train, bus...) or the next stay, whichever comes first. */
-function heroHtml(cu) {
+/* The hero: the next transport (plane, train, bus...) or the next stay,
+   whichever comes first. With neither, the Did you know fact takes its place
+   (Isa, 06/11/2026: "next up or fun fact"). */
+function heroHtml(cu, fact) {
   const h = nextHero(cu);
+  if (!h && fact) {
+    return '<section class="ins-hero" aria-labelledby="insFact">'
+      + `<span class="ins-hero__kicker">${ms("lightbulb", "m3-icon--fill")}<h2 class="m3-title-s ins-hero__h" id="insFact">Did you know</h2></span>`
+      + `<p class="m3-body-l ins-hero__m">${esc(fact)}</p></section>`;
+  }
   if (!h) {
     return '<section class="ins-hero ins-hero--empty" aria-label="Next transport or accommodation">'
       + `<span class="ins-hero__icon">${ms("event_upcoming")}</span>`
@@ -156,13 +163,6 @@ function numbersHtml(counts, year) {
       + `<span class="m3-headline-s m3-num">${c.count}</span><span class="m3-body-s m3-variant ins-shape__l">${esc(c.label.toLowerCase())}</span></button>`).join("")}</div>`
     : '<p class="m3-body-m m3-variant">Nothing counted yet this year.</p>';
   return `<section class="ins-card" aria-labelledby="insNumbers">${cardHead("insNumbers", `${year} in numbers`, history)}${body}</section>`;
-}
-
-function factHtml(fact) {
-  if (!fact) return "";
-  return '<section class="ins-fact" aria-labelledby="insFact">'
-    + `<div class="ins-fact__head">${ms("lightbulb", "m3-icon--fill")}<h2 class="m3-title-s" id="insFact">Did you know</h2></div>`
-    + `<p class="m3-body-l ins-fact__t">${esc(fact)}</p></section>`;
 }
 
 /* A ticket stub: the category emoji, the name, a perforation, the date. On the
@@ -207,9 +207,9 @@ export function insightsHtml() {
   const events = ctx.data.events(), today = todayKey(), who = me(), year = Number(today.slice(0, 4));
   const cu = comingUp(events, today);
   const fact = didYouKnow(events, year, seed);
-  return '<div class="ins">' + offlineCardHtml() + heroHtml(cu)
+  return '<div class="ins">' + offlineCardHtml() + heroHtml(cu, fact)
     + '<div class="ins-panes">'
-    + `<div class="ins-col ins-col--a">${numbersHtml(shownCounts(events, year), year)}${factHtml(fact)}</div>`
+    + `<div class="ins-col ins-col--a">${numbersHtml(shownCounts(events, year), year)}</div>`
     + `<div class="ins-col ins-col--b">${wallHtml(ticketWall(events, today, who), wallTakenOff(events, today, who).length > 0)}</div>`
     + `<div class="ins-col ins-col--c">${cleanupHtml()}</div>`
     + "</div></div>";
