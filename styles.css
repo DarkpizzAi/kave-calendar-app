@@ -124,9 +124,11 @@ body.gated .app-header, body.gated .app-nav-bar, body.gated .app-rail, body.gate
    --lc-h is the strip's height (calendar.js, 0 when the strip is beside the
    agenda), --lc-top follows the strip's own sticky offset as the top bar
    slides away. --lc-top is a registered length so it can transition once
-   here instead of on every row. */
+   here instead of on every row. --pin-gap keeps the box clear of the strip,
+   so the box's top edge has one place under the week and one under the open
+   month, and follows the strip as the top bar slides away. */
 @property --lc-top { syntax: "<length>"; inherits: true; initial-value: 0px; }
-.cal { position: relative; --pin: calc(var(--lc-top) + var(--lc-h, 0px)); transition: --lc-top 250ms cubic-bezier(.2, 0, 0, 1); }
+.cal { position: relative; --pin-gap: 8px; --pin: calc(var(--lc-top) + var(--lc-h, 0px) + var(--pin-gap)); transition: --lc-top 250ms cubic-bezier(.2, 0, 0, 1); }
 .app-col:has(.app-header.is-hidden) .cal { --lc-top: calc(var(--header-h, 64px) * -1); }
 .lc {
   position: sticky; top: 0; z-index: 1; overflow: hidden;
@@ -186,7 +188,23 @@ span.lc-title { padding-left: 8px; }
    day's content (a box reaches over the day before it, see .ag-hlw). */
 .cal-agenda { position: relative; isolation: isolate; padding-top: 16px; max-width: 720px; margin: 0 auto; width: 100%; }
 .ag-pin { position: sticky; top: var(--pin); height: 0; }
-.mhead { position: relative; z-index: 1; padding: 16px 0 4px; margin: 0; }
+/* The box's top edge never leaves the pin line. A leaving day pushes its box
+   up (sticky), and this mask, held from the strip's top down to the pin line,
+   hides the part above it, so the box reads as shrinking from the bottom. Its
+   last 12px only paint the two rounded corners back in. It sits over the
+   boxes and under every day's content; it starts above the agenda and takes
+   no room (the negative margins). */
+.ag-mask {
+  --mh: calc(var(--pin) - var(--lc-top) + 12px);
+  position: sticky; top: var(--lc-top); z-index: 1; height: var(--mh);
+  margin: calc(var(--mh) * -1) 0 0; pointer-events: none;
+  --c: var(--md-sys-color-surface);
+  background:
+    radial-gradient(circle at 100% 100%, transparent 11.5px, var(--c) 12px) left bottom / 12px 12px no-repeat,
+    radial-gradient(circle at 0 100%, transparent 11.5px, var(--c) 12px) right bottom / 12px 12px no-repeat,
+    linear-gradient(var(--c), var(--c)) top / 100% calc(100% - 12px) no-repeat;
+}
+.mhead { position: relative; z-index: 2; padding: 16px 0 4px; margin: 0; }
 .ag { position: relative; display: flex; align-items: flex-start; gap: 8px; padding: 8px; border-radius: 12px; min-width: 0; }
 .ag.empty { padding: 4px 8px; }
 /* dimmed by its contents, not the row: opacity on the row would make it a
@@ -203,13 +221,13 @@ span.lc-title { padding-left: 8px; }
 .ag-hl { position: sticky; top: var(--pin); height: 50%; border-radius: 12px; }
 .ag.sel .ag-hl, .ag.leaving .ag-hl { background: var(--md-sys-color-secondary-container); }
 /* the date: day of the week small, the number under it, one size for every day */
-.ag-d { position: sticky; top: calc(var(--pin) + 8px); z-index: 1; flex: none; width: 56px; display: flex; flex-direction: column; align-items: center; padding: 4px 0 6px; border-radius: 12px; }
+.ag-d { position: sticky; top: calc(var(--pin) + 8px); z-index: 2; flex: none; width: 56px; display: flex; flex-direction: column; align-items: center; padding: 4px 0 6px; border-radius: 12px; }
 .ag-dw { color: var(--md-sys-color-on-surface-variant); }
 .ag-dn { font-variant-numeric: tabular-nums; }
 .ag-dw, .ag-dn { transition: color 150ms linear; }
 .ag.sel .ag-dw { color: inherit; }
 .ag.today .ag-dw, .ag.today .ag-dn { color: var(--kave-today); font-weight: 700; }
-.ag-evs { position: relative; z-index: 1; flex: 1; display: flex; flex-direction: column; gap: 6px; min-width: 0; }
+.ag-evs { position: relative; z-index: 2; flex: 1; display: flex; flex-direction: column; gap: 6px; min-width: 0; }
 .ag.empty .ag-evs { min-height: 48px; justify-content: center; }
 .ag-note { color: var(--md-sys-color-on-surface-variant); }
 .ag.sel .ag-note { color: inherit; }

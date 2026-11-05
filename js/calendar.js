@@ -177,7 +177,7 @@ function agendaRow(d) {
 }
 
 function agendaHtml() {
-  const out = ['<div class="ag-pin" aria-hidden="true"></div>'];
+  const out = ['<div class="ag-mask" aria-hidden="true"></div><div class="ag-pin" aria-hidden="true"></div>'];
   let last = "";
   for (const d of agendaDays(frame.range.min, frame.range.max)) {
     const ym = d.slice(0, 7);
@@ -291,7 +291,10 @@ function goTo(d, smooth) {
      box to the next day there, stop one pixel short */
   const res = pinPick(rows(), row.offsetTop);
   const short = res && res.day !== d ? 1 : 0;
-  const top = Math.max(0, rowTop(row) - moving - edgeY(true) - short);
+  /* the pin line keeps a gap under the strip (styles.css --pin-gap) */
+  const cal = mn.querySelector(".cal");
+  const gap = cal ? parseFloat(getComputedStyle(cal).getPropertyValue("--pin-gap")) || 0 : 0;
+  const top = Math.max(0, rowTop(row) - moving - edgeY(true) - gap - short);
   const ms = glide ? Math.min(600, 250 + Math.abs(top - mn.scrollTop) / 20) : 0;
   /* marked after the measuring: a big layout can take longer than the mark */
   markJump(ms + 400);
