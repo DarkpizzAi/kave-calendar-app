@@ -47,3 +47,8 @@ test("prefs: a category missing from the stored order goes just above Other", ()
   eq(o.slice(-2), ["health", "none"]);
   eq(readPrefs({ gridOrder: "junk" }).gridOrder, DAY_PRIORITY);
 });
+test("prefs: Year in numbers keeps the hidden categories once each, and junk reads as none hidden", () => {
+  eq(readPrefs({}).hiddenTiles, []);
+  eq(readPrefs({ hiddenTiles: ["films", "films", 3, "drinks"] }).hiddenTiles, ["films", "drinks"]);
+  eq(readPrefs({ hiddenTiles: "films" }).hiddenTiles, []);
+});

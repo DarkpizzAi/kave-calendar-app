@@ -24,6 +24,7 @@ import { ms, offlineCardHtml } from "./chrome-icons.js";
 import { ticketsOf, ticketButton } from "./tickets.js";
 import { categoryGroup } from "./cal-model.js";
 import { kaveKey } from "../m3/kave-m3.js";
+import { readPrefs } from "./prefs.js";
 import { TILES, yearCounts, history, yearlyCharts, comingUp, nextHero, ticketWall, wallTakenOff, wallTap, didYouKnow } from "./insights-data.js";
 import { QUEUE_PATH, LOG_PATH, answerKey, mergeOutbox, cleanupCounts, pruneIfFresh, compactStamp, flushOutbox } from "./cleanup.js";
 
@@ -130,11 +131,17 @@ function heroHtml(cu) {
     emoji = "🏨"; label = "Next accommodation"; title = [s.title, s.city].filter(Boolean).join(", ");
     meta = `${fmt(s.start)} to ${fmt(s.end)}, ${s.nights} night${s.nights === 1 ? "" : "s"}`;
   }
-  return `<section class="ins-hero" aria-label="${esc(label)}">`
-    + `<div class="ins-hero__kicker"><span class="m3-emoji" aria-hidden="true">${emoji}</span><span class="m3-title-s">${esc(label)}</span>`
-    + `<span class="m3-spacer"></span><span class="m3-label-l">${esc(inDays(h.days))}</span></div>`
-    + `<h2 class="m3-headline-m ins-hero__t">${esc(title)}</h2><p class="m3-body-m ins-hero__m">${esc(meta)}</p>`
-    + `<div class="ins-hero__acts"><button type="button" class="m3-btn ins-hero__open" data-ins="event" data-id="${esc(h.id)}">Open event</button></div></section>`;
+  /* the whole card opens the event (Isa, 05/11/2026: no button) */
+  return `<button type="button" class="ins-hero ins-hero--tap" data-ins="event" data-id="${esc(h.id)}" aria-label="${esc(`${label}: ${title}, ${meta}, ${inDays(h.days)}. Open the event`)}">`
+    + `<span class="ins-hero__kicker"><span class="m3-emoji" aria-hidden="true">${emoji}</span><span class="m3-title-s">${esc(label)}</span>`
+    + `<span class="m3-spacer"></span><span class="m3-label-l">${esc(inDays(h.days))}</span></span>`
+    + `<span class="m3-headline-m ins-hero__t">${esc(title)}</span><span class="m3-body-m ins-hero__m">${esc(meta)}</span></button>`;
+}
+
+/* the year's counts, without the categories turned off in Settings */
+function shownCounts(events, year) {
+  const hidden = new Set(readPrefs(store.state.settings).hiddenTiles);
+  return yearCounts(events, year).filter((c) => !hidden.has(c.key));
 }
 
 /* Option D: each category as a shape of its own colour holding its emoji,
@@ -202,7 +209,7 @@ export function insightsHtml() {
   const fact = didYouKnow(events, year, seed);
   return '<div class="ins">' + offlineCardHtml() + heroHtml(cu)
     + '<div class="ins-panes">'
-    + `<div class="ins-col ins-col--a">${numbersHtml(yearCounts(events, year), year)}${factHtml(fact)}</div>`
+    + `<div class="ins-col ins-col--a">${numbersHtml(shownCounts(events, year), year)}${factHtml(fact)}</div>`
     + `<div class="ins-col ins-col--b">${wallHtml(ticketWall(events, today, who), wallTakenOff(events, today, who).length > 0)}</div>`
     + `<div class="ins-col ins-col--c">${cleanupHtml()}</div>`
     + "</div></div>";

@@ -27,10 +27,11 @@ import { refreshSheet, sheetOwnsPop, openLevel } from "./sheet.js";
 import { openSearch, onSearchPop, searchIsOpen, refreshSearch } from "./search.js";
 import { syncBarOn } from "./sync.js";
 import { readPrefs, defaultsSummary, VIEW_NAMES, DETAIL_NAMES } from "./prefs.js";
+import { TILES } from "./insights-data.js";
 import { CATEGORIES, iconFor } from "./icons.js";
 import { DAY_PRIORITY } from "./cal-model.js";
 import { resetCalendarDefaults } from "./calendar.js";
-import { showTopBar } from "./top-bar.js";
+import { showTopBar, resetPageBar } from "./top-bar.js";
 import { checkForUpdate, ensureVersionAsked, updateStatusLines, updateBusy, updateButtonText, updateReady, restartForUpdate } from "./updates.js";
 import { gateStep, gateHtml, bindGate } from "./gate.js";
 import { insightsHtml, bindInsights, newVisit } from "./view-insights.js";
@@ -86,6 +87,12 @@ export function setView(name) {
   main.scrollTop = 0;
   showTopBar();
   render();
+  /* again, once the new tab is drawn: setting 0 while the Calendar's snap
+     was still on snapped the list to its first day, and the next tab opened
+     that far down (52px on a phone, Isa 05/11/2026). The snap line belongs to
+     the Calendar only. */
+  if (name !== "calendar") main.style.scrollPaddingTop = "";
+  main.scrollTop = 0;
   if (ghost) {
     main.style.opacity = "0";
     fadeThrough(ghost, main).then(() => { main.style.opacity = ""; ghost.remove(); });
@@ -187,6 +194,11 @@ function settingsHtml() {
       ${navIconRow("archive", "inventory_2", "Archive", "Look back before this year")}
     </div>
 
+    ${head("Insights")}
+    <div class="m3-grouped">
+      ${navIconRow("insnums", "bar_chart", "Year in numbers", tilesSummary(prefs.hiddenTiles))}
+    </div>
+
     ${head("Sync")}
     <div class="m3-grouped">
       ${row("sync", "Sync", `<div class="sync-status m3-body-m m3-variant">${lines(syncL)}</div>`,
@@ -210,6 +222,23 @@ function settingsHtml() {
       ${row("monitor_heart", "Display", `<div class="sync-status m3-body-m m3-variant">${lines(displayLines())}</div>`)}
     </div>
   </div>`;
+}
+
+/* ---------- Year in numbers (a page of Settings, Isa 05/11/2026) ----------
+   Which categories Insights counts. Each is a filter chip; at least one stays on. */
+const tilesSummary = (hidden) => {
+  const on = TILES.filter((t) => !hidden.includes(t.key)).length;
+  return on === TILES.length ? "Every category" : `${on} of ${TILES.length} categories`;
+};
+function insnumsHtml() {
+  const hidden = readPrefs(store.state.settings).hiddenTiles;
+  const chips = TILES.map((t) => {
+    const on = !hidden.includes(t.key);
+    return `<button type="button" class="m3-chip${on ? " is-selected" : ""}" aria-pressed="${on}" data-ins-tile="${esc(t.key)}">`
+      + `${on ? ms("check") : ""}<span class="m3-emoji" aria-hidden="true">${esc(t.emoji)}</span>${esc(t.label)}</button>`;
+  }).join("");
+  return `<div class="page-col"><p class="m3-body-m m3-variant page-intro">The categories Insights counts in its year in numbers. Tap one to show or hide it.</p>`
+    + group("Categories", staticRow(`<div class="m3-chips" role="group" aria-label="Categories">${chips}</div>`)) + `</div>`;
 }
 
 /* ---------- Calendar defaults and Grid emoji order (pages of Settings) ---------- */
@@ -322,6 +351,8 @@ export function render() {
   markJump(300); // rewriting the list moves its scroll: the reader did not
   main.innerHTML = current === "calendar" ? calendarHtml() : insightsHtml();
   main.classList.toggle("is-cal", current === "calendar");
+  /* the + adds to the calendar: it shows on that tab only (Isa, 05/11/2026) */
+  $("fab").hidden = current !== "calendar";
   $("nav").innerHTML = navItems("bar");
   $("railItems").innerHTML = navItems("rail");
   if (current === "calendar") { afterCalendar(main, before); firstDraw = false; }
@@ -400,8 +431,8 @@ export function closeDrawer() {
 }
 export const drawerIsOpen = () => drawerOpen;
 
-const PAGE_TITLES = { settings: "Settings", roadmap: "Roadmap", archive: "Archive", defaults: "Calendar defaults", emorder: "Grid emoji order" };
-const PAGE_HTML = { settings: settingsHtml, roadmap: roadmapHtml, archive: archiveHtml, defaults: defaultsHtml, emorder: emorderHtml };
+const PAGE_TITLES = { settings: "Settings", roadmap: "Roadmap", archive: "Archive", defaults: "Calendar defaults", emorder: "Grid emoji order", insnums: "Year in numbers" };
+const PAGE_HTML = { settings: settingsHtml, roadmap: roadmapHtml, archive: archiveHtml, defaults: defaultsHtml, emorder: emorderHtml, insnums: insnumsHtml };
 let pages = []; // [{ name, hist }] bottom to top; the top one is on screen
 let pageCloseRequested = false;
 let hostToken = 0;
@@ -416,6 +447,7 @@ function drawPage(name, keepScroll) {
   $("pageTitle").textContent = PAGE_TITLES[name];
   body.innerHTML = PAGE_HTML[name]();
   body.scrollTop = keepScroll ? top : 0;
+  if (!keepScroll) resetPageBar();
 }
 /* A change of data redraws the open page in place, unless the reader is in the
    middle of typing (a token being pasted must not vanish under a sync). */
@@ -449,7 +481,7 @@ export function openPage(name) {
   pageCloseRequested = false;
   const host = $("page");
   drawPage(name, false);
-  if (first) { hostToken++; host.hidden = false; sharedAxisIn(host, 1); }
+  if (first) { hostToken++; host.hidden = false; resetPageBar(); sharedAxisIn(host, 1); }
   else sharedAxisIn($("pageBody"), 1);
   $("pageBack").focus({ preventScroll: true });
   if (name === "archive") archiveOpened();
@@ -523,6 +555,14 @@ export function onPageClick(e) {
   const pick = d.prefView != null ? ["defaultView", d.prefView] : d.prefDetail != null ? ["defaultDetail", d.prefDetail] : null;
   if (pick && PREF_KEYS.includes(pick[0])) { resetCalendarDefaults(); store.setSetting(pick[0], pick[1]); again(); return; } /* reset first: the save redraws the Calendar */
   if (d.ogReset != null) { saveOrder(DAY_PRIORITY); return; }
+  if (d.insTile) {
+    const hidden = readPrefs(store.state.settings).hiddenTiles;
+    const next = hidden.includes(d.insTile) ? hidden.filter((k) => k !== d.insTile) : [...hidden, d.insTile];
+    if (next.length >= TILES.length) return; /* at least one category stays on */
+    store.setSetting("hiddenTiles", next.length ? next : null);
+    again();
+    return;
+  }
   const up = d.ogUp, down = d.ogDown, t = up || down;
   if (t) {
     const order = [...readPrefs(store.state.settings).gridOrder];

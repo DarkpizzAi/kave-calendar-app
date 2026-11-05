@@ -31,7 +31,14 @@ export function readPrefs(settings) {
     defaultView: oneOf(VIEW_NAMES, migrateViewKey(s.defaultView), "week"),
     defaultDetail: oneOf(DETAIL_NAMES, s.defaultDetail, "full"),
     gridOrder: readGridOrder(s.gridOrder),
+    hiddenTiles: readHiddenTiles(s.hiddenTiles),
   };
+}
+/* Year in numbers (Insights): the categories the reader chose not to see
+   (Isa, 05/11/2026). Stored as the hidden ones, so a category added later
+   shows until it is turned off. Junk reads as none hidden. */
+export function readHiddenTiles(stored) {
+  return Array.isArray(stored) ? [...new Set(stored.filter((k) => typeof k === "string"))] : [];
 }
 
 /* The Grid emoji order: the stored list kept as far as it is valid (known

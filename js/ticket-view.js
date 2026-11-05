@@ -1,6 +1,8 @@
 /* Compass: the ticket viewer (stage 4, spec 6.3). A level of the one sheet:
-   the ticket's pages full width and scrollable, pinch to zoom (nothing here
-   blocks touch gestures), Send a copy in the bar and the sheet's own back
+   the ticket's pages full width and scrollable, pinch to zoom inside the
+   viewer (Isa, 05/11/2026: a pinch zoomed the whole app; now the pages grow
+   in their own box and one finger pans them), a double tap zooms in and out,
+   Send a copy in the bar and the sheet's own back
    arrow to leave. The screen is kept awake while it is open, so a QR code
    does not dim at the gate. Task 4 only restyled it (Material 3 buttons and
    text); what it opens and how it works offline are unchanged.
@@ -97,6 +99,49 @@ async function sendCopy() {
   setTimeout(() => URL.revokeObjectURL(url), 10000);
 }
 
+/* ---- pinch to zoom, inside the viewer ----
+   The box keeps the page from zooming (touch-action: pan-x pan-y, so the
+   browser only scrolls it); two fingers set --z, the pages' width as a
+   multiple of the box, and the scroll keeps the point under the fingers
+   still. A zoomed box is marked data-no-swipe, so panning down never closes
+   the sheet. */
+const ZMAX = 4;
+let pinch = null;
+function setZoom(box, z, cx, cy) {
+  const z0 = Number(box.dataset.z || 1);
+  z = Math.max(1, Math.min(ZMAX, z));
+  const r = box.getBoundingClientRect(), mx = cx - r.left, my = cy - r.top;
+  const px = (box.scrollLeft + mx) / z0, py = (box.scrollTop + my) / z0;
+  box.dataset.z = String(z);
+  box.style.setProperty("--z", String(z));
+  box.toggleAttribute("data-no-swipe", z > 1.01);
+  box.scrollLeft = px * z - mx;
+  box.scrollTop = py * z - my;
+}
+const dist = (t) => Math.hypot(t[0].clientX - t[1].clientX, t[0].clientY - t[1].clientY);
+const mid = (t) => [(t[0].clientX + t[1].clientX) / 2, (t[0].clientY + t[1].clientY) / 2];
+function wireZoom(root) {
+  root.addEventListener("touchstart", (e) => {
+    const box = e.target.closest && e.target.closest(".tkv");
+    if (!box || e.touches.length !== 2) return;
+    pinch = { box, d0: dist(e.touches) || 1, z0: Number(box.dataset.z || 1) };
+  }, { passive: true });
+  root.addEventListener("touchmove", (e) => {
+    if (!pinch || e.touches.length !== 2) return;
+    if (e.cancelable) e.preventDefault();
+    const [cx, cy] = mid(e.touches);
+    setZoom(pinch.box, pinch.z0 * dist(e.touches) / pinch.d0, cx, cy);
+  }, { passive: false });
+  const done = (e) => { if (pinch && e.touches.length < 2) pinch = null; };
+  root.addEventListener("touchend", done, { passive: true });
+  root.addEventListener("touchcancel", done, { passive: true });
+  root.addEventListener("dblclick", (e) => {
+    const box = e.target.closest && e.target.closest(".tkv");
+    if (!box) return;
+    setZoom(box, Number(box.dataset.z || 1) > 1.01 ? 1 : 2.5, e.clientX, e.clientY);
+  });
+}
+
 export function initTicketView(c) {
   ctx = c;
   registerLevel("ticket", {
@@ -109,6 +154,7 @@ export function initTicketView(c) {
     },
   });
   const root = document.getElementById("sheetRoot");
+  wireZoom(root);
   /* A tap on a ticket line (Day, event page, history) opens the viewer. It
      is caught before the sheet's own handler, because a Day line sits inside
      a strip that would otherwise open the event. */

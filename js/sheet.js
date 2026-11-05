@@ -15,7 +15,7 @@
    button are one path, and a second request for the same close is ignored. */
 "use strict";
 
-import { swipeToClose } from "./sheet-swipe.js";
+import { swipeToClose, makeFling } from "./sheet-swipe.js";
 import { escapeHtml as esc } from "./util.js";
 import { addDays, dayOfWeek } from "./dates.js";
 import { holidayOn, isProvisional } from "./holidays.js";
@@ -253,14 +253,17 @@ function sync(anim = "", from = null, force = false) {
 
 /* ---------- drag to close (a phone's bottom sheet) ----------
    By the handle, or by a swipe down anywhere in the sheet (sheet-swipe.js):
-   both follow the finger, close past a third of the height, else spring back. */
+   both follow the finger, close past a quarter of the height or on a flick
+   down (sheet-swipe.js makeFling), else spring back. */
 function bindDrag(view) {
   const { el, host } = view, scrim = host.querySelector(".m3-scrim");
   let dy = 0, h = 1, live = false;
-  const begin = () => { el.getAnimations().forEach((a) => a.cancel()); dy = 0; h = el.offsetHeight || 1; live = true; };
+  const fling = makeFling();
+  const begin = () => { el.getAnimations().forEach((a) => a.cancel()); dy = 0; h = el.offsetHeight || 1; live = true; fling.reset(); };
   const move = (d) => {
     if (!live) return;
     dy = d;
+    fling.add(d);
     el.style.transform = `translateY(${dy}px)`;
     if (scrim) scrim.style.opacity = String(Math.max(0, 1 - dy / h));
   };
@@ -269,7 +272,7 @@ function bindDrag(view) {
     live = false;
     const from = dy;
     const fade = scrim ? Number(scrim.style.opacity || 1) : 1;
-    if (!cancelled && from > h / 3) {
+    if (!cancelled && fling.closes(from, h)) {
       /* leave from where the finger let go; the history is walked back at once */
       const t = Math.max(120, 250 * (1 - from / h));
       view.dragged = true;
