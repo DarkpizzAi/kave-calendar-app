@@ -59,6 +59,10 @@ on this origin can read it and write to the private repo.
 - Every URL goes through `safeUrl`. Escaping does nothing to a
   `javascript:` scheme, which is how this exact bug reached production in the
   sister app.
+  The one non-http(s) link the app writes is the Android `intent:` that
+  `appHref` (`js/util.js`) builds from a link `safeUrl` already passed, for
+  sellers listed in `APP_PACKAGES` only (installed web apps open plain links
+  in a browser tab, not in the seller's app).
 - No `eval`, no `new Function`, no `document.write`, no
   `insertAdjacentHTML`. Not "avoid" - none.
 - **Recompute the CSP hash after touching `#theme-preload`**, even by one
@@ -103,7 +107,7 @@ any mismatch. The amount locks, the interpretation stays editable.
 The dependency runs one way: the finance side reads the extracts and consults
 Compass for interpretation. Never build a path where Compass's number
 overrides an extract. Instinct's facts are the exception to "a sweep
-proposes": the hourly sweep writes them to events directly (the latest source
+proposes": the inbound run (every 10 minutes for mail) writes them to events directly (the latest source
 wins: a mail sent after a person's last edit overwrites, an edit made after the
 mail is kept), and the only questions
 it asks are who is going and who paid when Instinct did not say. The bank's

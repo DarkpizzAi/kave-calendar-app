@@ -26,6 +26,29 @@ export function safeUrl(u) {
   } catch { return ""; }
 }
 
+/* Sellers whose own site names their Android app (/.well-known/assetlinks.json,
+   checked 05/11/2026). An installed web app opens a plain https link in a browser
+   tab, not in the seller's app (Isa, on the Ryanair link), so on Android the link
+   becomes an intent for that app, with the page itself as the fallback when the
+   app is not installed. Elsewhere the link is left as it is. */
+export const APP_PACKAGES = {
+  "www.ryanair.com": "com.ryanair.cheapflights",
+  "www.iberia.com": "com.iberia.android",
+  "dice.fm": "fm.dice",
+  "link.dice.fm": "fm.dice",
+  "www.doctoralia.es": "es.doctoralia",
+};
+
+export function appHref(u, ua = (typeof navigator !== "undefined" && navigator.userAgent) || "") {
+  const safe = safeUrl(u);
+  if (!safe || !/Android/i.test(ua)) return safe;
+  const url = new URL(safe);
+  const pkg = APP_PACKAGES[url.host];
+  if (!pkg || url.protocol !== "https:") return safe;
+  return `intent://${url.host}${url.pathname}${url.search}#Intent;scheme=https;package=${pkg};`
+    + `S.browser_fallback_url=${encodeURIComponent(safe)};end`;
+}
+
 export function uid() {
   return Date.now().toString(36) + Math.random().toString(36).slice(2, 8);
 }

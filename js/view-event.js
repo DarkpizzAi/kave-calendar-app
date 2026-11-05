@@ -8,7 +8,7 @@
    through escapeHtml and every url through safeUrl. */
 "use strict";
 
-import { escapeHtml as esc, safeUrl, copyText } from "./util.js";
+import { escapeHtml as esc, safeUrl, appHref, copyText } from "./util.js";
 import { todayKey } from "./dates.js";
 import { newEvent, STATUS_LABEL, statusOf } from "./model.js";
 import { CATEGORIES as MONEY, formatCents, visibleCosts, toCents } from "./money.js";
@@ -104,7 +104,12 @@ function linkRow(l, i, inForm) {
   if (inForm) return li({ icon: map ? "map" : "link", text, sub, trail: remove, main: { tag: "button", attrs: ` data-act="editlink" data-i="${i}"` } });
   if (!u) return li({ icon: map ? "map" : "link", text, sub, trail: edit });
   return li({ icon: map ? "map" : "link", text, sub, trail: `${edit}<span class="m3-list-item__trail">${ms("open_in_new")}</span>`,
-    main: { tag: "a", attrs: ` href="${esc(u)}" target="_blank" rel="noopener noreferrer"` } });
+    main: { tag: "a", attrs: linkAttrs(u) } });
+}
+/* An app link (intent:, Android) opens in place: a new tab would stay blank behind the app. */
+function linkAttrs(u) {
+  const h = appHref(u);
+  return h === u ? ` href="${esc(u)}" target="_blank" rel="noopener noreferrer"` : ` href="${esc(h)}"`;
 }
 
 /* ---------- the event page ---------- */
