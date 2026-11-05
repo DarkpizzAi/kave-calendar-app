@@ -242,6 +242,7 @@ export function calendarHtml() {
 /* After the tab's HTML is in place: a tab that was not on screen opens on the
    selected day; a redraw for new data keeps where the reader was. */
 export function afterCalendar(mn, before) {
+  mn.classList.remove("fast");
   if (S.fresh) {
     S.touched = false;
     goTo(S.sel, false);
@@ -435,8 +436,9 @@ function setBox(res) {
       const had = !!box.style.height, from = box.getBoundingClientRect().height;
       box.getAnimations().forEach((a) => a.cancel());
       box.style.height = want;
-      /* a box just drawn (a new draw) takes its height at once */
-      if (had && Math.abs(from - res.vis) > 1) play(box, [{ height: `${from}px` }, { height: want }], 300, EASE.decelerate);
+      /* a box just drawn (a new draw) takes its height at once, and so does
+         one the list is racing through */
+      if (had && !M.fast && Math.abs(from - res.vis) > 1) play(box, [{ height: `${from}px` }, { height: want }], 300, EASE.decelerate);
     }
   }
   S.box = res.day;
@@ -457,6 +459,7 @@ function syncBox() {
    app went to. */
 function onScroll() {
   if (!ctx.isCalendar() || !frame) return;
+  track(view());
   syncBox();
   if (isJumping()) return;
   S.touched = true;
@@ -468,14 +471,87 @@ function pinMoved() {
   syncBox();
   if (!isJumping()) followBox();
 }
-function followBox() {
+/* While the list moves fast the box keeps showing every day it passes, but
+   the strip waits for the list to slow down or rest, then catches up in one
+   move (Hugo skips weeks at a time, 05/11/2026). While it is still moving at
+   all, the strip never redraws to a new week or month: a redraw would put
+   the snap back on mid-fling and stop it dead. */
+function followBox(force) {
   const cur = S.box;
-  if (cur && cur !== S.sel) {
-    const prev = S.sel, crossed = cur.slice(0, 7) !== prev.slice(0, 7);
-    S.sel = cur;
-    if (!S.open || expanded() || crossed) S.month = cur.slice(0, 7);
-    moveStripSel(prev);
+  if (!cur || cur === S.sel) return;
+  if (!force && (M.fast || (moving() && !sameStrip(cur)))) return;
+  const prev = S.sel, crossed = cur.slice(0, 7) !== prev.slice(0, 7);
+  S.sel = cur;
+  if (!S.open || expanded() || crossed) S.month = cur.slice(0, 7);
+  moveStripSel(prev);
+}
+/* the day is in the week or month the strip shows: its box can glide there */
+function sameStrip(d) {
+  const t = stripEl(), c = t && t.querySelector(`.lc-week [data-day="${d}"], .lc-grid [data-day="${d}"]:not(.out)`);
+  return !!c && !c.disabled;
+}
+
+/* ---- fast scrolling ----
+   Speed comes from the scroll events themselves (px per ms, smoothed), so a
+   phone fling, a trackpad and a free-spinning wheel all count the same. Above
+   FAST the strip and the box's height animation wait. A burst of wheel
+   notches also lifts the snap (.fast): with a snap point on every day the
+   browser pulls each notch back to a day, which is what made a free-spinning
+   wheel crawl. When the list rests the snap comes back the way it would have
+   landed anyway: a short glide to the nearest day on the pin line. Touch
+   keeps the browser's own snap: its fling already lands on a day. */
+const FAST = 1.5, REST_MS = 140, WHEEL_BURST_MS = 80;
+const M = { y: 0, t: 0, v: 0, fast: false, wheelAt: 0, rest: 0 };
+const moving = () => performance.now() - M.t < REST_MS;
+function track(mn) {
+  const now = performance.now(), dt = now - M.t, dy = Math.abs(mn.scrollTop - M.y);
+  /* a first event after a pause carries no speed */
+  const v = dt > 0 && dt < REST_MS ? dy / dt : 0;
+  M.v = M.v * 0.6 + v * 0.4;
+  M.y = mn.scrollTop; M.t = now;
+  if (M.v > FAST) M.fast = true;
+  else if (M.fast && M.v < FAST / 2) { M.fast = false; if (!isJumping()) followBox(); }
+  clearTimeout(M.rest);
+  M.rest = setTimeout(rest, REST_MS);
+}
+function onWheel() {
+  const now = performance.now(), mn = view();
+  if (ctx.isCalendar() && mn && now - M.wheelAt < WHEEL_BURST_MS && !mn.classList.contains("fast")) mn.classList.add("fast");
+  M.wheelAt = now;
+}
+function rest() {
+  M.v = 0;
+  M.fast = false;
+  const mn = view();
+  if (!mn) return;
+  if (!ctx.isCalendar() || !frame) { mn.classList.remove("fast"); return; }
+  if (mn.classList.contains("fast")) {
+    /* a notch may still be on its way: wait for the wheel to stop too */
+    if (performance.now() - M.wheelAt < REST_MS) { M.rest = setTimeout(rest, REST_MS); return; }
+    const top = nearestSnap(mn);
+    mn.classList.remove("fast");
+    if (top != null && Math.abs(top - mn.scrollTop) > 1) {
+      /* glideTo turns the snap off for the glide and back on once it lands */
+      markJump(260);
+      glideTo(mn, top, 180);
+      return; // the glide's own scroll events bring the next rest
+    }
   }
+  syncBox();
+  if (!isJumping()) followBox(true);
+}
+/* Where the browser's mandatory snap would settle: the scroll position that
+   puts the nearest day's top on the snap line (the scroller's padding). */
+function nearestSnap(mn) {
+  const list = rows();
+  if (!list.length) return null;
+  const base = rowTop(list[0].el) - list[0].top;
+  const line = mn.scrollTop + (parseFloat(mn.style.scrollPaddingTop) || 0) - base;
+  let lo = 0, hi = list.length - 1;
+  while (lo < hi) { const mid = (lo + hi) >> 1; if (list[mid].top < line) lo = mid + 1; else hi = mid; }
+  const best = lo > 0 && line - list[lo - 1].top < list[lo].top - line ? lo - 1 : lo;
+  const max = mn.scrollHeight - mn.clientHeight;
+  return Math.max(0, Math.min(max, mn.scrollTop + list[best].top - line));
 }
 
 /* The strip's box moves to S.sel. In the same week or month it glides there
@@ -723,6 +799,7 @@ export function initCalendar(c) {
   onBarMove((o, H) => { if (ctx.isCalendar()) followBar(o, H); });
   mn.addEventListener("scroll", onScroll, { passive: true });
   for (const ev of ["wheel", "touchstart", "pointerdown"]) mn.addEventListener(ev, takeOver, { passive: true });
+  mn.addEventListener("wheel", onWheel, { passive: true });
   document.addEventListener("click", onClick);
   stripGestures(mn);
   /* the window crossed a size class: the strip is a pane or a card now */

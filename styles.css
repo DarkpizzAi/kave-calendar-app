@@ -129,9 +129,10 @@ body.gated .app-header, body.gated .app-nav-bar, body.gated .app-rail, body.gate
    line is placed in px by calendar.js (placePin: the probe's top and the
    scroller's scroll-padding), never through an inherited variable, so moving
    it restyles two elements, not every row. A glide the app runs itself turns
-   the snapping off until it lands (.gliding). */
+   the snapping off until it lands (.gliding). A fast-spinning wheel turns it
+   off too until the list rests, then glides to the nearest day (.fast). */
 #view.is-cal { scroll-snap-type: y mandatory; }
-#view.is-cal.gliding, #view.is-cal.settling { scroll-snap-type: none; }
+#view.is-cal.gliding, #view.is-cal.settling, #view.is-cal.fast { scroll-snap-type: none; }
 .cal { position: relative; }
 /* One exception to the plain top bar (Isa, 06/11/2026): over the Calendar it
    takes the strip's fill, so bar and strip read as one surface. Not in the
