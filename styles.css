@@ -48,7 +48,12 @@ a { color: var(--md-sys-color-primary); }
 .app-fab { bottom: calc(96px + env(safe-area-inset-bottom, 0px)); }
 [data-size="medium"] .app-rail, [data-size="expanded"] .app-rail { display: flex; }
 [data-size="medium"] .app-nav-bar, [data-size="expanded"] .app-nav-bar { display: none; }
-[data-size="medium"] .app-fab, [data-size="expanded"] .app-fab { display: none; }
+/* the + floats on every window (Isa, 05/11/2026: not in the rail). Wide: at
+   the bottom right of the agenda column, never over the month grid. The
+   agenda's right edge sits (100vw - block) / 2 + 376px from the window's, the
+   block being min(1120px, the room beside the rail and #view's padding). */
+[data-size="medium"] .app-fab, [data-size="expanded"] .app-fab { bottom: calc(24px + env(safe-area-inset-bottom, 0px)); }
+[data-size="expanded"] .app-fab { right: calc((100vw - min(1120px, 100vw - 144px)) / 2 + 392px); }
 /* the menu button lives in the rail there; the space stays so the title stays centred */
 [data-size="medium"] .app-menu-btn, [data-size="expanded"] .app-menu-btn { visibility: hidden; }
 [data-size="medium"] #view, [data-size="expanded"] #view { padding-left: 24px; padding-right: 24px; }
@@ -217,18 +222,20 @@ span.lc-title { padding-left: 8px; }
 .ag-note { color: var(--md-sys-color-on-surface-variant); }
 .ag.sel .ag-note { color: inherit; }
 
+/* S5 (Isa, 05/11/2026): an event is filled with its category's colour, white
+   text in light mode, the deep container in dark (the -fill tokens) */
 .evc {
-  --kc: var(--kave-data-other-container); --onkc: var(--kave-data-on-other-container);
+  --kc: var(--kave-data-other-fill); --onkc: var(--kave-data-on-other-fill);
   display: flex; align-items: center; gap: 12px; width: 100%; min-width: 0; text-align: left;
   padding: 10px 12px; border-radius: 12px; background: var(--kc); color: var(--onkc);
 }
-.evc.g-food, .dcard.g-food { --kc: var(--kave-data-food-container); --onkc: var(--kave-data-on-food-container); }
-.evc.g-nights, .dcard.g-nights { --kc: var(--kave-data-nights-container); --onkc: var(--kave-data-on-nights-container); }
-.evc.g-culture, .dcard.g-culture { --kc: var(--kave-data-culture-container); --onkc: var(--kave-data-on-culture-container); }
-.evc.g-outdoors, .dcard.g-outdoors { --kc: var(--kave-data-outdoors-container); --onkc: var(--kave-data-on-outdoors-container); }
-.evc.g-travel, .dcard.g-travel { --kc: var(--kave-data-travel-container); --onkc: var(--kave-data-on-travel-container); }
-.evc.g-life, .dcard.g-life { --kc: var(--kave-data-life-container); --onkc: var(--kave-data-on-life-container); }
-.evc.g-other, .dcard.g-other { --kc: var(--kave-data-other-container); --onkc: var(--kave-data-on-other-container); }
+.evc.g-food, .dcard.g-food { --kc: var(--kave-data-food-fill); --onkc: var(--kave-data-on-food-fill); }
+.evc.g-nights, .dcard.g-nights { --kc: var(--kave-data-nights-fill); --onkc: var(--kave-data-on-nights-fill); }
+.evc.g-culture, .dcard.g-culture { --kc: var(--kave-data-culture-fill); --onkc: var(--kave-data-on-culture-fill); }
+.evc.g-outdoors, .dcard.g-outdoors { --kc: var(--kave-data-outdoors-fill); --onkc: var(--kave-data-on-outdoors-fill); }
+.evc.g-travel, .dcard.g-travel { --kc: var(--kave-data-travel-fill); --onkc: var(--kave-data-on-travel-fill); }
+.evc.g-life, .dcard.g-life { --kc: var(--kave-data-life-fill); --onkc: var(--kave-data-on-life-fill); }
+.evc.g-other, .dcard.g-other { --kc: var(--kave-data-other-fill); --onkc: var(--kave-data-on-other-fill); }
 .evc:hover { box-shadow: inset 0 0 0 100vmax color-mix(in srgb, currentColor 8%, transparent); }
 .evc-em { font-size: 20px; flex: none; white-space: nowrap; }
 .evc-t { flex: 1; min-width: 0; display: flex; flex-direction: column; }
@@ -238,7 +245,9 @@ span.lc-title { padding-left: 8px; }
 .evc-todo .m3-icon { font-size: 18px; }
 
 /* Expanded: the month stays open in a side pane beside the agenda */
-[data-size="expanded"] .cal { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 440px); gap: 24px; align-items: start; }
+/* Ladle's wide + skinny layout (Isa, 05/11/2026): the agenda and a 400px grid,
+   1120 in all, centred beside the rail; never edge to edge */
+[data-size="expanded"] .cal { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 400px); gap: 24px; align-items: start; max-width: 1120px; margin: 0 auto; }
 [data-size="expanded"] .cal-agenda { order: 1; margin: 0; max-width: none; }
 [data-size="expanded"] .lc { order: 2; margin: 0; border-radius: 24px; top: 8px; }
 [data-size="expanded"] .lc-in { padding: 8px 12px 12px; }
@@ -279,11 +288,7 @@ span.lc-title { padding-left: 8px; }
 [data-size="medium"] .ins, [data-size="expanded"] .ins { padding-bottom: 0; }
 .ins-panes { display: flex; flex-direction: column; gap: 16px; min-width: 0; }
 .ins-col { display: flex; flex-direction: column; gap: 16px; min-width: 0; }
-[data-size="medium"] .ins { max-width: 960px; }
-[data-size="medium"] .ins-panes { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); grid-template-areas: "a b" "a c"; align-items: start; }
-[data-size="expanded"] .ins { max-width: 1280px; }
-[data-size="expanded"] .ins-panes { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); grid-template-areas: "a b c"; align-items: start; }
-.ins-col--a { grid-area: a; } .ins-col--b { grid-area: b; } .ins-col--c { grid-area: c; }
+/* one column, 720, at every window size (Isa, 05/11/2026) */
 .ins-hero { background: var(--md-sys-color-primary-container); color: var(--md-sys-color-on-primary-container); border-radius: 28px; padding: 20px; display: flex; flex-direction: column; gap: 8px; min-width: 0; }
 .ins-hero__kicker { display: flex; align-items: center; gap: 8px; }
 .ins-hero__kicker .m3-emoji { font-size: 20px; }

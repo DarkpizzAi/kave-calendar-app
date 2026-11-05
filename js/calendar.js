@@ -275,7 +275,7 @@ function placePin() {
   probe.style.top = `${pin}px`;
   /* the snap line is where the line will be once the bar rests, so a day
      snapped while the bar is still moving is already in the right place */
-  mn.style.scrollPaddingTop = `${barH + pin + Math.max(barTarget(), -(barH - inset))}px`;
+  mn.style.scrollPaddingTop = `${barH + pin + Math.max(barTarget(), lowestShift(barH, inset))}px`;
 }
 function watchStrip(mn) {
   const t = stripEl();
@@ -295,10 +295,16 @@ function watchStrip(mn) {
    status bar (the bar's own safe-area padding); the line under it, and so the
    box and the rule, go with it. */
 let shift = 0;
+/* How far up the strip and the box may follow the bar. A phone: up to the
+   status bar (the bar's safe-area padding). A wide window: they stop 28px
+   from the top, level with the menu icon in the rail (Isa, 05/11/2026), so
+   20px short of the 8px they sit under a showing bar. */
+const RAIL_ALIGN = 20;
+function lowestShift(H, inset) { return -(H - inset - (expanded() ? RAIL_ALIGN : 0)); }
 function followBar(o, H) {
   const bar = document.getElementById("topBar");
   const inset = bar ? parseFloat(getComputedStyle(bar).paddingTop) || 0 : 0;
-  shift = Math.max(o, -(H - inset));
+  shift = Math.max(o, lowestShift(H, inset));
   const tr = shift ? `translateY(${shift}px)` : "";
   for (const el of [stripEl(), view() && view().querySelector(".ag-pin")]) if (el) el.style.transform = tr;
   placePin();

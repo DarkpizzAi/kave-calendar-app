@@ -24,7 +24,6 @@ export function wire() {
   on("searchBtn", "click", openSearch);
   const add = () => { if (actions.add) actions.add(); };
   on("fab", "click", add);
-  on("railAdd", "click", add);
   on("drawerScrim", "click", closeDrawer);
   document.querySelectorAll("#drawer [data-page]").forEach((b) => b.addEventListener("click", () => openPage(b.dataset.page)));
   on("pageBack", "click", closePage);

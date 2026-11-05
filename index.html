@@ -37,7 +37,7 @@
     base-uri 'none';
     object-src 'none';
     form-action 'none';
-    script-src 'self' 'sha256-otBnb0OxQNfkQPgRGhBbgYfnItUF6YEQrusVUD1eCdk=';
+    script-src 'self' 'sha256-by1U/+2mWvcyx70HvQpFmf5C2Bn9T3wQUKGv4SbDZ4Y=';
     style-src 'self' 'unsafe-inline' https://fonts.googleapis.com;
     style-src-elem 'self' https://fonts.googleapis.com;
     style-src-attr 'unsafe-inline';
@@ -65,12 +65,10 @@
     root.dataset.themeBoot = "1";
     try {
       var s = JSON.parse(localStorage.getItem("compass.settings")) || {};
-      /* same list as PALETTES in js/theme.js; the three pre-Material 3 names
-         map across (cobalt and chartreuse to blue, amber to yellow) and
-         anything else is blue */
-      var map = { cobalt: "blue", amber: "yellow", chartreuse: "blue",
-                  blue: "blue", teal: "teal", yellow: "yellow",
-                  periwinkle: "periwinkle", terracotta: "terracotta" };
+      /* same list as PALETTES in js/theme.js: Cobalt (stored as blue, or
+         cobalt from before Material 3) and Chartreuse; anything else,
+         including the retired seeds, is Cobalt */
+      var map = { blue: "blue", cobalt: "blue", chartreuse: "chartreuse" };
       root.setAttribute("data-seed", map[s.palette] || "blue");
       root.style.colorScheme = matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light";
     } catch (e) { /* first run, or storage blocked */ }
@@ -111,11 +109,11 @@
 </head>
 <body>
   <div class="shell">
-    <!-- Medium and expanded: the rail, menu button first, then New event, then
-         the destinations. Which of rail and bar shows follows <html data-size>. -->
+    <!-- Medium and expanded: the rail, menu button first, then the
+         destinations (like Ladle's; New event is the floating + on every
+         window). Which of rail and bar shows follows <html data-size>. -->
     <nav class="m3-rail app-rail" aria-label="Sections">
       <button type="button" id="railMenuBtn" class="m3-icon-btn" aria-label="Menu"><span class="m3-icon" aria-hidden="true">menu</span></button>
-      <button type="button" id="railAdd" class="m3-fab" aria-label="New event"><span class="m3-icon" aria-hidden="true">add</span></button>
       <div class="m3-rail__items" id="railItems"></div>
     </nav>
     <div class="app-col">

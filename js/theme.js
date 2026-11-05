@@ -16,18 +16,16 @@ import { store } from "./store.js";
    repeats the id list and the legacy map (it runs before modules load);
    change both, then recompute its hash. */
 export const PALETTES = {
-  blue: "Blue",
-  teal: "Teal",
-  yellow: "Yellow",
-  periwinkle: "Periwinkle",
-  terracotta: "Terracotta",
+  blue: "Cobalt",
+  chartreuse: "Chartreuse",
 };
 /* The seed colour of each palette, shown as its swatch (an identity, not a
    theme colour: the same five hexes the kit's seeds are built from). */
-export const SEED_HEX = { blue: "#4285f4", teal: "#009688", yellow: "#ffc107", periwinkle: "#5c6bc0", terracotta: "#c05c46" };
-/* A palette stored before Material 3 maps across: cobalt and chartreuse become
-   blue, amber becomes yellow. Anything unknown is blue. */
-const LEGACY = { cobalt: "blue", amber: "yellow", chartreuse: "blue" };
+export const SEED_HEX = { blue: "#1a73e8", chartreuse: "#d7d63a" };
+/* Two themes since 05/11/2026 (Isa): the old name cobalt is Cobalt, and every
+   retired seed (amber, teal, yellow, periwinkle, terracotta) or unknown id
+   falls back to Cobalt. */
+const LEGACY = { cobalt: "blue" };
 const has = (o, k) => Object.prototype.hasOwnProperty.call(o, k);
 export function toSeed(id) {
   if (has(PALETTES, id)) return id;
