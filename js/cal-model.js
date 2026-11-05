@@ -310,28 +310,27 @@ export function clampMonth(ym, min, max) {
   return m < lo ? lo : m > hi ? hi : m;
 }
 
-/* The day the agenda highlights, for the pin line y (the strip's lower edge),
-   "next day waits" (Isa, 05/11/2026). rows: in order, { day, top, h } in one
-   coordinate space with y. c is the day under the line, r what is left of it
-   below the line, n the day after and d the distance from the line to n's top
-   (r, or r plus a month header between them):
-   - d at least n's height: c is highlighted, its box r tall (it shrinks with
-     c's content) and n waits below it;
-   - d below n's height: n is highlighted, its box n's height, and n slides up
-     into it. This is exactly when n's sticky box (styles.css .ag-hl) reaches
-     the line, so the rule and the CSS never disagree.
-   With no header at the change r equals n's height, so a shrinking box hands
-   over without a jump; a taller next day (or a header in between) makes the
-   box grow. vis is the box's height. Above the first row the first row is the
-   day. No rows gives null. */
-export function pinPick(rows, y) {
+/* The day in the agenda's fixed box, for the pin line y (Isa, 06/11/2026: the
+   box stays still and the days snap into it). rows: in order, { day, top, h }
+   in one coordinate space with y. The agenda always comes to rest with a
+   day's top on the line (scroll snap), so the box belongs to the day it would
+   rest on: the one whose top is nearest the line. Scrolling on from a day
+   hands the box over halfway through it, never earlier, and days of the same
+   height hand over with no change to the box at all.
+   A day taller than the room under the line (avail) can rest anywhere inside
+   itself (the browser scrolls freely through an oversized snap area), so it
+   counts as "at the line" over that whole stretch. vis is the box's height:
+   the day's, capped at avail. Above the first row the first row; no rows,
+   null. A tie stays with the earlier day. */
+export function pinPick(rows, y, avail = Infinity) {
   if (!rows.length) return null;
   let lo = 0, hi = rows.length - 1, i = 0;
   while (lo <= hi) { const mid = (lo + hi) >> 1; if (rows[mid].top <= y + 0.5) { i = mid; lo = mid + 1; } else hi = mid - 1; }
   const c = rows[i], n = rows[i + 1];
-  const r = c.top + c.h - y;
-  if (n && n.top - y < n.h) return { day: n.day, vis: n.h, i: i + 1 };
-  return { day: c.day, vis: Math.max(0, Math.min(r, c.h)), i };
+  const slack = Math.max(0, c.h - avail);
+  const toC = Math.max(0, y - (c.top + slack)), toN = n ? n.top - y : Infinity;
+  if (toN < toC) i += 1;
+  return { day: rows[i].day, vis: Math.min(rows[i].h, avail), i };
 }
 
 /* One finished drag on the strip: sideways moves a week (a month when open),

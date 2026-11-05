@@ -38,8 +38,7 @@ const S = {
   fx: 0,          // +1 / -1: the body slides in from that side after a swipe
   fresh: true,    // the tab was not on screen before this draw
   touched: false, // the reader has scrolled since the tab appeared
-  box: null,      // the day the agenda's box is on (the rule's, see pinPick)
-  vis: 0,         // that box's height
+  box: null,      // the day in the agenda's fixed box (the rule's, see pinPick)
 };
 
 let ctx = null;          // { data, render, isCalendar, sync, add }
@@ -168,16 +167,14 @@ function agendaRow(d) {
     .filter(Boolean).join(" ");
   const note = d === frame.today && !evs.length ? '<span class="ag-note m3-body-s">Nothing planned today</span>' : "";
   const holiday = hol ? `<span class="ag-note m3-body-s">${esc(hol)}</span>` : "";
-  /* the box lives in the row (see .ag-hl in styles.css): sticky, so it moves
-     with the scroll on the compositor and never trails the content */
-  return `<div class="${cls}" data-row="${d}"><div class="ag-hlw" aria-hidden="true"><div class="ag-hl"></div></div>`
+  return `<div class="${cls}" data-row="${d}">`
     + `<button type="button" class="ag-d" data-act="day" data-d="${d}" aria-label="Open ${esc(longDay(d))}">`
     + `<span class="ag-dw m3-label-s">${SHORTDOW[dayOfWeek(d)]}</span><span class="ag-dn m3-title-l">${Number(d.slice(8))}</span></button>`
     + `<div class="ag-evs">${holiday}${evs.map((e) => card(e, d)).join("")}${note}</div></div>`;
 }
 
 function agendaHtml() {
-  const out = ['<div class="ag-mask" aria-hidden="true"></div><div class="ag-pin" aria-hidden="true"></div>'];
+  const out = ['<div class="ag-pin" aria-hidden="true"><div class="ag-box"></div></div>'];
   let last = "";
   for (const d of agendaDays(frame.range.min, frame.range.max)) {
     const ym = d.slice(0, 7);
@@ -231,29 +228,72 @@ export function afterCalendar(mn, before) {
   syncBox();
 }
 
-/* The pin line under the strip, for CSS: --lc-h is the strip's height when it
-   sits above the agenda (0 beside it, expanded), --lc-top its sticky offset
-   (styles.css, it follows the top bar). One observer, moved to each new strip.
-   The line can move with no scroll at all (the month opening, the top bar
-   sliding in or out), so both re-run the rule. */
+/* The pin line: GAP under the strip when it sits above the agenda, GAP under
+   the top bar beside it (expanded, where the grid card keeps the same 8px),
+   and with the strip when the top bar slides away. Set in px on the two
+   things that use it, the sticky probe carrying the box and the scroller's
+   snap padding, so moving it restyles two elements, never the thousand rows. The strip's height changes (the month opening, a
+   sixth row, the safe area) come through one observer, moved to each new
+   strip. */
+const GAP = 8;
 let stripObs = null;
+function placePin() {
+  const mn = view(), probe = mn && mn.querySelector(".ag-pin"), t = stripEl();
+  if (!probe || !t) return;
+  const bar = document.getElementById("topBar");
+  const barH = bar ? bar.offsetHeight : 0, hidden = !!bar && bar.classList.contains("is-hidden");
+  /* sticky offsets count from below the room #view keeps for the bar */
+  const pin = (hidden ? -barH : 0) + (expanded() ? 0 : t.offsetHeight) + GAP;
+  probe.style.top = `${pin}px`;
+  mn.style.scrollPaddingTop = `${barH + pin}px`;
+}
 function watchStrip(mn) {
-  const cal = mn.querySelector(".cal"), t = stripEl();
-  if (!cal || !t) return;
-  if (!cal.dataset.pinWired) {
-    cal.dataset.pinWired = "1";
-    cal.addEventListener("transitionend", (e) => { if (e.target === cal && e.propertyName === "--lc-top") pinMoved(); });
+  const t = stripEl();
+  if (!t) return;
+  const set = () => { placePin(); pinMoved(); };
+  if (typeof ResizeObserver === "function") {
+    if (stripObs) stripObs.disconnect();
+    stripObs = new ResizeObserver(set);
+    stripObs.observe(t);
   }
-  if (typeof ResizeObserver !== "function") return;
-  if (stripObs) stripObs.disconnect();
-  const set = () => { cal.style.setProperty("--lc-h", `${expanded() ? 0 : t.offsetHeight}px`); pinMoved(); };
-  stripObs = new ResizeObserver(set);
-  stripObs.observe(t);
   set();
 }
 
+/* The top bar slides in or out (render.js showTopBar / hideTopBar come here).
+   The bar moves by a transform (styles.css .app-header); the strip and the
+   box jump to their new sticky place at once and are slid there from the old
+   one by a transform, the bar's 250ms and easing, so the three move together
+   on the compositor and nothing is laid out frame by frame. The days are not
+   moved, so the line now sits over other content: the rule waits out the
+   slide (the box would flick back a day and forward again), and the snap
+   settles the day once the finger lets go. */
+const SLIDE = 250;
+let slideEnd = 0, slideTimer = 0;
+const pinnedEls = () => [stripEl(), view() && view().querySelector(".ag-pin")].filter(Boolean);
+export function setTopBar(hide) {
+  const bar = document.getElementById("topBar");
+  if (!bar || bar.classList.contains("is-hidden") === hide) return;
+  const els = ctx && ctx.isCalendar() ? pinnedEls() : [];
+  /* where they are drawn now, a slide still running included */
+  const before = els.map((el) => el.getBoundingClientRect().top);
+  els.forEach((el) => el.getAnimations().forEach((a) => { if (a.id === "bar") a.cancel(); }));
+  bar.classList.toggle("is-hidden", hide);
+  if (!els.length) return;
+  placePin();
+  const f = motionFactor();
+  els.forEach((el, i) => {
+    const dy = before[i] - el.getBoundingClientRect().top;
+    if (f && Math.abs(dy) >= 1 && typeof el.animate === "function") {
+      el.animate([{ transform: `translateY(${dy}px)` }, { transform: "none" }], { duration: SLIDE * f, easing: EASE.emphasized, id: "bar" });
+    }
+  });
+  slideEnd = performance.now() + SLIDE * f;
+  clearTimeout(slideTimer);
+  slideTimer = setTimeout(pinMoved, SLIDE * f + 20);
+}
+
 /* ---- scrolling ---- */
-const showBar = () => { const b = document.getElementById("topBar"); if (b) b.classList.remove("is-hidden"); };
+const showBar = () => setTopBar(false);
 
 /* The scroller's coordinate of the strip's lower edge: the top bar, plus the
    strip when it sits above the agenda (not in the side pane). `final` asks for
@@ -287,17 +327,14 @@ function goTo(d, smooth) {
      difference; take it back off */
   const t = stripEl(), inner = t && t.firstElementChild;
   const moving = !expanded() && t && inner ? t.offsetHeight - inner.offsetHeight : 0;
-  /* landed, the line is at the row's top; if the rule would already give the
-     box to the next day there, stop one pixel short */
-  const res = pinPick(rows(), row.offsetTop);
-  const short = res && res.day !== d ? 1 : 0;
-  /* the pin line keeps a gap under the strip (styles.css --pin-gap) */
-  const cal = mn.querySelector(".cal");
-  const gap = cal ? parseFloat(getComputedStyle(cal).getPropertyValue("--pin-gap")) || 0 : 0;
-  const top = Math.max(0, rowTop(row) - moving - edgeY(true) - gap - short);
+  /* landed, the row's top is on the pin line, GAP under the strip */
+  const top = Math.max(0, rowTop(row) - moving - edgeY(true) - GAP);
   const ms = glide ? Math.min(600, 250 + Math.abs(top - mn.scrollTop) / 20) : 0;
   /* marked after the measuring: a big layout can take longer than the mark */
   markJump(ms + 400);
+  /* snapping off first: the bar coming back moves the snap line, and a
+     snapped list would jump to it before the glide starts */
+  if (ms) mn.classList.add("gliding");
   showBar();
   glideTo(mn, top, ms);
   /* once the jump mark is over the box and the strip agree again, whatever
@@ -311,7 +348,7 @@ function goTo(d, smooth) {
    (the jump mark covers it) and a hidden page still lands: a timer snaps to the
    end. Any touch, wheel or press on the list stops it. ms 0 is a jump. */
 let glideId = 0, glideEnd = 0;
-function stopGlide() { cancelAnimationFrame(glideId); clearTimeout(glideEnd); glideId = glideEnd = 0; }
+function stopGlide() { cancelAnimationFrame(glideId); clearTimeout(glideEnd); glideId = glideEnd = 0; const mn = view(); if (mn) mn.classList.remove("gliding"); }
 /* the reader touched the list: the glide stops and their scroll drives the
    highlight and the bar at once */
 function takeOver() { if (glideId || glideEnd) { stopGlide(); clearJump(); } }
@@ -329,12 +366,14 @@ const emphasized = bezier(0.2, 0, 0, 1);
 function glideTo(mn, top, ms) {
   stopGlide();
   if (!ms || !motionFactor()) { mn.scrollTop = top; return; }
+  /* every frame's scrollTop would be snapped to a day: off until it lands */
+  mn.classList.add("gliding");
   const from = mn.scrollTop, t0 = performance.now();
   const step = (now) => {
     const p = Math.min(1, (now - t0) / ms);
     mn.scrollTop = from + (top - from) * emphasized(p);
     if (p < 1) glideId = requestAnimationFrame(step);
-    else { glideId = 0; clearTimeout(glideEnd); glideEnd = 0; } /* landed: the snap timer must not fire later */
+    else { glideId = 0; clearTimeout(glideEnd); glideEnd = 0; mn.classList.remove("gliding"); } /* landed: the snap timer must not fire later */
   };
   glideId = requestAnimationFrame(step);
   glideEnd = setTimeout(() => { stopGlide(); mn.scrollTop = top; }, ms + 100);
@@ -350,42 +389,46 @@ function rows() {
   return rowCache;
 }
 
-/* The pin line in the agenda's coordinates. A zero-height sticky probe sits
-   on it (styles.css .ag-pin), so this is the line the CSS is really using,
-   the top bar's slide and the strip's height animation included. */
+/* The pin line in the agenda's coordinates: the sticky probe's offsetTop
+   (the agenda is its offset parent), which counts the sticky offset but not
+   the top bar's slide transform, so the rule reads where the line is going,
+   not where the slide has it this frame. */
 function pinY() {
-  const ag = view() && view().querySelector(".cal-agenda"), probe = ag && ag.querySelector(".ag-pin");
-  return probe ? probe.getBoundingClientRect().top - ag.getBoundingClientRect().top : 0;
+  const probe = view() && view().querySelector(".cal-agenda > .ag-pin");
+  return probe ? probe.offsetTop : 0;
 }
 
-/* Put the agenda's box where the rule says. Its height only changes at a
-   hand-over: a box that has to grow is revealed with a clip (paint only, no
-   layout), and going back up the list a box that has to shrink is clipped
-   down; the sticky CSS does all the rest, so no frame of scrolling runs any. */
+/* The fixed box takes the rule's day: that row gets .sel (its date and text
+   colours) and the box takes its height, animated only when the height
+   changes (300ms decelerate, as the strip's own box glides). The box itself
+   never moves; scrolling and the snap bring the day to it. */
 function setBox(res) {
   if (!res) return;
-  if (S.box === res.day) { S.vis = res.vis; return; }
-  const list = rows(), from = S.vis, to = res.vis;
-  const old = S.box && list.find((r) => r.day === S.box), now = list[res.i];
-  const hlOf = (r) => r.el.querySelector(".ag-hl");
-  if (old) { old.el.classList.remove("sel"); hlOf(old).getAnimations().forEach((a) => a.cancel()); }
-  if (now) {
-    now.el.classList.add("sel");
-    hlOf(now).getAnimations().forEach((a) => a.cancel());
-    if (old && to > from + 2) {
-      play(hlOf(now), [{ clipPath: `inset(0 0 ${to - from}px 0 round 12px)` }, { clipPath: "inset(0 0 0 0 round 12px)" }], 300, EASE.decelerate);
-    } else if (old && from > to + 2) {
-      old.el.classList.add("leaving");
-      play(hlOf(old), [{ clipPath: "inset(0 0 0 0 round 12px)" }, { clipPath: `inset(0 0 ${from - to}px 0 round 12px)` }], 300, EASE.decelerate, { fill: "forwards" })
-        .then(() => { old.el.classList.remove("leaving"); hlOf(old).getAnimations().forEach((a) => a.cancel()); });
+  const list = rows(), now = list[res.i];
+  const box = view() && view().querySelector(".ag-box");
+  if (S.box !== res.day) {
+    const old = S.box && list.find((r) => r.day === S.box);
+    if (old) old.el.classList.remove("sel");
+    if (now) now.el.classList.add("sel");
+  }
+  if (box) {
+    const want = `${res.vis}px`;
+    if (box.style.height !== want) {
+      const had = !!box.style.height, from = box.getBoundingClientRect().height;
+      box.getAnimations().forEach((a) => a.cancel());
+      box.style.height = want;
+      /* a box just drawn (a new draw) takes its height at once */
+      if (had && Math.abs(from - res.vis) > 1) play(box, [{ height: `${from}px` }, { height: want }], 300, EASE.decelerate);
     }
   }
   S.box = res.day;
-  S.vis = to;
 }
 function syncBox() {
-  if (!frame || !view() || !view().querySelector(".cal-agenda")) return;
-  setBox(pinPick(rows(), pinY()));
+  const mn = view(), ag = mn && mn.querySelector(".cal-agenda");
+  if (!frame || !ag || performance.now() < slideEnd) return;
+  const probe = ag.querySelector(".ag-pin");
+  const avail = probe ? mn.clientHeight - (parseFloat(mn.style.scrollPaddingTop) || 0) : Infinity;
+  setBox(pinPick(rows(), pinY(), Math.max(48, avail)));
 }
 
 /* The reader scrolls the agenda: the box follows the rule on every scroll

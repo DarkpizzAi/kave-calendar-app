@@ -120,27 +120,32 @@ body.gated .app-header, body.gated .app-nav-bar, body.gated .app-rail, body.gate
    one row per day. Colour is tokens only: the selected day is the secondary
    container, an event takes its category group's container. */
 #view.is-cal { overflow-anchor: none; padding-bottom: 112px; }
-/* The pin line under the strip, where the agenda's box and dates stick:
-   --lc-h is the strip's height (calendar.js, 0 when the strip is beside the
-   agenda), --lc-top follows the strip's own sticky offset as the top bar
-   slides away. --lc-top is a registered length so it can transition once
-   here instead of on every row. --pin-gap keeps the box clear of the strip,
-   so the box's top edge has one place under the week and one under the open
-   month, and follows the strip as the top bar slides away. */
-@property --lc-top { syntax: "<length>"; inherits: true; initial-value: 0px; }
-.cal { position: relative; --pin-gap: 8px; --pin: calc(var(--lc-top) + var(--lc-h, 0px) + var(--pin-gap)); transition: --lc-top 250ms cubic-bezier(.2, 0, 0, 1); }
-.app-col:has(.app-header.is-hidden) .cal { --lc-top: calc(var(--header-h, 64px) * -1); }
+/* The agenda snaps: every scroll comes to rest with a day's top on the pin
+   line, 8px under the strip, where the one fixed box waits (.ag-box). The
+   line is placed in px by calendar.js (placePin: the probe's top and the
+   scroller's scroll-padding), never through an inherited variable, so moving
+   it restyles two elements, not every row. A glide the app runs itself turns
+   the snapping off until it lands (.gliding). */
+#view.is-cal { scroll-snap-type: y mandatory; }
+#view.is-cal.gliding { scroll-snap-type: none; }
+.cal { position: relative; }
+/* One exception to the plain top bar (Isa, 06/11/2026): over the Calendar it
+   takes the strip's fill, so bar and strip read as one surface. Not in the
+   wide layout, where the strip is a card of its own. */
+html:not([data-size="expanded"]) .app-col:has(#view.is-cal) .app-header { background: var(--md-sys-color-surface-container-low); }
 .lc {
   position: sticky; top: 0; z-index: 1; overflow: hidden;
   margin: 0 -16px; border-radius: 0 0 24px 24px;
   background: var(--md-sys-color-surface-container-low); color: var(--md-sys-color-on-surface);
   touch-action: none; user-select: none; -webkit-user-select: none;
-  transition: top 250ms cubic-bezier(.2, 0, 0, 1), padding-top 250ms cubic-bezier(.2, 0, 0, 1);
 }
 .lc-in { padding: 0 16px 4px; }
 /* sticky offsets count from the scroller's content box, which starts below the
    room kept for the bar: 0 sits right under the bar, minus the bar's height
-   sits at the very top, which is where it slides to when the bar scrolls away */
+   sits at the very top, which is where it goes when the bar slides away. It
+   goes there at once; calendar.js setTopBar slides it from where it was, by a
+   transform, with the bar. The days are never transformed: snapping reads
+   where they are drawn, and they must be drawn where they are. */
 .app-col:has(.app-header.is-hidden) .lc { top: calc(var(--header-h, 64px) * -1); padding-top: env(safe-area-inset-top, 0px); }
 [data-size="medium"] .lc { margin: 0 -24px; }
 [data-size="medium"] .lc-in { padding: 0 24px 4px; }
@@ -184,50 +189,32 @@ span.lc-title { padding-left: 8px; }
 [data-size="expanded"] .lc-d.mc { min-height: 72px; }
 [data-size="expanded"] .lc-d .emos { font-size: 18px; height: 22px; }
 
-/* The agenda is one stacking context, so every day's box sits under every
-   day's content (a box reaches over the day before it, see .ag-hlw). */
+/* The agenda is one stacking context: the box under every day's content. */
 .cal-agenda { position: relative; isolation: isolate; padding-top: 16px; max-width: 720px; margin: 0 auto; width: 100%; }
-.ag-pin { position: sticky; top: var(--pin); height: 0; }
-/* The box's top edge never leaves the pin line. A leaving day pushes its box
-   up (sticky), and this mask, held from the strip's top down to the pin line,
-   hides the part above it, so the box reads as shrinking from the bottom. Its
-   last 12px only paint the two rounded corners back in. It sits over the
-   boxes and under every day's content; it starts above the agenda and takes
-   no room (the negative margins). */
-.ag-mask {
-  --mh: calc(var(--pin) - var(--lc-top) + 12px);
-  position: sticky; top: var(--lc-top); z-index: 1; height: var(--mh);
-  margin: calc(var(--mh) * -1) 0 0; pointer-events: none;
-  --c: var(--md-sys-color-surface);
-  background:
-    radial-gradient(circle at 100% 100%, transparent 11.5px, var(--c) 12px) left bottom / 12px 12px no-repeat,
-    radial-gradient(circle at 0 100%, transparent 11.5px, var(--c) 12px) right bottom / 12px 12px no-repeat,
-    linear-gradient(var(--c), var(--c)) top / 100% calc(100% - 12px) no-repeat;
-}
-.mhead { position: relative; z-index: 2; padding: 16px 0 4px; margin: 0; }
-.ag { position: relative; display: flex; align-items: flex-start; gap: 8px; padding: 8px; border-radius: 12px; min-width: 0; }
+/* room after the last day, so even it can come to rest on the line */
+.cal-agenda::after { content: ""; display: block; height: 50vh; }
+/* The pin line: a zero-height sticky probe (its top is set by calendar.js),
+   carrying the box. The box never moves; days scroll through it and one
+   settles in it. Its height is the settling day's, and only animates when
+   that day is taller or shorter than the last (calendar.js setBox). */
+.ag-pin { position: sticky; top: 0; height: 0; z-index: 0; }
+.ag-box { position: absolute; top: 0; left: 0; right: 0; height: 0; border-radius: 12px; background: var(--md-sys-color-secondary-container); pointer-events: none; }
+.mhead { position: relative; z-index: 1; padding: 16px 0 4px; margin: 0; }
+.ag { position: relative; display: flex; align-items: flex-start; gap: 8px; padding: 8px; border-radius: 12px; min-width: 0; scroll-snap-align: start; }
 .ag.empty { padding: 4px 8px; }
 /* dimmed by its contents, not the row: opacity on the row would make it a
-   stacking context and lift its box over the day above */
+   stacking context and lift it out of the agenda's order */
 .ag.past > .ag-d, .ag.past > .ag-evs { opacity: .8; }
 .ag.sel > .ag-d, .ag.sel > .ag-evs { opacity: 1; }
 .ag.sel { color: var(--md-sys-color-on-secondary-container); }
-/* "Next day waits" (pinPick in cal-model.js). Each day carries its box. The
-   wrapper reaches one day-height above the day, so the sticky box (one day
-   tall) holds under the strip while the day slides up into it, then the day's
-   end pushes it up and it shrinks with the content. Scrolling moves it on the
-   compositor; calendar.js only says which day has it. */
-.ag-hlw { position: absolute; left: 0; right: 0; bottom: 0; height: 200%; z-index: 0; pointer-events: none; }
-.ag-hl { position: sticky; top: var(--pin); height: 50%; border-radius: 12px; }
-.ag.sel .ag-hl, .ag.leaving .ag-hl { background: var(--md-sys-color-secondary-container); }
 /* the date: day of the week small, the number under it, one size for every day */
-.ag-d { position: sticky; top: calc(var(--pin) + 8px); z-index: 2; flex: none; width: 56px; display: flex; flex-direction: column; align-items: center; padding: 4px 0 6px; border-radius: 12px; }
+.ag-d { position: relative; z-index: 1; flex: none; width: 56px; display: flex; flex-direction: column; align-items: center; padding: 4px 0 6px; border-radius: 12px; }
 .ag-dw { color: var(--md-sys-color-on-surface-variant); }
 .ag-dn { font-variant-numeric: tabular-nums; }
 .ag-dw, .ag-dn { transition: color 150ms linear; }
 .ag.sel .ag-dw { color: inherit; }
 .ag.today .ag-dw, .ag.today .ag-dn { color: var(--kave-today); font-weight: 700; }
-.ag-evs { position: relative; z-index: 2; flex: 1; display: flex; flex-direction: column; gap: 6px; min-width: 0; }
+.ag-evs { position: relative; z-index: 1; flex: 1; display: flex; flex-direction: column; gap: 6px; min-width: 0; }
 .ag.empty .ag-evs { min-height: 48px; justify-content: center; }
 .ag-note { color: var(--md-sys-color-on-surface-variant); }
 .ag.sel .ag-note { color: inherit; }

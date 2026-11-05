@@ -291,22 +291,29 @@ test("agenda keeps the empty days", () => {
   eq(agendaDays("2026-10-30", "2026-11-02"), ["2026-10-30", "2026-10-31", "2026-11-01", "2026-11-02"]);
   eq(agendaDays("2026-11-02", "2026-10-30"), [], "a backwards range is empty");
 });
-test("pinPick: next day waits below a shrinking box, then takes over at its own height", () => {
+test("pinPick: the box belongs to the day nearest the line, handing over halfway", () => {
   /* a: 200 tall, b: 50, c: 120 */
   const rows = [{ day: "a", top: 0, h: 200 }, { day: "b", top: 200, h: 50 }, { day: "c", top: 250, h: 120 }];
-  eq(pinPick(rows, 0), { day: "a", vis: 200, i: 0 }, "a at the line, whole");
-  eq(pinPick(rows, 100), { day: "a", vis: 100, i: 0 }, "the box shrinks with a; b waits below");
-  eq(pinPick(rows, 150), { day: "a", vis: 50, i: 0 }, "down to b's height, a still holds it");
-  eq(pinPick(rows, 151), { day: "b", vis: 50, i: 1 }, "then b takes over, same height: no jump");
-  eq(pinPick(rows, 199), { day: "b", vis: 50, i: 1 }, "b slides into its box");
-  eq(pinPick(rows, 200), { day: "c", vis: 120, i: 2 }, "b fully in: a taller c takes over at once (the box grows)");
+  eq(pinPick(rows, 0), { day: "a", vis: 200, i: 0 }, "a at the line");
+  eq(pinPick(rows, 100), { day: "a", vis: 200, i: 0 }, "halfway through a: a still has it (a tie stays)");
+  eq(pinPick(rows, 101), { day: "b", vis: 50, i: 1 }, "past halfway: b's top is nearer");
+  eq(pinPick(rows, 225), { day: "b", vis: 50, i: 1 });
+  eq(pinPick(rows, 226), { day: "c", vis: 120, i: 2 });
   eq(pinPick(rows, -40), { day: "a", vis: 200, i: 0 }, "above the first row: the first row");
-  eq(pinPick(rows, 400), { day: "c", vis: 0, i: 2 }, "past the last row: the last row, nothing left");
+  eq(pinPick(rows, 400), { day: "c", vis: 120, i: 2 }, "past the last row: the last row");
   eq(pinPick([], 10), null);
-  /* a month header (40px) between b and c: c takes over when its own top is within its height of the line */
+  /* same heights: the box never changes size, only its day */
+  const same = [{ day: "x", top: 0, h: 60 }, { day: "y", top: 60, h: 60 }];
+  eq([pinPick(same, 30).vis, pinPick(same, 31).vis, pinPick(same, 31).day], [60, 60, "y"]);
+  /* a month header (40px) between a and b: b's top counts from where it really is */
   const hdr = [{ day: "a", top: 0, h: 100 }, { day: "b", top: 140, h: 60 }];
-  eq(pinPick(hdr, 70), { day: "a", vis: 30, i: 0 }, "a shrinks; the header and b wait below");
-  eq(pinPick(hdr, 81), { day: "b", vis: 60, i: 1 }, "b's top 59px below the line: b takes over (the box grows from a's 19px)");
+  eq(pinPick(hdr, 70).day, "a", "70 from a, 70 to b: a tie stays");
+  eq(pinPick(hdr, 71).day, "b");
+  /* a day taller than the room (avail 300): it holds the box anywhere inside, capped */
+  const tall = [{ day: "t", top: 0, h: 900 }, { day: "u", top: 900, h: 60 }];
+  eq(pinPick(tall, 550, 300), { day: "t", vis: 300, i: 0 }, "inside the tall day");
+  eq(pinPick(tall, 750, 300).day, "t", "its end in view: 150 from its resting stretch, 150 to u");
+  eq(pinPick(tall, 751, 300).day, "u");
 });
 test("clamping", () => {
   eq(clampDay("2028-11-01", "2025-10-26", "2028-10-26"), "2028-10-26");

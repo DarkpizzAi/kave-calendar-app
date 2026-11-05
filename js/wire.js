@@ -41,12 +41,25 @@ export function wire() {
   });
 
   /* The top bar hides after 64px of downward scroll and returns on any upward
-     one; a scroll the app caused itself (a redraw, back to today) never hides it. */
+     one, but only for a scroll the reader is driving: a finger on the list or
+     a mouse wheel (every fling starts with a drag, so its direction is known
+     before the finger lifts). A scroll the app caused (a redraw, back to
+     today) never moves it, and neither does the Calendar's snap settling a
+     day on its line after the finger lifts, which often runs a little upward
+     after a downward scroll and would bring the bar back every time. */
   const view = document.getElementById("view");
-  let lastY = 0;
+  let lastY = 0, touching = false, wheelAt = 0;
+  if (view) {
+    view.addEventListener("touchstart", () => { touching = true; }, { passive: true });
+    const lift = () => { touching = false; };
+    view.addEventListener("touchend", lift, { passive: true });
+    view.addEventListener("touchcancel", lift, { passive: true });
+    view.addEventListener("wheel", () => { wheelAt = performance.now(); }, { passive: true });
+  }
+  const driving = () => touching || performance.now() - wheelAt < 300;
   if (view) view.addEventListener("scroll", () => {
     const y = view.scrollTop;
-    if (isJumping()) { lastY = y; return; }
+    if (isJumping() || !driving()) { lastY = y; return; }
     if (y <= 0 || y < lastY) showTopBar();
     else if (y > 64 && y > lastY) hideTopBar();
     lastY = y;

@@ -29,7 +29,7 @@ import { syncBarOn } from "./sync.js";
 import { readPrefs, defaultsSummary, VIEW_NAMES, DETAIL_NAMES } from "./prefs.js";
 import { CATEGORIES, iconFor } from "./icons.js";
 import { DAY_PRIORITY } from "./cal-model.js";
-import { resetCalendarDefaults } from "./calendar.js";
+import { resetCalendarDefaults, setTopBar } from "./calendar.js";
 import { checkForUpdate, ensureVersionAsked, updateStatusLines, updateBusy, updateButtonText, updateReady, restartForUpdate } from "./updates.js";
 import { gateStep, gateHtml, bindGate } from "./gate.js";
 import { insightsHtml, bindInsights, newVisit } from "./view-insights.js";
@@ -102,8 +102,9 @@ export function paintSyncBar() {
   if (b) b.hidden = !syncBarOn();
 }
 
-export function showTopBar() { const b = $("topBar"); if (b) b.classList.remove("is-hidden"); }
-export function hideTopBar() { const b = $("topBar"); if (b) b.classList.add("is-hidden"); }
+/* calendar.js slides the strip and the agenda's box along with the bar */
+export function showTopBar() { setTopBar(false); }
+export function hideTopBar() { setTopBar(true); }
 
 /* ---------- settings ---------- */
 const esc = escapeHtml;
