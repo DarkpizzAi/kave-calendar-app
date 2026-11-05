@@ -265,6 +265,21 @@ test("update: Check for updates offers the snackbar when a worker is waiting", a
   env.host.remove();
 });
 
+test("update: a dismissed prompt stays dismissed, and Settings still says ready", async () => {
+  const env = freshEnv(mockSw({ reg: mockReg() }));
+  offerUpdate();
+  eq(U.updateState.kind, "ready", "an offer alone makes Settings say ready");
+  env.host.querySelector('.m3-snackbar [aria-label="Dismiss"]').click();
+  for (let i = 0; i < 20 && snackText(env.host).length; i++) await sleep(50);
+  eq(snackText(env.host).length, 0, "dismissed");
+  await sleep(150);
+  eq(snackText(env.host).length, 0, "it does not come back on its own");
+  await checkForUpdate(() => {});
+  eq(U.updateState.kind, "ready", "the old page is still on screen: not up to date");
+  eq(snackText(env.host).length, 1, "asking again shows it again");
+  env.host.remove();
+});
+
 test("update: Check for updates with nothing new says up to date and shows no snackbar", async () => {
   const env = freshEnv(mockSw({ reg: mockReg() }));
   await checkForUpdate(() => {});

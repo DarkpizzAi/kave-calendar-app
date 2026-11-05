@@ -28,7 +28,7 @@ import { kaveKey } from "../m3/kave-m3.js";
 const MONEY_LABEL = Object.fromEntries(MONEY.map((c) => [c.slug, c.label]));
 const CURRENCIES = [["EUR", "€ EUR"], ["GBP", "£ GBP"], ["USD", "$ USD"], ["CHF", "CHF"], ["CZK", "Kč CZK"], ["MAD", "MAD"], ["MYR", "RM MYR"], ["VND", "₫ VND"]];
 const OWNERS = [["shared", "Both of us"], ["isa", "Isa"], ["hugo", "Hugo"]];
-const STATUS_CHOICES = [["planned", "Planned"], ["booked", "Booked"], ["cancelled", "Cancelled"]];
+const STATUS_CHOICES = [["idea", "Idea"], ["planned", "Planned"], ["booked", "Booked"], ["cancelled", "Cancelled"]];
 const RUNG = { estimate: ["Estimate", "An estimate"], recorded: ["Recorded", "Recorded by hand"],
   confirmed: ["Email", "Confirmed by the booking email"], locked: ["Bank", "Locked by the bank extract"] };
 const personName = (p) => ({ isa: "Isa", hugo: "Hugo", shared: "Both of you" }[p] || "");
@@ -114,7 +114,7 @@ function eventPage(e) {
   const acts = (e.activities || []).map((a) => categoryOf(a.type).label).join(", then ");
   const { date, time } = whenParts(e, thisYear());
   const status = shownStatus(e);
-  const statusText = status === "idea" ? "Planned" : STATUS_LABEL[statusOf({ status })];
+  const statusText = STATUS_LABEL[statusOf({ status })];
   const hero = `<section class="ev-hero" style="${kaveKey(group)}" aria-label="${esc(e.title)}">`
     + `<span class="ev-emo m3-emoji" aria-hidden="true">${iconsOf(e, me()).map(esc).join("")}</span>`
     + `<h3 class="m3-headline-s ev-title${e.status === "cancelled" ? " cancelled" : ""}">${esc(e.title)}</h3>`
@@ -183,7 +183,7 @@ const dtField = (label, icon, text, empty, act, which, clearable) =>
   + (clearable && text ? `<button type="button" class="m3-icon-btn m3-icon-btn--small" data-act="cleartime" data-w="${which}" aria-label="Clear the time (all day)">${ms("close")}</button>` : "")
   + `<span class="m3-icon fld-ic" aria-hidden="true">${icon}</span></div>`;
 const when = (label, which, day, time) =>
-  `<div class="fsec"><p class="m3-label-l m3-variant fsec-h">${label}</p><div class="fgrid">`
+  `<div class="fsec"><p class="m3-title-s fsec-h">${label}</p><div class="fgrid">`
   + dtField("Date", "calendar_today", dateLabel(day), "Choose a day", "pickdate", which, false)
   + dtField("Time", "schedule", time, "All day", "picktime", which, true) + "</div></div>";
 
@@ -200,7 +200,7 @@ function activityBlock(d) {
     pick = `<div class="m3-stack picker">${GROUPS.map((g) => {
       const cats = CATEGORIES.filter((c) => c.group === g);
       if (!cats.length) return "";
-      return `<p class="m3-label-l m3-variant catgroup">${esc(g)}</p><div class="m3-chips">${cats.map((c) =>
+      return `<p class="m3-title-s catgroup">${esc(g)}</p><div class="m3-chips">${cats.map((c) =>
         `<button type="button" class="m3-chip cat-chip" style="${kaveKey(categoryGroup(c.type))}" data-act="pickcat" data-c="${esc(c.type)}">`
         + `<span class="m3-emoji">${esc(iconFor({ type: c.type }, d, me()))}</span>${esc(c.label)}</button>`).join("")}</div>`;
     }).join("")}<button type="button" class="m3-btn m3-btn--text picker-x" data-act="pickclose">Cancel</button></div>`;

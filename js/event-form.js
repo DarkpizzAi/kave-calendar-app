@@ -234,10 +234,9 @@ export function replaceLink(e, i, { url, label }) {
 }
 
 /* The status chip the form shows: what the page shows (a ticket link reads as
-   Booked, an idea as Planned) until the person taps a chip. */
+   Booked) until the person taps a chip. An idea is a status like any other. */
 export function statusChoice(d) {
-  const s = d.statusTouched ? d.status : shownStatus(d);
-  return s === "idea" ? "planned" : s;
+  return d.statusTouched ? d.status : shownStatus(d);
 }
 
 /* A form is dirty when its draft differs from how it opened. */

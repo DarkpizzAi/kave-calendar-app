@@ -85,16 +85,22 @@ export async function restartForUpdate() {
    the update is still unanswered. A tap on its Restart or dismiss answers it. */
 export const UPDATE_TEXT = "A new version is ready";
 let updatePending = false;
+/* A new version is on this phone and the page on screen is still the old
+   one. Answering the snackbar (Restart or dismiss) does not change that, so
+   Settings keeps saying "New version ready" with Restart until the reload. */
+let updateWaiting = false;
 let watchedHost = null, watcher = null;
 export const updateIsPending = () => updatePending;
 /* tests only: forget a previous update flow */
-export function resetUpdateFlow() { updatePending = false; restarting = false; watchedHost = null; if (watcher) watcher.disconnect(); watcher = null; }
+export function resetUpdateFlow() { updatePending = false; updateWaiting = false; restarting = false; watchedHost = null; if (watcher) watcher.disconnect(); watcher = null; updateState = { kind: "idle", version: null, checkedAt: null, reason: null }; }
 
 function showUpdateSnack() {
   showSnackbar(deps.host(), { text: UPDATE_TEXT, action: "Restart", ms: 0, onAction: () => { restartForUpdate(); } });
 }
 
 export function offerUpdate() {
+  updateWaiting = true;
+  if (updateState.kind !== "ready") updateState = { ...updateState, kind: "ready", checkedAt: updateState.checkedAt || Date.now() };
   if (updatePending) return;
   updatePending = true;
   const host = deps.host();
@@ -165,7 +171,7 @@ export async function checkForUpdate(onChange) {
     /* an update found earlier this session and not restarted yet counts: its
        worker has usually taken over already (skipWaiting), so nothing is
        installing now, but the page on screen is still the old shell */
-    if (!incoming && !updatePending) {
+    if (!incoming && !updateWaiting) {
       updateState = { kind: "current", version: await swVersion(), checkedAt: Date.now() };
       onChange();
       return;

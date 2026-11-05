@@ -208,7 +208,7 @@ test("edit link: replaces at its position, keeps other fields, refuses unsafe or
   eq(replaceLink(e, 0, { url: "https://ra.co/x", label: "Renamed" }).links[0].label, "Renamed", "its own address is fine");
 });
 test("status chips: seeded as the page shows it, untouched until a chip is tapped", () => {
-  eq(statusChoice({ status: "idea", links: [] }), "planned");
+  eq(statusChoice({ status: "idea", links: [] }), "idea");
   eq(statusChoice({ status: "done", links: [] }), "planned", "a legacy done reads as planned");
   eq(statusChoice({ status: "planned", links: [{ label: "Ticket", url: "https://x.example" }] }), "booked");
   eq(statusChoice({ status: "planned", statusTouched: true, links: [{ label: "Ticket", url: "https://x.example" }] }), "planned");

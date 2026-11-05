@@ -644,7 +644,7 @@ export function archiveHtml() {
   const chips = `<div class="m3-chips ar-years" role="radiogroup" aria-label="Year">${years.map((yy) =>
     `<button type="button" role="radio" aria-checked="${yy === y}" class="m3-chip${yy === y ? " is-selected" : ""}" data-arch-year="${esc(yy)}">${yy === y ? ms("check") : ""}${esc(yy)}</button>`).join("")}</div>`;
   return `<div class="page-col">${intro}${chips}`
-    + `<p class="m3-label-l m3-variant page-intro">${inYear.length} event${inYear.length === 1 ? "" : "s"} in ${esc(y)}, in ${months.length} month${months.length === 1 ? "" : "s"}${AR.loading ? " (looking for older years)" : ""}</p>`
+    + `<p class="m3-body-m m3-variant page-intro">${inYear.length} event${inYear.length === 1 ? "" : "s"} in ${esc(y)}, in ${months.length} month${months.length === 1 ? "" : "s"}${AR.loading ? " (looking for older years)" : ""}</p>`
     + months.map((ym) => archiveCard(ym, inYear.filter((e) => e.start.startsWith(ym)), idx, me, order)).join("") + `</div>`;
 }
 

@@ -10,6 +10,12 @@
                  year before (2028 in spring 2027, 2029 in spring 2028): re-check
                  then, fix any difference, and flip STATUS to "official".
                  A Sunday holiday is left out (as 2027 does); a Saturday one stays.
+                 La Merce on a Sunday moves to the Monday, as Barcelona did in
+                 2023 (2028: 25/09).
+                 Known to over-count: the law allows 12 regional days plus 2
+                 local ones, and 2028 lists 14 regional candidates, 2029 13. The
+                 Generalitat drops or swaps some each year; which ones is only
+                 known from its order. Rechecked 05/11/2026: still unpublished.
    Only the days the official lists name are here; a holiday that falls on a
    weekend in a given year is simply absent from that year. */
 "use strict";
@@ -29,7 +35,7 @@ export const HOLIDAYS = {
 
   "2028-01-01": "Cap d'Any", "2028-01-06": "Reis", "2028-04-14": "Divendres Sant", "2028-04-17": "Dilluns de Pasqua",
   "2028-05-01": "Festa del Treball", "2028-06-05": "Segona Pasqua", "2028-06-24": "Sant Joan", "2028-08-15": "L'Assumpció",
-  "2028-09-11": "Diada", "2028-10-12": "Festa Nacional d'Espanya", "2028-11-01": "Tots Sants",
+  "2028-09-11": "Diada", "2028-09-25": "La Mercè", "2028-10-12": "Festa Nacional d'Espanya", "2028-11-01": "Tots Sants",
   "2028-12-06": "Dia de la Constitució", "2028-12-08": "La Immaculada", "2028-12-25": "Nadal", "2028-12-26": "Sant Esteve",
 
   "2029-01-01": "Cap d'Any", "2029-01-06": "Reis", "2029-03-30": "Divendres Sant", "2029-04-02": "Dilluns de Pasqua",
