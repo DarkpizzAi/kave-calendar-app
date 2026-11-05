@@ -29,7 +29,8 @@ import { syncBarOn } from "./sync.js";
 import { readPrefs, defaultsSummary, VIEW_NAMES, DETAIL_NAMES } from "./prefs.js";
 import { CATEGORIES, iconFor } from "./icons.js";
 import { DAY_PRIORITY } from "./cal-model.js";
-import { resetCalendarDefaults, setTopBar } from "./calendar.js";
+import { resetCalendarDefaults } from "./calendar.js";
+import { showTopBar } from "./top-bar.js";
 import { checkForUpdate, ensureVersionAsked, updateStatusLines, updateBusy, updateButtonText, updateReady, restartForUpdate } from "./updates.js";
 import { gateStep, gateHtml, bindGate } from "./gate.js";
 import { insightsHtml, bindInsights, newVisit } from "./view-insights.js";
@@ -102,9 +103,8 @@ export function paintSyncBar() {
   if (b) b.hidden = !syncBarOn();
 }
 
-/* calendar.js slides the strip and the agenda's box along with the bar */
-export function showTopBar() { setTopBar(false); }
-export function hideTopBar() { setTopBar(true); }
+/* the bar's scroll behaviour, and what follows it, is top-bar.js */
+export { showTopBar } from "./top-bar.js";
 
 /* ---------- settings ---------- */
 const esc = escapeHtml;

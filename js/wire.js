@@ -9,8 +9,8 @@
 import { store } from "./store.js";
 import { sheetOpen } from "./sheet.js";
 import { render, openDrawer, closeDrawer, openPage, closePage, openSearch, onPageClick, onPageChange, onShellPop,
-  pageIsOpen, drawerIsOpen, showTopBar, hideTopBar, actions, paintSyncBar, currentView } from "./render.js";
-import { isJumping } from "./util.js";
+  pageIsOpen, drawerIsOpen, actions, paintSyncBar, currentView } from "./render.js";
+import { initTopBar, measureBar } from "./top-bar.js";
 import { attachPullToRefresh, showSnackbar } from "../m3/kave-m3.js";
 import { onSyncState } from "./sync.js";
 
@@ -40,30 +40,8 @@ export function wire() {
     else if (drawerIsOpen()) { e.preventDefault(); closeDrawer(); }
   });
 
-  /* The top bar hides after 64px of downward scroll and returns on any upward
-     one, but only for a scroll the reader is driving: a finger on the list or
-     a mouse wheel (every fling starts with a drag, so its direction is known
-     before the finger lifts). A scroll the app caused (a redraw, back to
-     today) never moves it, and neither does the Calendar's snap settling a
-     day on its line after the finger lifts, which often runs a little upward
-     after a downward scroll and would bring the bar back every time. */
-  const view = document.getElementById("view");
-  let lastY = 0, touching = false, wheelAt = 0;
-  if (view) {
-    view.addEventListener("touchstart", () => { touching = true; }, { passive: true });
-    const lift = () => { touching = false; };
-    view.addEventListener("touchend", lift, { passive: true });
-    view.addEventListener("touchcancel", lift, { passive: true });
-    view.addEventListener("wheel", () => { wheelAt = performance.now(); }, { passive: true });
-  }
-  const driving = () => touching || performance.now() - wheelAt < 300;
-  if (view) view.addEventListener("scroll", () => {
-    const y = view.scrollTop;
-    if (isJumping() || !driving()) { lastY = y; return; }
-    if (y <= 0 || y < lastY) showTopBar();
-    else if (y > 64 && y > lastY) hideTopBar();
-    lastY = y;
-  }, { passive: true });
+  /* The top bar moves with the scroll, Material 3 "enter always" (top-bar.js). */
+  initTopBar();
 
   /* The header is fixed, so the body needs its real height as padding. It is
      measured rather than assumed because it changes with the safe-area inset
@@ -71,6 +49,7 @@ export function wire() {
   const syncHeaderHeight = () => {
     const h = document.querySelector(".app-header");
     if (h) document.documentElement.style.setProperty("--header-h", h.offsetHeight + "px");
+    measureBar();
   };
   syncHeaderHeight();
   window.addEventListener("resize", syncHeaderHeight);

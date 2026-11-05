@@ -27,15 +27,13 @@ a { color: var(--md-sys-color-primary); }
   position: relative; overflow: hidden;
 }
 .app-col { flex: 1; min-width: 0; display: flex; flex-direction: column; position: relative; }
-/* The top bar floats over the scroller and slides away on the reader's own
-   downward scroll (render.js toggles .is-hidden); #view keeps the room for it
-   as padding, so hiding it never shifts the content under the finger. */
+/* The top bar floats over the scroller and moves with the reader's own
+   scroll, Material 3 "enter always" (top-bar.js sets its transform); #view
+   keeps the room for it as padding, so it never shifts the content. */
 .app-header {
   position: absolute; top: 0; left: 0; right: 0; z-index: 5; height: auto; min-height: 64px;
-  padding-top: env(safe-area-inset-top, 0px); margin-top: 0;
-  transition: transform 250ms cubic-bezier(.2, 0, 0, 1);
+  padding-top: env(safe-area-inset-top, 0px); margin-top: 0; will-change: transform;
 }
-.app-header.is-hidden { transform: translateY(-100%); }
 .app-header .m3-top-bar__title { margin: 0; font-weight: 400; }
 .app-spacer { width: 48px; flex: none; }
 #view { flex: 1; min-height: 0; overflow-y: auto; padding: var(--header-h, 64px) 16px 24px; }
@@ -127,7 +125,7 @@ body.gated .app-header, body.gated .app-nav-bar, body.gated .app-rail, body.gate
    it restyles two elements, not every row. A glide the app runs itself turns
    the snapping off until it lands (.gliding). */
 #view.is-cal { scroll-snap-type: y mandatory; }
-#view.is-cal.gliding { scroll-snap-type: none; }
+#view.is-cal.gliding, #view.is-cal.settling { scroll-snap-type: none; }
 .cal { position: relative; }
 /* One exception to the plain top bar (Isa, 06/11/2026): over the Calendar it
    takes the strip's fill, so bar and strip read as one surface. Not in the
@@ -141,12 +139,12 @@ html:not([data-size="expanded"]) .app-col:has(#view.is-cal) .app-header { backgr
 }
 .lc-in { padding: 0 16px 4px; }
 /* sticky offsets count from the scroller's content box, which starts below the
-   room kept for the bar: 0 sits right under the bar, minus the bar's height
-   sits at the very top, which is where it goes when the bar slides away. It
-   goes there at once; calendar.js setTopBar slides it from where it was, by a
-   transform, with the bar. The days are never transformed: snapping reads
-   where they are drawn, and they must be drawn where they are. */
-.app-col:has(.app-header.is-hidden) .lc { top: calc(var(--header-h, 64px) * -1); padding-top: env(safe-area-inset-top, 0px); }
+   room kept for the bar: 0 sits right under the bar. As the bar scrolls away
+   the strip follows it by a transform (calendar.js followBar), never by its
+   sticky offset, so nothing is laid out while it moves. The days are never
+   transformed: snapping reads where they are drawn. Its fill reaches up
+   behind the status bar, where it stops. */
+.lc { box-shadow: 0 -120px 0 0 var(--md-sys-color-surface-container-low); }
 [data-size="medium"] .lc { margin: 0 -24px; }
 [data-size="medium"] .lc-in { padding: 0 24px 4px; }
 
@@ -245,7 +243,7 @@ span.lc-title { padding-left: 8px; }
 [data-size="expanded"] .cal-agenda { order: 1; margin: 0; max-width: none; }
 [data-size="expanded"] .lc { order: 2; margin: 0; border-radius: 24px; top: 8px; }
 [data-size="expanded"] .lc-in { padding: 8px 12px 12px; }
-[data-size="expanded"] .app-col:has(.app-header.is-hidden) .lc { top: calc(var(--header-h, 64px) * -1 + 8px); padding-top: 0; }
+[data-size="expanded"] .lc { box-shadow: none; }
 
 
 /* ---------- the sheet system (Task 4): sheet, form, menus, dialogs, pickers ----------
