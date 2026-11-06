@@ -52,11 +52,8 @@ without `--target`, the script writes into the main checkout. Run it with
 working one.
 
 `styles.css` uses the kit's tokens and must define none of its own.
-`tokens.css` (pre-Material) is still written by the script but `index.html`
-no longer links it and `SHELL` no longer caches it. The `TARGETS` entry in
-the script still says Compass links it; if you change how this app links or
-names a synced file, flip its flag in that script's `TARGETS` in the same
-commit, or the check stops guarding it silently.
+The pre-Material `tokens.css` was retired on 06/11/2026: `m3/` is the only
+synced styling.
 
 ## Security: XSS is the whole threat model
 
