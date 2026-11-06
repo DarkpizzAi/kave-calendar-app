@@ -656,9 +656,8 @@ export function dayEvents(d, archive) {
    even before the Calendar has been opened this session). */
 export function todaysCount() {
   if (!ctx || !store.state.settings.me) return 0;
-  const detail = S.detail || readPrefs(store.state.settings).defaultDetail;
   const today = todayKey();
-  return cmTodaysCount(eventsOn(ctx.data.events(), today), store.state.settings.me, detail, today);
+  return cmTodaysCount(eventsOn(ctx.data.events(), today), store.state.settings.me, today);
 }
 
 /* Things the sheet needs to draw its levels, from the same frame. */

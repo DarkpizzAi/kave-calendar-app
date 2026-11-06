@@ -185,14 +185,14 @@ export function fullPastMonths(today, floorYear) {
   return pastMonths(today, floorYear, 9999).length;
 }
 
-/* F3: the Calendar nav icon's badge: what the views show on `day`. Minimal
-   shows only the viewer's own (and shared) events; Full shows
-   both people's -- applyDetail's own rule, reused. A cancelled event and
-   the middle nights of a stay are not counted: no view shows them on the
-   day. */
-export function todaysCount(eventsToday, me, detail, day) {
+/* F3: the Calendar nav icon's badge: the viewer's own and shared events on
+   `day`, never the other person's, whatever the detail level (Isa,
+   06/11/2026: "3 events today" counted Hugo's two). applyDetail's Minimal
+   rule, reused. A cancelled event and the middle nights of a stay are not
+   counted: no view shows them on the day. */
+export function todaysCount(eventsToday, me, day) {
   const shown = eventsToday.filter((e) => !e.deleted && e.status !== "cancelled" && !isMidStay(e, day));
-  return applyDetail(shown, me, detail).length;
+  return applyDetail(shown, me, "minimal").length;
 }
 
 /* The emoji for an event, drawn for this viewer. A dated idea shows ❔. */

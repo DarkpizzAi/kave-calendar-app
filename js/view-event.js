@@ -14,7 +14,7 @@ import { newEvent, STATUS_LABEL, statusOf } from "./model.js";
 import { CATEGORIES as MONEY, formatCents, visibleCosts, toCents } from "./money.js";
 import { CATEGORIES, GROUPS, iconFor, categoryOf, onlyIcon } from "./icons.js";
 import { readForm, costDefaults, canChangeCost, addTask, addCost, addLinkTo, whenParts, mapsUrl, isMapsUrl, toDraft, costPayerText, mergeDraftCosts,
-  spanAfterStartChange, spanAfterEndChange, copyToDay, replaceCost, replaceTask, replaceLink, findLinkIndex, statusChoice, draftKey, isDirty } from "./event-form.js";
+  spanAfterStartChange, spanAfterEndChange, copyToDay, replaceCost, replaceTask, replaceLink, findLinkIndex, statusChoice, draftKey, isDirty, ownerChoices, defaultOwner } from "./event-form.js";
 import { defaultCity, shownStatus, categoryGroup, iconsOf } from "./cal-model.js";
 import { registerLevel, openLevel, replaceTop, back, closeAll, topLevel, openLayer, closeLayer, snack } from "./sheet.js";
 import { loadRange } from "./views.js";
@@ -27,7 +27,6 @@ import { kaveKey } from "../m3/kave-m3.js";
 
 const MONEY_LABEL = Object.fromEntries(MONEY.map((c) => [c.slug, c.label]));
 const CURRENCIES = [["EUR", "€ EUR"], ["GBP", "£ GBP"], ["USD", "$ USD"], ["CHF", "CHF"], ["CZK", "Kč CZK"], ["MAD", "MAD"], ["MYR", "RM MYR"], ["VND", "₫ VND"]];
-const OWNERS = [["shared", "Both of us"], ["isa", "Isa"], ["hugo", "Hugo"]];
 const STATUS_CHOICES = [["idea", "Idea"], ["planned", "Planned"], ["booked", "Booked"], ["cancelled", "Cancelled"]];
 const RUNG = { estimate: ["Estimate", "An estimate"], recorded: ["Recorded", "Recorded by hand"],
   confirmed: ["Email", "Confirmed by the booking email"], locked: ["Bank", "Locked by the bank extract"] };
@@ -178,7 +177,7 @@ function eventPage(e) {
 function blank(date) {
   const start = date || todayKey();
   const city = defaultCity(data.events(), start);
-  return { title: "", start, end: "", startTime: "", endTime: "", owner: "shared", status: "planned", activities: [],
+  return { title: "", start, end: "", startTime: "", endTime: "", owner: defaultOwner(me()), status: "planned", activities: [],
     city: city[0].toUpperCase() + city.slice(1), venue: "", guests: "", notes: "", refs: "", links: [], checklist: [], costs: [], newCost: null };
 }
 
@@ -228,7 +227,7 @@ function formPage(d) {
     + when("Ends", "end", d.end || d.start, d.endTime)
     + heading("Activity") + activityBlock(d)
     + heading("Where") + `<div class="fcol">${field("venue", "Venue", d.venue)}${field("city", "City", d.city)}</div>`
-    + heading("Who") + `<div class="fcol">${chips("owner", OWNERS, d.owner)}${field("guests", "Guests, first names", d.guests)}</div>`
+    + heading("Who") + `<div class="fcol">${chips("owner", ownerChoices(me()), d.owner)}${field("guests", "Guests, first names", d.guests)}</div>`
     + heading("Status") + chips("status", STATUS_CHOICES, statusChoice(d))
     + costsHeading(costs) + grouped([...costs.map((k) => costRow(k, true)), addRow("Add a cost", "addcost")])
     + heading("To-dos") + grouped([...todos, addRow("Add a to-do for Isa, Hugo or both", "addtodo")])

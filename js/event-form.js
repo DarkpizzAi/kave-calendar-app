@@ -12,6 +12,16 @@ const LONGDOW = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturd
 const MONTHS = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
 
 /* The form's raw values -> the event's fields, cleaned, plus what is wrong. */
+/* Who an event is for, as the form offers it: the viewer first, then the
+   other person, then both; a new event is the viewer's own (Isa, 06/11/2026).
+   Without a viewer the old order stays, with "shared" as the default. */
+const NAMES = { isa: "Isa", hugo: "Hugo", shared: "Both of us" };
+export function ownerChoices(me) {
+  const order = me === "isa" ? ["isa", "hugo", "shared"] : me === "hugo" ? ["hugo", "isa", "shared"] : ["shared", "isa", "hugo"];
+  return order.map((o) => [o, NAMES[o]]);
+}
+export const defaultOwner = (me) => (me === "isa" || me === "hugo" ? me : "shared");
+
 export function readForm(raw) {
   const t = (v) => String(v == null ? "" : v).trim();
   const fields = {

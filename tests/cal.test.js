@@ -164,7 +164,7 @@ test("M3: Back events are ignored one by one, never more than were caused", () =
 });
 
 /* ---- F3: today's-event-count badge, filtered by detail level ---- */
-test("cal: todaysCount is minimal-only-mine, both people at full", () => {
+test("cal: todaysCount counts only mine and shared, never the other person's", () => {
   const evs = [
     ev("mine", "2026-09-25", { owner: "isa" }),
     ev("shared", "2026-09-25", { owner: "shared" }),
@@ -172,15 +172,15 @@ test("cal: todaysCount is minimal-only-mine, both people at full", () => {
     ev("gone", "2026-09-25", { owner: "hugo", deleted: true }),
   ];
   const D = "2026-09-25";
-  eq(todaysCount(evs, "isa", "minimal", D), 2, "only mine and shared");
-  eq(todaysCount(evs, "isa", "full", D), 3);
-  eq(todaysCount([], "isa", "full", D), 0);
+  eq(todaysCount(evs, "isa", D), 2, "only mine and shared");
+  eq(todaysCount(evs, "hugo", D), 2, "his and shared");
+  eq(todaysCount([], "isa", D), 0);
 });
 test("review: the badge counts what the views show -- no cancelled event, no middle night of a stay", () => {
   const stay = ev("stay", "2026-09-24", { end: "2026-09-26", activities: [act("accommodation", "🏨")] });
   const evs = [ev("on", "2026-09-25"), ev("off", "2026-09-25", { status: "cancelled" }), stay];
-  eq(todaysCount(evs, "isa", "full", "2026-09-25"), 1, "the stay's middle night and the cancelled event are left out");
-  eq(todaysCount([stay], "isa", "full", "2026-09-26"), 1, "check-out day counts");
+  eq(todaysCount(evs, "isa", "2026-09-25"), 1, "the stay's middle night and the cancelled event are left out");
+  eq(todaysCount([stay], "isa", "2026-09-26"), 1, "check-out day counts");
 });
 
 /* ---- F7: "load older" jumps straight to 1 January of the floor year, and

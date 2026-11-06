@@ -1,5 +1,5 @@
 import { test, eq, ok, throws } from "./run.js";
-import { readForm, costDefaults, canChangeCost, addTask, addCost, whenLine, whenParts, mapsUrl, toDraft, isMapsUrl, costPayerText,
+import { ownerChoices, defaultOwner, readForm, costDefaults, canChangeCost, addTask, addCost, whenLine, whenParts, mapsUrl, toDraft, isMapsUrl, costPayerText,
   spanAfterStartChange, spanAfterEndChange, copyToDay, addLinkTo,
   replaceCost, replaceTask, replaceLink, statusChoice, draftKey, isDirty, findLinkIndex, mergeDraftCosts } from "../js/event-form.js";
 import { newEvent, validateEvent } from "../js/model.js";
@@ -242,4 +242,14 @@ test("event form: save keeps the live locked lines and takes editable lines from
   ok(out.some((k) => k.id === "n"), "a new draft line is kept");
   eq(out.length, 4);
   eq(live.length, 4, "the live list is untouched");
+});
+
+test("form: who is offered viewer first, then the other person, then both; a new event is the viewer's", () => {
+  eq(ownerChoices("isa").map((x) => x[0]).join(), "isa,hugo,shared");
+  eq(ownerChoices("hugo").map((x) => x[0]).join(), "hugo,isa,shared");
+  eq(ownerChoices("").map((x) => x[0]).join(), "shared,isa,hugo", "no viewer keeps the old order");
+  eq(ownerChoices("isa")[2][1], "Both of us");
+  eq(defaultOwner("isa"), "isa");
+  eq(defaultOwner("hugo"), "hugo");
+  eq(defaultOwner(undefined), "shared");
 });
