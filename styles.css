@@ -429,7 +429,7 @@ button.m3-list-item, a.m3-list-item { width: 100%; text-align: left; text-decora
 .dp-grid { display: grid; grid-template-columns: repeat(7, 40px); justify-content: center; gap: 4px; padding: 4px 12px; flex: none; }
 .dp-w { height: 40px; display: grid; place-items: center; font-size: 16px; line-height: 24px; letter-spacing: .5px; color: var(--md-sys-color-on-surface); }
 .dp-d { width: 40px; height: 40px; border-radius: 50%; display: grid; place-items: center; font-size: 16px; line-height: 24px; letter-spacing: .5px; font-variant-numeric: tabular-nums; color: var(--md-sys-color-on-surface); }
-.dp-d.today { box-shadow: inset 0 0 0 1px var(--md-sys-color-primary); color: var(--md-sys-color-on-surface); font-weight: 700; } /* the ring marks today; on the dialog the number keeps the text colour (accent as text fails AA there) */
+.dp-d.today { box-shadow: inset 0 0 0 1px var(--md-sys-color-primary); color: var(--md-sys-color-on-surface); } /* the ring marks today, as Material; on the dialog the number keeps the text colour (accent as text fails AA there) */
 /* the picked day and time take the accent (two fills only, Isa, 06/11/2026): white on primary is 3.59 in Cobalt dark */
 .dp-d.on { background: var(--md-sys-color-primary-container); color: var(--md-sys-color-on-primary-container); box-shadow: none; }
 .dp-d:hover:not(.on) { box-shadow: inset 0 0 0 100vmax color-mix(in srgb, currentColor 8%, transparent); }

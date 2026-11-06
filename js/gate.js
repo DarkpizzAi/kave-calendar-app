@@ -33,7 +33,7 @@ const dialog = (inner) => '<div class="m3-scrim" aria-hidden="true"></div>'
 
 export function gateHtml(step) {
   if (step === "token") {
-    return dialog('<label class="m3-field"><input class="m3-field__input" id="gateToken" type="password" autocomplete="off" autocapitalize="off" spellcheck="false" aria-label="Access" data-1p-ignore data-lpignore="true"></label>'
+    return dialog('<label class="m3-field"><span class="m3-field__label">Access</span><input class="m3-field__input" id="gateToken" type="password" autocomplete="off" autocapitalize="off" spellcheck="false" aria-label="Access" data-1p-ignore data-lpignore="true"></label>'
       + `<div class="m3-dialog__actions"><button type="button" class="m3-btn m3-btn--filled" id="gateGo" aria-label="Connect">${ms("arrow_forward")}</button></div>`);
   }
   if (step === "who") {
