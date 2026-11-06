@@ -344,7 +344,7 @@ a.ticket:hover { box-shadow: inset 0 0 0 100vmax color-mix(in srgb, currentColor
 .tk-perf { border-top: 2px dashed currentColor; opacity: .35; margin: 4px 0; }
 .tk-x { position: absolute; top: 6px; right: 6px; width: 32px; height: 32px; border-radius: 50%; background: var(--md-sys-color-inverse-surface); color: var(--md-sys-color-inverse-on-surface); display: grid; place-items: center; z-index: 1; }
 .tk-x .m3-icon { font-size: 18px; }
-.tk-x.is-add { background: var(--md-sys-color-primary); color: var(--md-sys-color-on-primary); }
+.tk-x.is-add { background: var(--md-sys-color-primary); color: var(--md-sys-color-on-primary); } /* graphic: the + icon, 3:1 */
 .ticket.is-off { background: var(--md-sys-color-surface-container-highest); color: var(--md-sys-color-on-surface-variant); }
 .ticket.is-off .tk-emo { filter: grayscale(1); opacity: .55; }
 .ins-key { display: flex; flex-wrap: wrap; gap: 8px 16px; color: var(--md-sys-color-on-surface-variant); }
@@ -388,7 +388,7 @@ button.m3-list-item, a.m3-list-item { width: 100%; text-align: left; text-decora
 .notes-row .m3-list-item__text > * { white-space: normal; }
 .cost-amt { display: flex; flex-direction: column; align-items: flex-end; padding-right: 4px; }
 .cb { width: 18px; height: 18px; border: 2px solid var(--md-sys-color-on-surface-variant); border-radius: 2px; flex: none; display: grid; place-items: center; margin: 0 3px; } /* off-scale: M3 checkbox, an 18 box centred in a 24 icon area */
-.cb.on { background: var(--md-sys-color-primary); border-color: var(--md-sys-color-primary); color: var(--md-sys-color-on-primary); }
+.cb.on { background: var(--md-sys-color-primary); border-color: var(--md-sys-color-primary); color: var(--md-sys-color-on-primary); } /* graphic: the check mark, 3:1 */
 .cb .m3-icon { font-size: 16px; font-variation-settings: "FILL" 0, "wght" 700, "GRAD" 0, "opsz" 20; }
 .todo.done .m3-body-l { text-decoration: line-through; color: var(--md-sys-color-on-surface-variant); }
 
@@ -430,7 +430,8 @@ button.m3-list-item, a.m3-list-item { width: 100%; text-align: left; text-decora
 .dp-w { height: 40px; display: grid; place-items: center; font-size: 16px; line-height: 24px; letter-spacing: .5px; color: var(--md-sys-color-on-surface); }
 .dp-d { width: 40px; height: 40px; border-radius: 50%; display: grid; place-items: center; font-size: 16px; line-height: 24px; letter-spacing: .5px; font-variant-numeric: tabular-nums; color: var(--md-sys-color-on-surface); }
 .dp-d.today { box-shadow: inset 0 0 0 1px var(--md-sys-color-primary); color: var(--md-sys-color-primary); }
-.dp-d.on { background: var(--md-sys-color-primary); color: var(--md-sys-color-on-primary); box-shadow: none; }
+/* the picked day and time take the accent (two fills only, Isa, 06/11/2026): white on primary is 3.59 in Cobalt dark */
+.dp-d.on { background: var(--md-sys-color-primary-container); color: var(--md-sys-color-on-primary-container); box-shadow: none; }
 .dp-d:hover:not(.on) { box-shadow: inset 0 0 0 100vmax color-mix(in srgb, currentColor 8%, transparent); }
 .dp-d:disabled { opacity: .38; pointer-events: none; }
 .dp-acts { padding: 8px 12px 12px; flex: none; }
@@ -444,7 +445,7 @@ button.m3-list-item, a.m3-list-item { width: 100%; text-align: left; text-decora
 .tp-pivot { fill: var(--md-sys-color-primary); }
 .tp-n { position: absolute; width: 40px; height: 40px; margin: -20px 0 0 -20px; border-radius: 50%; display: grid; place-items: center; font-size: 16px; letter-spacing: .5px; color: var(--md-sys-color-on-surface); font-variant-numeric: tabular-nums; }
 .tp-n.in { width: 32px; height: 32px; margin: -16px 0 0 -16px; color: var(--md-sys-color-on-surface-variant); }
-.tp-n.on { background: var(--md-sys-color-primary); color: var(--md-sys-color-on-primary); }
+.tp-n.on { background: var(--md-sys-color-primary-container); color: var(--md-sys-color-on-primary-container); }
 
 /* a row whose text is tappable while its end holds its own buttons (fix round 1) */
 .m3-list-item > .row-main { display: flex; align-items: center; gap: 16px; flex: 1; min-width: 0; align-self: stretch; margin: -8px 0 -8px -16px; padding: 8px 0 8px 16px; text-align: left; text-decoration: none; color: inherit; border-radius: inherit; }
