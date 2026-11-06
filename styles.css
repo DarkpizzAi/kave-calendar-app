@@ -387,7 +387,7 @@ button.m3-list-item, a.m3-list-item { width: 100%; text-align: left; text-decora
 .add-row .m3-body-l { font-weight: 500; }
 .notes-row .m3-list-item__text > * { white-space: normal; }
 .cost-amt { display: flex; flex-direction: column; align-items: flex-end; padding-right: 4px; }
-.cb { width: 18px; height: 18px; border: 2px solid var(--md-sys-color-on-surface-variant); border-radius: 2px; flex: none; display: grid; place-items: center; margin: 0 3px; }
+.cb { width: 18px; height: 18px; border: 2px solid var(--md-sys-color-on-surface-variant); border-radius: 2px; flex: none; display: grid; place-items: center; margin: 0 3px; } /* off-scale: M3 checkbox, an 18 box centred in a 24 icon area */
 .cb.on { background: var(--md-sys-color-primary); border-color: var(--md-sys-color-primary); color: var(--md-sys-color-on-primary); }
 .cb .m3-icon { font-size: 16px; font-variation-settings: "FILL" 0, "wght" 700, "GRAD" 0, "opsz" 20; }
 .todo.done .m3-body-l { text-decoration: line-through; color: var(--md-sys-color-on-surface-variant); }
