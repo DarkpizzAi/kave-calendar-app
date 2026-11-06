@@ -1,3 +1,4 @@
+import { makeFling } from "../js/sheet-swipe.js";
 import { test, eq, ok } from "./run.js";
 import { indexByDay, eventsOn, isMidStay, stayRole, stayLabel, pickDayIcon, isAway,
   shouldLoadMore, nextCount, iconsOf, searchEvents, todaysCount, fullPastWeeks, fullPastMonths,
@@ -354,6 +355,20 @@ test("strip gestures: sideways moves, down opens, up closes, small movement is a
   eq(stripGesture({ dx: -3, dy: -55 }), "close");
   eq(stripGesture({ dx: 20, dy: 15 }), null, "a tap that wobbled");
   eq(stripGesture({ dx: 50, dy: 49 }), "prev", "the longer axis wins");
+  eq(stripGesture({ dx: 2, dy: 28 }), "open", "a short swipe is enough (Pixel quick settings)");
+  eq(stripGesture({ dx: 2, dy: -28 }), "close");
+});
+
+test("a sheet closes on a short pull or a light flick, as the Pixel's quick settings", () => {
+  const f = makeFling();
+  f.reset();
+  eq(f.closes(50, 800), true, "50px on a tall sheet closes (it used to need 200)");
+  eq(f.closes(40, 800), false, "40px slowly springs back");
+  eq(f.closes(30, 100), true, "a quarter of a short sheet");
+  f.reset(); f.add(0);
+  const t0 = performance.now(); while (performance.now() - t0 < 20) { /* wait */ }
+  f.add(12);
+  eq(f.closes(12, 800), true, "a light flick down closes whatever the distance");
 });
 
 test("review focus 1: a day with three events has one strip emoji and three agenda cards", () => {

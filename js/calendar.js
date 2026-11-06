@@ -498,10 +498,12 @@ function sameStrip(d) {
    notches also lifts the snap (.fast): with a snap point on every day the
    browser pulls each notch back to a day, which is what made a free-spinning
    wheel crawl. When the list rests the snap comes back the way it would have
-   landed anyway: a short glide to the nearest day on the pin line. Touch
-   keeps the browser's own snap: its fling already lands on a day. */
+   landed anyway: a short glide to the nearest day on the pin line. A hard
+   touch fling lifts it the same way (Hugo, 06/11/2026: "swipe hard just
+   once and it goes brrrr through weeks"): with a snap point on every day the
+   browser's snapped fling stopped after a few days. */
 const FAST = 1.5, REST_MS = 140, WHEEL_BURST_MS = 80;
-const M = { y: 0, t: 0, v: 0, fast: false, wheelAt: 0, rest: 0 };
+const M = { y: 0, t: 0, v: 0, fast: false, wheelAt: 0, rest: 0, touching: false };
 const moving = () => performance.now() - M.t < REST_MS;
 function track(mn) {
   const now = performance.now(), dt = now - M.t, dy = Math.abs(mn.scrollTop - M.y);
@@ -509,8 +511,10 @@ function track(mn) {
   const v = dt > 0 && dt < REST_MS ? dy / dt : 0;
   M.v = M.v * 0.6 + v * 0.4;
   M.y = mn.scrollTop; M.t = now;
-  if (M.v > FAST) M.fast = true;
-  else if (M.fast && M.v < FAST / 2) { M.fast = false; if (!isJumping()) followBox(); }
+  if (M.v > FAST) {
+    M.fast = true;
+    if (ctx.isCalendar() && !mn.classList.contains("gliding") && !mn.classList.contains("fast")) mn.classList.add("fast");
+  } else if (M.fast && M.v < FAST / 2) { M.fast = false; if (!isJumping()) followBox(); }
   clearTimeout(M.rest);
   M.rest = setTimeout(rest, REST_MS);
 }
@@ -526,8 +530,8 @@ function rest() {
   if (!mn) return;
   if (!ctx.isCalendar() || !frame) { mn.classList.remove("fast"); return; }
   if (mn.classList.contains("fast")) {
-    /* a notch may still be on its way: wait for the wheel to stop too */
-    if (performance.now() - M.wheelAt < REST_MS) { M.rest = setTimeout(rest, REST_MS); return; }
+    /* a notch may still be on its way, or a finger still down: wait for both */
+    if (performance.now() - M.wheelAt < REST_MS || M.touching) { M.rest = setTimeout(rest, REST_MS); return; }
     const top = nearestSnap(mn);
     mn.classList.remove("fast");
     if (top != null && Math.abs(top - mn.scrollTop) > 1) {
@@ -799,6 +803,8 @@ export function initCalendar(c) {
   mn.addEventListener("scroll", onScroll, { passive: true });
   for (const ev of ["wheel", "touchstart", "pointerdown"]) mn.addEventListener(ev, takeOver, { passive: true });
   mn.addEventListener("wheel", onWheel, { passive: true });
+  mn.addEventListener("touchstart", () => { M.touching = true; }, { passive: true });
+  for (const ev of ["touchend", "touchcancel"]) mn.addEventListener(ev, () => { M.touching = false; }, { passive: true });
   document.addEventListener("click", onClick);
   stripGestures(mn);
   /* the window crossed a size class: the strip is a pane or a card now */

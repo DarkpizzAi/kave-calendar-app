@@ -336,8 +336,11 @@ export function pinPick(rows, y, avail = Infinity) {
 /* One finished drag on the strip: sideways moves a week (a month when open),
    down opens the month, up closes it; the longer axis wins and anything under
    40px is a tap. */
+/* A swipe on the strip: 24px is enough (Isa, 06/11/2026, the Pixel's quick
+   settings open and close on a very short swipe); less is a tap that wobbled. */
+export const STRIP_SWIPE = 24;
 export function stripGesture({ dx, dy }) {
-  if (Math.max(Math.abs(dx), Math.abs(dy)) < 40) return null;
+  if (Math.max(Math.abs(dx), Math.abs(dy)) < STRIP_SWIPE) return null;
   if (Math.abs(dx) > Math.abs(dy)) return dx < 0 ? "next" : "prev";
   return dy > 0 ? "open" : "close";
 }
