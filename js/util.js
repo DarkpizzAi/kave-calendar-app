@@ -27,7 +27,7 @@ export function safeUrl(u) {
 }
 
 /* Sellers whose own site names their Android app (/.well-known/assetlinks.json,
-   checked 05/11/2026). An installed web app opens a plain https link in a browser
+   checked 05/11/2026, ra.co and booking.com added 21/11/2026). An installed web app opens a plain https link in a browser
    tab, not in the seller's app (Isa, on the Ryanair link), so on Android the link
    becomes an intent for that app, with the page itself as the fallback when the
    app is not installed. Elsewhere the link is left as it is. */
@@ -37,6 +37,8 @@ export const APP_PACKAGES = {
   "dice.fm": "fm.dice",
   "link.dice.fm": "fm.dice",
   "www.doctoralia.es": "es.doctoralia",
+  "ra.co": "net.residentadvisor.raguide",
+  "www.booking.com": "com.booking",
 };
 
 export function appHref(u, ua = (typeof navigator !== "undefined" && navigator.userAgent) || "") {

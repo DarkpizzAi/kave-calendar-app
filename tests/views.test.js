@@ -98,3 +98,10 @@ test("range: a year back, two years ahead", () => {
 test("range: a 29 February today keeps a real day in the other years", () => {
   eq(loadRange("2028-02-29"), { min: "2027-02-28", max: "2030-02-28" });
 });
+test("catalogue, 21/11/2026: At ours, Celebration and Home and errands, default icons first", () => {
+  eq(categoryOf("at-ours").label, "At ours");
+  eq(categoryOf("celebration").label, "Celebration");
+  eq(categoryOf("home").label, "Home and errands");
+  eq([iconsOf("at-ours")[0], iconsOf("celebration")[0], iconsOf("home")[0]], ["\u{1F6CB}️", "\u{1F389}", "\u{1F9F0}"]);
+  eq([categoryOf("at-ours").group, categoryOf("celebration").group, categoryOf("home").group], ["Nightlife & Social", "Nightlife & Social", "Other"]);
+});

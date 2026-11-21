@@ -335,9 +335,9 @@ test("review focus 3: at the ends of the range, arrows and swipes stop", () => {
 
 test("categories map to the seven colour groups (spec section 2)", () => {
   const want = {
-    food: ["eating", "drinks"], nights: ["live-music", "clubbing", "birthday"], culture: ["cinema", "activity", "games"],
+    food: ["eating", "drinks"], nights: ["live-music", "clubbing", "birthday", "at-ours", "celebration"], culture: ["cinema", "activity", "games"],
     outdoors: ["park", "beach", "sport", "hike"], travel: ["transport", "accommodation", "business-trip"],
-    life: ["work", "visitor", "health"], other: ["none"],
+    life: ["work", "visitor", "health", "home"], other: ["none"],
   };
   for (const [g, types] of Object.entries(want)) for (const t of types) eq(categoryGroup(t), g, t);
   eq(categoryGroup("something-new"), "other", "an unlisted category falls to Other");

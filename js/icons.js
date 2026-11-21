@@ -22,6 +22,8 @@ export const CATEGORIES = [
   { type: "drinks", label: "Drinks", group: "Nightlife & Social", icons: [{ icon: "🍺" }, { icon: "🥂" }, { icon: "🍹" }, { icon: "🍻", note: "pre-drinks" }, { icon: "🍷" }] },
   { type: "eating", label: "Eating out", group: "Nightlife & Social", icons: [{ icon: "🍴" }, { icon: "🍔" }, { icon: "🍝" }, { icon: "🥞", note: "brunch" }, { icon: "🍜" }, { icon: "🥩" }, { icon: "🍕" }, { icon: "🍙" }, { icon: "🍣" }, { icon: "🌮" }, { icon: "☕", note: "coffee" }, { icon: "🥘", note: "paella" }, { icon: "🥐", note: "croissant" }, { icon: "🍦", note: "ice cream" }] },
   { type: "birthday", label: "Birthday party", group: "Nightlife & Social", icons: [{ icon: "🎂" }] },
+  { type: "at-ours", label: "At ours", group: "Nightlife & Social", icons: [{ icon: "🛋️" }, { icon: "🍽️", note: "dinner" }, { icon: "🍿", note: "movie night" }, { icon: "🎲", note: "board games" }, { icon: "📺", note: "watch party" }] },
+  { type: "celebration", label: "Celebration", group: "Nightlife & Social", icons: [{ icon: "🎉" }, { icon: "💍", note: "wedding" }, { icon: "🍼", note: "baby shower" }, { icon: "🎓", note: "graduation" }, { icon: "👋", note: "goodbye" }, { icon: "🎆", note: "new year" }] },
   { type: "cinema", label: "Cinema", group: "Entertainment & Leisure", icons: [{ icon: "🎬" }] },
   { type: "activity", label: "Paid activity", group: "Entertainment & Leisure", icons: [{ icon: "🎟" }, { icon: "🎭", note: "theatre" }, { icon: "🏛", note: "museum" }, { icon: "🏺", note: "pottery" }, { icon: "🎤", note: "karaoke" }, { icon: "🩰", note: "ballet" }, { icon: "🖼", note: "exhibition" }, { icon: "🎨", note: "workshop" }, { icon: "🎳", note: "bowling" }, { icon: "🎢", note: "amusement park" }, { icon: "🧗", note: "climbing" }, { icon: "🧖", note: "spa" }, { icon: "💆", note: "massage" }, { icon: "🧩", note: "escape room" }] },
   { type: "games", label: "Games", group: "Entertainment & Leisure", icons: [{ icon: "🎮", note: "videogames" }, { icon: "🎲", note: "board games" }] },
@@ -35,6 +37,7 @@ export const CATEGORIES = [
   { type: "transport", label: "Transport", group: "Travel & Work", icons: [{ icon: "✈️", note: "flight" }, { icon: "🛫", note: "outbound" }, { icon: "🚄", note: "train" }, { icon: "🛬", note: "return" }, { icon: "🚌", note: "bus" }, { icon: "🚗", note: "car" }, { icon: "🚢", note: "boat" }] },
   { type: "accommodation", label: "Accommodation", group: "Travel & Work", icons: [{ icon: "🏨" }, { icon: "🏡" }, { icon: "⛺" }] },
   { type: "health", label: "Health appointment", group: "Other", icons: [{ icon: "🩺" }, { icon: "🦷", note: "dentist" }] },
+  { type: "home", label: "Home and errands", group: "Other", icons: [{ icon: "🧰" }, { icon: "🔧", note: "maintenance" }, { icon: "💶", note: "payment" }, { icon: "🛍️", note: "errand" }] },
   { type: "none", label: "Other", group: "Other", icons: [{ icon: "📌" }] },
 ];
 

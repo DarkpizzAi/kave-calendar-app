@@ -349,11 +349,11 @@ export function stripGesture({ dx, dy }) {
    stable id (icons.js); anything not listed, now or later, is Other. */
 export const GROUP_OF = {
   eating: "food", drinks: "food",
-  "live-music": "nights", clubbing: "nights", birthday: "nights",
+  "live-music": "nights", clubbing: "nights", birthday: "nights", "at-ours": "nights", celebration: "nights",
   cinema: "culture", activity: "culture", games: "culture",
   park: "outdoors", beach: "outdoors", sport: "outdoors", hike: "outdoors",
   transport: "travel", accommodation: "travel", "business-trip": "travel",
-  work: "life", visitor: "life", health: "life",
+  work: "life", visitor: "life", health: "life", home: "life",
 };
 export const categoryGroup = (type) => (Object.prototype.hasOwnProperty.call(GROUP_OF, type) ? GROUP_OF[type] : "other");
 

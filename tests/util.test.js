@@ -1,4 +1,4 @@
-import { test, eq } from "./run.js";
+import { test, eq, ok } from "./run.js";
 import { escapeHtml, safeUrl, appHref } from "../js/util.js";
 
 test("escapeHtml escapes the five characters", () => {
@@ -32,4 +32,11 @@ test("appHref leaves other sellers, other phones and bad links alone", () => {
   eq(appHref("https://www.liceubarcelona.cat/x", ANDROID), "https://www.liceubarcelona.cat/x");
   eq(appHref("https://www.ryanair.com/gb/en/trip/manage", "Mozilla/5.0 (iPhone; CPU iPhone OS 18_0)"), "https://www.ryanair.com/gb/en/trip/manage");
   eq(appHref("javascript:alert(1)", ANDROID), "");
+});
+test("appHref opens the Resident Advisor and Booking.com apps on Android", () => {
+  eq(appHref("https://ra.co/events/es/barcelona", ANDROID),
+    "intent://ra.co/events/es/barcelona#Intent;scheme=https;package=net.residentadvisor.raguide;"
+    + "S.browser_fallback_url=https%3A%2F%2Fra.co%2Fevents%2Fes%2Fbarcelona;end");
+  ok(appHref("https://www.booking.com/hotel/x.html", ANDROID).includes("package=com.booking;"), "booking");
+  eq(appHref("https://ra.co/events", "Mozilla/5.0 (iPhone)"), "https://ra.co/events");
 });
