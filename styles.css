@@ -180,7 +180,7 @@ button.lc-title:hover, .lc-d:hover, .lc-handle:hover, .ag-d:hover { box-shadow: 
 .lc-d .dn { height: 32px; display: grid; place-items: center; font-variant-numeric: tabular-nums; }
 .lc-d .emos { height: 20px; font-size: 16px; display: flex; align-items: center; justify-content: center; white-space: nowrap; }
 .lc-d .emos.grey, .evc.grey .evc-em { filter: grayscale(1); opacity: .6; }
-.lc-d.out { opacity: .35; }
+.lc-d.out { opacity: .35; } /* brand-exception: Faded Calendar days: outside the month */
 .lc-d.past:not(.today):not(.sel) .emos { opacity: .8; }
 .lc-d.sel { background: var(--md-sys-color-secondary-container); color: var(--md-sys-color-on-secondary-container); }
 .lc-d.sel .wd, .lc-d.sel .dn { color: inherit; }
@@ -211,7 +211,7 @@ button.lc-title:hover, .lc-d:hover, .lc-handle:hover, .ag-d:hover { box-shadow: 
 .ag.empty { padding: 4px 8px; }
 /* dimmed by its contents, not the row: opacity on the row would make it a
    stacking context and lift it out of the agenda's order */
-.ag.past > .ag-d, .ag.past > .ag-evs { opacity: .8; }
+.ag.past > .ag-d, .ag.past > .ag-evs { opacity: .8; } /* brand-exception: Faded Calendar days: over */
 .ag.sel > .ag-d, .ag.sel > .ag-evs { opacity: 1; }
 .ag.sel { color: var(--md-sys-color-on-secondary-container); }
 /* the date: day of the week small, the number under it, one size for every day */
