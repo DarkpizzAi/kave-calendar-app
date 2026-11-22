@@ -143,18 +143,25 @@ body.gated .app-header, body.gated .app-nav-bar, body.gated .app-rail, body.gate
    The 06/11/2026 exception that gave the bar the strip's fill is retired. */
 .lc {
   position: sticky; top: 0; z-index: 1; overflow: hidden;
-  margin: 0 -16px; border-radius: 0 0 24px 24px;
-  background: var(--md-sys-color-surface-container-low); color: var(--md-sys-color-on-surface);
+  margin: 0 -16px;
+  color: var(--md-sys-color-on-surface);
   touch-action: none; user-select: none; -webkit-user-select: none;
 }
-.lc-in { padding: 0 16px 4px; }
+.lc-in { padding: 0 16px 4px; background: var(--md-sys-color-surface); }
+/* 22/11/2026 (Isa): the month strip is part of the top bar: the bar's own fill, and the panel's corners curve under it, like the bar's cap */
+.lc::after {
+  content: ""; display: block; height: var(--kave-panel-r); pointer-events: none;
+  background:
+    radial-gradient(circle at 100% 100%, transparent var(--kave-panel-r), var(--md-sys-color-surface) calc(var(--kave-panel-r) + .5px)) left top / var(--kave-panel-r) var(--kave-panel-r) no-repeat,
+    radial-gradient(circle at 0 100%, transparent var(--kave-panel-r), var(--md-sys-color-surface) calc(var(--kave-panel-r) + .5px)) right top / var(--kave-panel-r) var(--kave-panel-r) no-repeat;
+}
 /* sticky offsets count from the scroller's content box, which starts below the
    room kept for the bar: 0 sits right under the bar. As the bar scrolls away
    the strip follows it by a transform (calendar.js followBar), never by its
    sticky offset, so nothing is laid out while it moves. The days are never
    transformed: snapping reads where they are drawn. Its fill reaches up
    behind the status bar, where it stops. */
-.lc { box-shadow: 0 -120px 0 0 var(--md-sys-color-surface-container-low); }
+.lc { box-shadow: 0 -120px 0 0 var(--md-sys-color-surface); }
 [data-size="medium"] .lc { margin: 0 -24px; }
 [data-size="medium"] .lc-in { padding: 0 24px 4px; }
 
@@ -200,7 +207,7 @@ button.lc-title:hover, .lc-d:hover, .lc-handle:hover, .ag-d:hover { box-shadow: 
 [data-size="expanded"] .lc-d .emos { font-size: 20px; height: 24px; }
 
 /* The agenda is one stacking context: the box under every day's content. */
-.cal-agenda { position: relative; isolation: isolate; padding-top: 16px; max-width: 720px; margin: 0 auto; width: 100%; }
+.cal-agenda { position: relative; isolation: isolate; padding-top: 0; max-width: 720px; margin: 0 auto; width: 100%; }
 /* room after the last day, so even it can come to rest on the line */
 .cal-agenda::after { content: ""; display: block; height: 50vh; }
 /* The pin line: a zero-height sticky probe (its top is set by calendar.js),
@@ -257,7 +264,9 @@ button.lc-title:hover, .lc-d:hover, .lc-handle:hover, .ag-d:hover { box-shadow: 
    1120 in all, centred beside the rail; never edge to edge */
 [data-size="expanded"] .cal { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 400px); gap: 24px; align-items: start; max-width: 1120px; margin: 0 auto; }
 [data-size="expanded"] .cal-agenda { order: 1; margin: 0; max-width: none; }
-[data-size="expanded"] .lc { order: 2; margin: 0; border-radius: 16px; top: 8px; }
+[data-size="expanded"] .lc { order: 2; margin: 0; border-radius: 16px; top: 16px; background: var(--md-sys-color-surface-container-low); }
+[data-size="expanded"] .lc::after { display: none; }
+[data-size="expanded"] .lc-in { background: none; }
 [data-size="expanded"] .lc-in { padding: 8px 12px 12px; }
 [data-size="expanded"] .lc { box-shadow: none; }
 
@@ -292,7 +301,7 @@ button.lc-title:hover, .lc-d:hover, .lc-handle:hover, .ag-d:hover { box-shadow: 
 
 /* ---------- Insights (Task 5) ---------- */
 .ins { max-width: 720px; margin: 0 auto; width: 100%; display: flex; flex-direction: column; gap: 16px; }
-.ins { padding-bottom: 80px; }
+.ins { padding: 16px 0 80px; }
 [data-size="medium"] .ins, [data-size="expanded"] .ins { padding-bottom: 0; }
 .ins-panes { display: flex; flex-direction: column; gap: 16px; min-width: 0; }
 .ins-col { display: flex; flex-direction: column; gap: 16px; min-width: 0; }

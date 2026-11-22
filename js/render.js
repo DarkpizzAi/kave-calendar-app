@@ -85,7 +85,7 @@ export function setView(name) {
      than jumping to #today, which sits below the controls. */
   markJump(300);
   main.scrollTop = 0;
-  showTopBar();
+  showTopBar(true);
   render();
   /* again, once the new tab is drawn: setting 0 while the Calendar's snap
      was still on snapped the list to its first day, and the next tab opened
