@@ -189,6 +189,8 @@ button.lc-title:hover, .lc-d:hover, .lc-handle:hover, .ag-d:hover { box-shadow: 
 .lc-ghost { position: absolute; z-index: 0; border-radius: 12px; background: var(--md-sys-color-secondary-container); pointer-events: none; will-change: transform; }
 .lc-d.sel.arriving { background: none; }
 .lc-d.today .wd, .lc-d.today .dn { color: var(--kave-today); font-weight: 700; }
+/* selected, today keeps its weight and takes the box's text colour: the accent on the accent fade is too faint */
+.lc-d.today.sel .wd, .lc-d.today.sel .dn { color: inherit; }
 .lc-handle { display: flex; justify-content: center; align-items: center; width: 100%; height: 20px; border-radius: 10px; }
 .lc-handle span { width: 32px; height: 4px; border-radius: 2px; background: var(--md-sys-color-on-surface-variant); opacity: .4; }
 [data-size="expanded"] .lc-d.mc { min-height: 72px; }
@@ -219,6 +221,7 @@ button.lc-title:hover, .lc-d:hover, .lc-handle:hover, .ag-d:hover { box-shadow: 
 .ag-dw, .ag-dn { transition: color 150ms linear; }
 .ag.sel .ag-dw { color: inherit; }
 .ag.today .ag-dw, .ag.today .ag-dn { color: var(--kave-today); font-weight: 700; }
+.ag.today.sel .ag-dw, .ag.today.sel .ag-dn { color: inherit; }
 .ag-evs { position: relative; z-index: 1; flex: 1; display: flex; flex-direction: column; gap: 6px; min-width: 0; }
 .ag.empty .ag-evs { min-height: 48px; justify-content: center; }
 .ag-note { color: var(--md-sys-color-on-surface-variant); }
@@ -279,7 +282,7 @@ button.lc-title:hover, .lc-d:hover, .lc-handle:hover, .ag-d:hover { box-shadow: 
 .m3-page.form-sheet { padding-bottom: env(safe-area-inset-bottom, 0px); }
 .m3-dialog.form-sheet { width: min(600px, calc(100% - 48px)); height: min(86%, 760px); }
 .form-sheet .sbody { gap: 12px; padding-top: 16px; padding-bottom: calc(32px + env(safe-area-inset-bottom, 0px)); }
-.form-sheet .m3-list-header { padding-left: 4px; min-height: 40px; }
+.form-sheet .m3-list-header { padding-left: 4px; min-height: 40px; color: var(--md-sys-color-on-surface); }
 .sbody .m3-list-header { padding-left: 4px; min-height: 40px; margin-top: 8px; }
 .sbody .pad { padding: 16px; }
 .sbody > .m3-grouped { flex: none; }
@@ -393,7 +396,7 @@ button.m3-list-item, a.m3-list-item { width: 100%; text-align: left; text-decora
 .todo.done .m3-body-l { text-decoration: line-through; color: var(--md-sys-color-on-surface-variant); }
 
 /* the form */
-.fsec-h { margin: 0 0 8px 4px; color: var(--md-sys-color-primary); }
+.fsec-h { margin: 0 0 8px 4px; color: var(--md-sys-color-on-surface); }
 .fgrid { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 12px; }
 .fcol { display: flex; flex-direction: column; gap: 16px; }
 .fld { padding-right: 4px; cursor: default; }
@@ -404,7 +407,7 @@ button.m3-list-item, a.m3-list-item { width: 100%; text-align: left; text-decora
 .m3-field:has(textarea) { align-items: flex-start; }
 .form-del { align-self: flex-start; margin-top: 8px; }
 .picker { gap: 8px; }
-.catgroup { margin: 8px 0 0 4px; color: var(--md-sys-color-primary); }
+.catgroup { margin: 8px 0 0 4px; color: var(--md-sys-color-on-surface); }
 .cat-chip { background: var(--kave-kc); color: var(--kave-onkc); border-color: transparent; padding-left: 8px; }
 .emogrid { display: grid; grid-template-columns: repeat(auto-fill, minmax(48px, 1fr)); gap: 8px; }
 .emobtn { height: 52px; border-radius: 16px; background: var(--kave-kc); color: var(--kave-onkc); font-size: 24px; display: grid; place-items: center; }
