@@ -265,6 +265,8 @@ export function afterCalendar(mn, before) {
    sixth row, the safe area) come through one observer, moved to each new
    strip. */
 const GAP = 8;
+/* wide: no strip above the agenda, so the first day rests 16 under the bar (the spec's rule), level with the grid card */
+const GAP_WIDE = 16;
 let stripObs = null;
 function placePin() {
   const mn = view(), probe = mn && mn.querySelector(".ag-pin"), t = stripEl();
@@ -272,7 +274,7 @@ function placePin() {
   const bar = document.getElementById("topBar"), barH = barHeight();
   const inset = bar ? parseFloat(getComputedStyle(bar).paddingTop) || 0 : 0;
   /* sticky offsets count from below the room #view keeps for the bar */
-  const pin = (expanded() ? 0 : t.offsetHeight) + GAP;
+  const pin = expanded() ? GAP_WIDE : t.offsetHeight + GAP;
   probe.style.top = `${pin}px`;
   /* the snap line is where the line will be once the bar rests, so a day
      snapped while the bar is still moving is already in the right place */
@@ -299,8 +301,8 @@ let shift = 0;
 /* How far up the strip and the box may follow the bar. A phone: up to the
    status bar (the bar's safe-area padding). A wide window: they stop 28px
    from the top, level with the menu icon in the rail (Isa, 05/11/2026), so
-   20px short of the 8px they sit under a showing bar. */
-const RAIL_ALIGN = 20;
+   12px short of the 16px they sit under a showing bar. */
+const RAIL_ALIGN = 12;
 function lowestShift(H, inset) { return -(H - inset - (expanded() ? RAIL_ALIGN : 0)); }
 function followBar(o, H) {
   const bar = document.getElementById("topBar");
