@@ -37,6 +37,11 @@ a { color: var(--md-sys-color-primary); }
 .app-header .m3-top-bar__title { margin: 0; font-weight: 400; }
 .app-spacer { width: 48px; flex: none; }
 #view { flex: 1; min-height: 0; overflow-y: auto; padding: var(--header-h, 64px) 16px 24px; }
+/* the page panel (kit: html[data-panel], .m3-panel): #view is it, the bars are the chrome. The rail is a sibling of
+   .app-col here, so the panel's left gutter is 6 on every window; the window-top cap (shown when the bar has scrolled
+   away) is the one thing that sits beside the rail */
+[data-size="medium"], [data-size="expanded"] { --kave-panel-left: 6px; }
+[data-size="medium"] body::before, [data-size="expanded"] body::before { left: 102px; }
 .view-leaving { position: absolute; left: 0; right: 0; pointer-events: none; overflow: hidden; }
 
 .app-nav-bar { flex: none; padding-bottom: calc(16px + env(safe-area-inset-bottom, 0px)); height: auto; min-height: 80px; }
@@ -134,10 +139,8 @@ body.gated .app-header, body.gated .app-nav-bar, body.gated .app-rail, body.gate
 #view.is-cal { scroll-snap-type: y mandatory; }
 #view.is-cal.gliding, #view.is-cal.settling, #view.is-cal.fast { scroll-snap-type: none; }
 .cal { position: relative; }
-/* One exception to the plain top bar (Isa, 06/11/2026): over the Calendar it
-   takes the strip's fill, so bar and strip read as one surface. Not in the
-   wide layout, where the strip is a card of its own. */
-html:not([data-size="expanded"]) .app-col:has(#view.is-cal) .app-header { background: var(--md-sys-color-surface-container-low); }
+/* The top bar is the chrome over the Calendar too (22/11/2026, the page panel): the strip below is a card on the panel.
+   The 06/11/2026 exception that gave the bar the strip's fill is retired. */
 .lc {
   position: sticky; top: 0; z-index: 1; overflow: hidden;
   margin: 0 -16px; border-radius: 0 0 24px 24px;
@@ -254,7 +257,7 @@ button.lc-title:hover, .lc-d:hover, .lc-handle:hover, .ag-d:hover { box-shadow: 
    1120 in all, centred beside the rail; never edge to edge */
 [data-size="expanded"] .cal { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 400px); gap: 24px; align-items: start; max-width: 1120px; margin: 0 auto; }
 [data-size="expanded"] .cal-agenda { order: 1; margin: 0; max-width: none; }
-[data-size="expanded"] .lc { order: 2; margin: 0; border-radius: 24px; top: 8px; }
+[data-size="expanded"] .lc { order: 2; margin: 0; border-radius: 16px; top: 8px; }
 [data-size="expanded"] .lc-in { padding: 8px 12px 12px; }
 [data-size="expanded"] .lc { box-shadow: none; }
 
@@ -307,7 +310,7 @@ button.lc-title:hover, .lc-d:hover, .lc-handle:hover, .ag-d:hover { box-shadow: 
 .ins-hero__t, .ins-hero__m, .ins-hero__h { margin: 0; overflow-wrap: anywhere; }
 .ins-hero--empty { align-items: flex-start; }
 .ins-hero__icon { width: 48px; height: 48px; border-radius: 50%; display: grid; place-items: center; background: color-mix(in srgb, currentColor 14%, transparent); }
-.ins-card { background: var(--md-sys-color-surface-container-low); color: var(--md-sys-color-on-surface); border-radius: 24px; padding: 16px; display: flex; flex-direction: column; gap: 12px; min-width: 0; --tbg: var(--md-sys-color-surface-container-low); }
+.ins-card { background: var(--md-sys-color-surface-container-low); color: var(--md-sys-color-on-surface); border-radius: 16px; padding: 16px; display: flex; flex-direction: column; gap: 12px; min-width: 0; --tbg: var(--md-sys-color-surface-container-low); }
 .ins-card .m3-btn--text { margin-right: -8px; }
 .ins-wide { align-self: flex-start; }
 .ins-shapes { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; }
@@ -330,7 +333,7 @@ button.lc-title:hover, .lc-d:hover, .lc-handle:hover, .ag-d:hover { box-shadow: 
 #sheetRoot .hc-svg { width: 100%; height: auto; display: block; overflow: visible; fill: initial; stroke: none; }
 .hc-bar { fill: var(--kave-kf, var(--kave-k)); } /* the strong fill, as the agenda's events (Isa, 05/11/2026) */
 .hc-base { stroke: var(--md-sys-color-outline-variant); stroke-width: 1; }
-.hc-n, .hc-y { text-anchor: middle; font-size: 11px; font-weight: 500; letter-spacing: .5px; }
+.hc-n, .hc-y { text-anchor: middle; font-size: 11px; font-weight: 500; letter-spacing: 0; }
 .hc-n { fill: var(--md-sys-color-on-surface); }
 .hc-y { fill: var(--md-sys-color-on-surface-variant); }
 .ins-filters { flex: none; }
@@ -400,7 +403,7 @@ button.m3-list-item, a.m3-list-item { width: 100%; text-align: left; text-decora
 .fgrid { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 12px; }
 .fcol { display: flex; flex-direction: column; gap: 16px; }
 .fld { padding-right: 4px; cursor: default; }
-.fld-main { flex: 1; min-width: 0; height: 54px; text-align: left; font-size: 16px; letter-spacing: .5px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.fld-main { flex: 1; min-width: 0; height: 54px; text-align: left; font-size: 16px; letter-spacing: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .fld-main.is-empty { color: var(--md-sys-color-on-surface-variant); }
 .fld-ic { color: var(--md-sys-color-on-surface-variant); margin: 0 8px 0 4px; }
 .m3-field textarea { resize: vertical; padding: 14px 0; font: inherit; font-size: 16px; }
@@ -430,8 +433,8 @@ button.m3-list-item, a.m3-list-item { width: 100%; text-align: left; text-decora
 .dp-head { padding: 16px 24px 12px; display: flex; flex-direction: column; gap: 8px; flex: none; }
 .dp-nav { display: flex; align-items: center; padding: 4px 12px 0 24px; flex: none; }
 .dp-grid { display: grid; grid-template-columns: repeat(7, 40px); justify-content: center; gap: 4px; padding: 4px 12px; flex: none; }
-.dp-w { height: 40px; display: grid; place-items: center; font-size: 16px; line-height: 24px; letter-spacing: .5px; color: var(--md-sys-color-on-surface); }
-.dp-d { width: 40px; height: 40px; border-radius: 50%; display: grid; place-items: center; font-size: 16px; line-height: 24px; letter-spacing: .5px; font-variant-numeric: tabular-nums; color: var(--md-sys-color-on-surface); }
+.dp-w { height: 40px; display: grid; place-items: center; font-size: 16px; line-height: 24px; letter-spacing: 0; color: var(--md-sys-color-on-surface); }
+.dp-d { width: 40px; height: 40px; border-radius: 50%; display: grid; place-items: center; font-size: 16px; line-height: 24px; letter-spacing: 0; font-variant-numeric: tabular-nums; color: var(--md-sys-color-on-surface); }
 .dp-d.today { box-shadow: inset 0 0 0 1px var(--md-sys-color-primary); color: var(--md-sys-color-on-surface); } /* the ring marks today, as Material; on the dialog the number keeps the text colour (accent as text fails AA there) */
 /* the picked day and time take the accent (two fills only, Isa, 06/11/2026): white on primary is 3.59 in Cobalt dark */
 .dp-d.on { background: var(--md-sys-color-primary-container); color: var(--md-sys-color-on-primary-container); box-shadow: none; }
@@ -446,7 +449,7 @@ button.m3-list-item, a.m3-list-item { width: 100%; text-align: left; text-decora
 .tp-dial svg { position: absolute; inset: 0; width: 256px; height: 256px; }
 .tp-hand { stroke: var(--md-sys-color-primary); stroke-width: 2; }
 .tp-pivot { fill: var(--md-sys-color-primary); }
-.tp-n { position: absolute; width: 40px; height: 40px; margin: -20px 0 0 -20px; border-radius: 50%; display: grid; place-items: center; font-size: 16px; letter-spacing: .5px; color: var(--md-sys-color-on-surface); font-variant-numeric: tabular-nums; }
+.tp-n { position: absolute; width: 40px; height: 40px; margin: -20px 0 0 -20px; border-radius: 50%; display: grid; place-items: center; font-size: 16px; letter-spacing: 0; color: var(--md-sys-color-on-surface); font-variant-numeric: tabular-nums; }
 .tp-n.in { width: 32px; height: 32px; margin: -16px 0 0 -16px; color: var(--md-sys-color-on-surface-variant); }
 .tp-n.on { background: var(--md-sys-color-primary-container); color: var(--md-sys-color-on-primary-container); }
 
@@ -469,7 +472,7 @@ body:has(.layer-host) #page, body:has(.layer-host) #searchPage { z-index: 19; }
 .sync-bar { position: absolute; left: 0; right: 0; bottom: 0; }
 .sync-bar[hidden] { display: none; }
 .ar-years { padding: 0 4px; }
-.ar-card { background: var(--md-sys-color-surface-container-low); color: var(--md-sys-color-on-surface); border-radius: 24px; padding: 16px; display: flex; flex-direction: column; gap: 12px; min-width: 0; }
+.ar-card { background: var(--md-sys-color-surface-container-low); color: var(--md-sys-color-on-surface); border-radius: 16px; padding: 16px; display: flex; flex-direction: column; gap: 12px; min-width: 0; }
 .ar-head { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; }
 .ar-head h2 { margin: 0; }
 .ar-d { pointer-events: none; min-height: 52px; }
