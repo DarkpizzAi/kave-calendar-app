@@ -476,10 +476,26 @@ test("guess: whole words only, accents and case folded, short or empty titles sa
   eq(g(null), null);
 });
 test("guess: the form suggests until a person picks or removes a category by hand", () => {
-  eq(suggestFor({ manual: false, title: "Dinner with Sara", current: [] }), [{ type: "eating", icon: "🍴" }]);
-  eq(suggestFor({ manual: false, title: "Dinner with Sara", current: [{ type: "eating", icon: "🍴" }] }), null, "nothing to change");
-  eq(suggestFor({ manual: false, title: "Concert", current: [{ type: "eating", icon: "🍴" }] }), [{ type: "live-music", icon: "🎶" }], "the title changed its mind");
-  eq(suggestFor({ manual: false, title: "Hmm", current: [{ type: "eating", icon: "🍴" }] }), [], "no longer says anything: the suggestion goes");
-  eq(suggestFor({ manual: true, title: "Concert", current: [{ type: "eating", icon: "🍴" }] }), null, "picked by hand: never again");
-  eq(suggestFor({ manual: true, title: "Concert", current: [] }), null, "removed by hand: stays empty");
+  const eat = { type: "eating", icon: "🍴" };
+  eq(suggestFor({ manual: false, title: "Dinner with Sara", current: null }), eat);
+  eq(suggestFor({ manual: false, title: "Dinner with Sara", current: eat }), undefined, "nothing to change");
+  eq(suggestFor({ manual: false, title: "Concert", current: eat }), { type: "live-music", icon: "🎶" }, "the title changed its mind");
+  eq(suggestFor({ manual: false, title: "Hmm", current: eat }), null, "no longer says anything: the suggestion goes");
+  eq(suggestFor({ manual: true, title: "Concert", current: eat }), undefined, "picked by hand: never again");
+  eq(suggestFor({ manual: true, title: "Concert", current: null }), undefined, "removed by hand: stays empty");
+});
+
+import { activitiesOf } from "../js/icons.js";
+test("one category per event: category is read first, an old activities list still reads whole", () => {
+  eq(activitiesOf({ category: { type: "eating", icon: "🍴" }, activities: [{ type: "drinks" }] }), [{ type: "eating", icon: "🍴" }]);
+  eq(activitiesOf({ activities: [{ type: "live-music" }, { type: "transport" }] }).map((a) => a.type), ["live-music", "transport"]);
+  eq(activitiesOf({}), []);
+  eq(activitiesOf(null), []);
+});
+test("one category per event: Grid, icons and away read the single category", () => {
+  const e = { id: "e1", title: "Dinner", owner: "isa", start: "2026-05-01", category: { type: "eating", icon: "🍴" }, links: [], checklist: [] };
+  eq(iconsOf(e, "isa"), ["🍴"]);
+  const trip = { ...e, id: "e2", title: "Travel", category: { type: "transport", icon: "🛫" } };
+  ok(isAway(trip) && !isAway(e));
+  eq(pickDayIcon([e, trip], "2026-05-01", { me: "isa" }).e.id, "e2", "the away category outranks eating");
 });

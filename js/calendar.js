@@ -24,7 +24,7 @@ import { indexByDay, eventsOn, pickDayIcon, iconsOf, todaysCount as cmTodaysCoun
 import { tick, brrr, calm } from "./haptics.js";
 import { openLevel } from "./sheet.js";
 import { ms, offlineCardHtml } from "./chrome-icons.js";
-import { iconFor } from "./icons.js";
+import { iconFor, activitiesOf } from "./icons.js";
 import { play, EASE, motionFactor } from "../m3/kave-m3.js";
 import { showTopBar, onBarMove, barOffset, barHeight, barTarget } from "./top-bar.js";
 
@@ -176,7 +176,7 @@ function stripMoving(ms) {
 }
 
 /* ---- the agenda ---- */
-const firstType = (e) => (e.activities && e.activities[0] && e.activities[0].type) || "none";
+const firstType = (e) => (activitiesOf(e)[0] || {}).type || "none";
 
 function card(e, d) {
   const theirs = frame.grey(e);

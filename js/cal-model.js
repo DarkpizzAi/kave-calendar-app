@@ -4,7 +4,7 @@
 "use strict";
 
 import { addDays, dayOfWeek, mondayOf, daysOf } from "./dates.js";
-import { CATEGORIES, iconFor } from "./icons.js";
+import { CATEGORIES, iconFor, activitiesOf } from "./icons.js";
 import { applyDetail } from "./filter.js";
 import { statusOf } from "./model.js";
 
@@ -48,7 +48,7 @@ export function indexByDay(events) {
 const covers = (e, d) => !e.deleted && e.start <= d && lastDay(e) >= d;
 export const eventsOn = (events, d) => indexByDay(events.filter((e) => covers(e, d))).get(d) || [];
 
-const has = (e, types) => (e.activities || []).some((a) => types.includes(a.type));
+const has = (e, types) => activitiesOf(e).some((a) => types.includes(a.type));
 /* The "who is away" categories. Exported: Grid ranks a day's emoji by it. */
 export const AWAY = ["transport", "accommodation", "business-trip"];
 
@@ -110,7 +110,7 @@ export function pickDayIcon(evs, d, { order = DAY_PRIORITY, me = null } = {}) {
   const span = order.length + 2;
   for (const e of evs) {
     const theirs = me && e.owner !== me && e.owner !== "shared" ? 1 : 0;
-    const acts = e.activities && e.activities.length ? e.activities : [{ type: "none" }];
+    const acts = activitiesOf(e).length ? activitiesOf(e) : [{ type: "none" }];
     for (const a of acts) {
       const key = theirs * span * 2 + dayRank(a, e, d, order) + 1;
       if (key < bestKey) { bestKey = key; best = { a, e }; }
@@ -198,7 +198,7 @@ export function todaysCount(eventsToday, me, day) {
 /* The emoji for an event, drawn for this viewer. A dated idea shows ❔. */
 export function iconsOf(e, viewer) {
   if (e.status === "idea") return ["❔"];
-  const acts = e.activities && e.activities.length ? e.activities : [{ type: "none" }];
+  const acts = activitiesOf(e).length ? activitiesOf(e) : [{ type: "none" }];
   return acts.map((a) => iconFor(a, e, viewer));
 }
 

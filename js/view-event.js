@@ -12,7 +12,7 @@ import { escapeHtml as esc, safeUrl, appHref, copyText } from "./util.js";
 import { todayKey } from "./dates.js";
 import { newEvent, STATUS_LABEL, statusOf } from "./model.js";
 import { CATEGORIES as MONEY, formatCents, visibleCosts, toCents } from "./money.js";
-import { CATEGORIES, GROUPS, iconFor, categoryOf, onlyIcon } from "./icons.js";
+import { CATEGORIES, GROUPS, iconFor, categoryOf, onlyIcon, activitiesOf } from "./icons.js";
 import { readForm, costDefaults, canChangeCost, addTask, addCost, addLinkTo, whenParts, mapsUrl, isMapsUrl, toDraft, costPayerText, mergeDraftCosts,
   spanAfterStartChange, spanAfterEndChange, copyToDay, replaceCost, replaceTask, replaceLink, findLinkIndex, statusChoice, draftKey, isDirty, ownerChoices, defaultOwner } from "./event-form.js";
 import { defaultCity, shownStatus, categoryGroup, iconsOf } from "./cal-model.js";
@@ -69,7 +69,7 @@ const chips = (key, opts, cur) => `<div class="m3-chips" role="radiogroup">${opt
 const field = (f, label, val, extra = "") =>
   `<label class="m3-field${needing === f ? " is-error" : ""}"><span class="m3-field__label">${esc(label)}</span>`
   + `<input class="m3-field__input" data-f="${f}" value="${esc(val)}" autocomplete="off"${extra}></label>`;
-const firstType = (e) => (e.activities && e.activities[0] && e.activities[0].type) || "none";
+const firstType = (e) => (activitiesOf(e)[0] || {}).type || "none";
 
 function costRow(k, removable) {
   const meta = [MONEY_LABEL[k.category] || k.category, costPayerText(k, me())].filter(Boolean).join(" · ");
@@ -117,7 +117,7 @@ function linkAttrs(u) {
 function eventPage(e) {
   const theirs = detailGrey(e);
   const group = theirs ? "other" : categoryGroup(firstType(e));
-  const acts = (e.activities || []).map((a) => categoryOf(a.type).label).join(", then ");
+  const acts = activitiesOf(e).map((a) => categoryOf(a.type).label).join(", then ");
   const { date, time } = whenParts(e, thisYear());
   const status = shownStatus(e);
   const statusText = STATUS_LABEL[statusOf({ status })];
@@ -179,7 +179,7 @@ function eventPage(e) {
 function blank(date) {
   const start = date || todayKey();
   const city = defaultCity(data.events(), start);
-  return { title: "", start, end: "", startTime: "", endTime: "", owner: defaultOwner(me()), status: "planned", activities: [],
+  return { title: "", start, end: "", startTime: "", endTime: "", owner: defaultOwner(me()), status: "planned", category: null,
     city: city[0].toUpperCase() + city.slice(1), venue: "", guests: "", notes: "", refs: "", links: [], checklist: [], costs: [], newCost: null };
 }
 
@@ -194,13 +194,13 @@ const when = (label, which, day, time) =>
   + dtField("Time", "schedule", time, "All day", "picktime", which, true) + "</div></div>";
 
 function activityBlock(d) {
-  const rows = d.activities.map((a, i) => {
-    const g = categoryGroup(a.type);
-    return li({ leadHtml: `<span class="m3-list-item__lead m3-list-item__lead--square m3-emoji" style="${kaveKey(g)}" aria-hidden="true">${esc(iconFor(a, d, me()))}</span>`,
-      text: categoryOf(a.type).label, sub: i ? "Then" : !catManual ? "Suggested from the title" : "",
-      trail: `<button type="button" class="m3-icon-btn" data-act="rmact" data-i="${i}" aria-label="Remove ${esc(categoryOf(a.type).label)}">${ms("close")}</button>` });
-  });
-  if (!picker) return grouped([...rows, addRow(d.activities.length ? "Add what happens next" : "Add an activity", "addact")]);
+  /* one category per event (spec 2026-11-23): its row, tapped to change it, with a button to clear it */
+  const c = d.category;
+  const rows = c ? [li({ leadHtml: `<span class="m3-list-item__lead m3-list-item__lead--square m3-emoji" style="${kaveKey(categoryGroup(c.type))}" aria-hidden="true">${esc(iconFor(c, d, me()))}</span>`,
+    text: categoryOf(c.type).label, sub: !catManual ? "Suggested from the title" : "",
+    main: { tag: "button", attrs: ' data-act="addact"' },
+    trail: `<button type="button" class="m3-icon-btn" data-act="rmact" aria-label="Remove ${esc(categoryOf(c.type).label)}">${ms("close")}</button>` })] : [];
+  if (!picker) return grouped([...rows, ...(c ? [] : [addRow("Pick a category", "addact")])]);
   let pick;
   if (picker === "cat") {
     pick = `<div class="m3-stack picker">${GROUPS.map((g) => {
@@ -417,9 +417,9 @@ function onInput(t) {
    (catManual) or the title stops saying it. Only the category block is redrawn, so typing keeps its
    place. */
 function suggestCategory() {
-  const next = suggestFor({ manual: catManual, title: draft.title, current: draft.activities });
-  if (!next) return;
-  draft.activities = next;
+  const next = suggestFor({ manual: catManual, title: draft.title, current: draft.category });
+  if (next === undefined) return;
+  draft.category = next;
   const blk = document.querySelector("#sheetRoot [data-actblock]");
   if (blk) blk.innerHTML = activityBlock(draft);
 }
@@ -579,9 +579,9 @@ function onFormAction(b, l) {
   else if (a === "pickback") picker = "cat";
   else if (a === "pickcat") {
     const only = onlyIcon(b.dataset.c);
-    if (only) { d.activities.push({ type: b.dataset.c, icon: only }); picker = null; } else picker = b.dataset.c;
-  } else if (a === "pickicon") { d.activities.push({ type: picker, icon: categoryOf(picker).icons[Number(b.dataset.i)].icon }); picker = null; }
-  else if (a === "rmact") d.activities.splice(Number(b.dataset.i), 1);
+    if (only) { d.category = { type: b.dataset.c, icon: only }; picker = null; } else picker = b.dataset.c;
+  } else if (a === "pickicon") { d.category = { type: picker, icon: categoryOf(picker).icons[Number(b.dataset.i)].icon }; picker = null; }
+  else if (a === "rmact") d.category = null;
   else if (a === "rmtodo") d.checklist.splice(Number(b.dataset.i), 1);
   else if (a === "rmlink") d.links.splice(Number(b.dataset.i), 1);
   else if (a === "rmcost") d.costs = d.costs.filter((k) => k.id !== b.dataset.k || !canChangeCost(k));

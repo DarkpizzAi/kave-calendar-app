@@ -22,6 +22,7 @@ import { holidayOn, isProvisional } from "./holidays.js";
 import { iconsOf, guestsExcludingViewer, rowMeta, categoryGroup, gesture, hasOpenTodos } from "./cal-model.js";
 import { frameNow, detailGrey, dayEvents } from "./calendar.js";
 import { ms } from "./chrome-icons.js";
+import { activitiesOf } from "./icons.js";
 import { splitLinks, ticketButton } from "./tickets.js";
 import { enterLayer, exitLayer, sharedAxisIn, sharedAxisOut, play, EASE, motionFactor, showSnackbar } from "../m3/kave-m3.js";
 
@@ -61,7 +62,7 @@ function title(l) {
 }
 
 /* ---------- the day level ---------- */
-const firstType = (e) => (e.activities && e.activities[0] && e.activities[0].type) || "none";
+const firstType = (e) => (activitiesOf(e)[0] || {}).type || "none";
 
 function dayCard(e, f, d) {
   const theirs = detailGrey(e);

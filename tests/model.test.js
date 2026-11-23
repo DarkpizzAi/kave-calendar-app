@@ -6,8 +6,8 @@ const LATER = new Date("2026-09-24T11:00:00Z");
 
 test("newEvent fills defaults", () => {
   const e = newEvent({ title: "La Colectiva", start: "2026-09-26" }, { me: "isa", now: NOW });
-  eq([e.owner, e.status, e.activities, e.links, e.deleted, e.source.kind, e.updated.by, e.costs.length],
-     ["isa", "planned", [], [], false, "app", "isa", 0]);
+  eq([e.owner, e.status, e.category.type, e.links, e.deleted, e.source.kind, e.updated.by, e.costs.length],
+     ["isa", "planned", "none", [], false, "app", "isa", 0]);
   ok(e.id.startsWith("ev_"));
 });
 test("an event needs a title and an exact day", () => {
@@ -20,10 +20,12 @@ test("newEvent refuses an invalid event, and refuses without a person (Review Fo
   await throws(() => newEvent({ title: " ", start: "2026-09-26" }, { me: "isa", now: NOW }));
   await throws(() => newEvent({ title: "x", start: "2026-09-26" }, { me: "", now: NOW }));
 });
-test("activities keep their order; the first is the main one", () => {
-  const e = newEvent({ title: "Night out", start: "2026-09-26",
-    activities: [{ type: "eating", icon: "🍝" }, { type: "drinks", icon: "🍸" }, { type: "clubbing", icon: "🪩" }] }, { me: "isa", now: NOW });
-  eq(e.activities.map((a) => a.type), ["eating", "drinks", "clubbing"]);
+test("an event has one category; without one it is Other", () => {
+  const e = newEvent({ title: "Dinner", start: "2026-09-26", category: { type: "eating", icon: "🍝" } }, { me: "isa", now: NOW });
+  eq(e.category, { type: "eating", icon: "🍝" });
+  ok(!("activities" in e), "the old list is not written any more");
+  eq(newEvent({ title: "x", start: "2026-09-26", category: null }, { me: "isa", now: NOW }).category, { type: "none", icon: "📌" });
+  eq(validateEvent({ title: "x", start: "2026-10-02", category: { type: "", icon: "🍸" } }), ["the category needs a type"]);
 });
 test("an activity needs a known shape", () => {
   eq(validateEvent({ title: "x", start: "2026-10-02", activities: [{ type: "", icon: "🍸" }] }), ["every activity needs a category"]);

@@ -58,12 +58,13 @@ export function guessCategory(title) {
   return { type: hit.type, icon };
 }
 
-/* What the form's category list should become after the title changed: null for "leave it", else the new
-   list (the guess, or empty when the title no longer says anything). A person's own pick or removal
+/* What the form's category should become after the title changed: undefined for "leave it", else the new
+   category (the guess), or null when the title no longer says anything. A person's own pick or removal
    (manual) ends the suggestions for that form. */
 export function suggestFor({ manual, title, current }) {
-  if (manual) return null;
+  if (manual) return undefined;
   const g = guessCategory(title);
-  const next = g ? [{ type: g.type, icon: g.icon }] : [];
-  return JSON.stringify(next) === JSON.stringify(current || []) ? null : next;
+  const next = g ? { type: g.type, icon: g.icon } : null;
+  const same = (!next && !current) || (next && current && next.type === current.type && next.icon === current.icon);
+  return same ? undefined : next;
 }

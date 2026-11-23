@@ -27,6 +27,7 @@ export function validateEvent(e) {
     if (!isValidDate(e.end) || precision(e.end) !== "day") errors.push("end must be an exact day");
     else if (compareDates(e.end, e.start) < 0) errors.push("end is before start");
   }
+  if (e.category && !e.category.type) errors.push("the category needs a type");
   if ((e.activities || []).some((a) => !a || !a.type)) errors.push("every activity needs a category");
   return errors;
 }
@@ -50,7 +51,7 @@ export function newEvent(fields, { me, now }) {
     start: fields.start, end: fields.end || null,
     startTime: fields.startTime || "", endTime: fields.endTime || "",
     status: fields.status || "planned",
-    activities: fields.activities || [],
+    category: fields.category && fields.category.type ? { type: fields.category.type, icon: fields.category.icon } : { type: "none", icon: "📌" },
     city: fields.city || "", venue: fields.venue || "",
     bookingRefs: fields.bookingRefs || [], links: [],
     guests: fields.guests || "", notes: fields.notes || "",

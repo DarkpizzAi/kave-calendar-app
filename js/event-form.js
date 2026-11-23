@@ -6,6 +6,7 @@ import { validateEvent, newEvent, addLink } from "./model.js";
 import { newCostLine, toCents, EDITABLE_STATES } from "./money.js";
 import { linkTier, shownStatus } from "./cal-model.js";
 import { safeUrl, uid } from "./util.js";
+import { activitiesOf } from "./icons.js";
 import { dayOfWeek, daysOf, addDays } from "./dates.js";
 
 const LONGDOW = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"];
@@ -28,7 +29,7 @@ export function readForm(raw) {
     title: t(raw.title), start: t(raw.start), end: t(raw.end) || null,
     startTime: t(raw.startTime), endTime: t(raw.endTime),
     owner: raw.owner || "shared", status: raw.status || "planned",
-    activities: (raw.activities || []).filter((a) => a && a.type),
+    category: raw.category && raw.category.type ? { type: raw.category.type, icon: raw.category.icon } : null,
     city: t(raw.city).toLowerCase(), venue: t(raw.venue), guests: t(raw.guests), notes: t(raw.notes),
     bookingRefs: t(raw.refs).split(",").map(t).filter(Boolean),
     links: (raw.links || []).map((l) => ({ ...l, label: t(l.label) || "Link", url: safeUrl(t(l.url)) })).filter((l) => l.url),
@@ -47,7 +48,7 @@ const COST_FOR = {
   "at-ours": "food/groceries", celebration: "gifts-donations/gifts",
 };
 export function costDefaults(event, me) {
-  const a = (event.activities || []).find((x) => COST_FOR[x.type]);
+  const a = activitiesOf(event).find((x) => COST_FOR[x.type]);
   return { category: a ? COST_FOR[a.type] : "travel/travel-other", payer: me, scope: event.owner === "shared" ? "shared" : "personal", state: "recorded", currency: "EUR" };
 }
 
@@ -131,7 +132,7 @@ export function toDraft(e) {
   const c = JSON.parse(JSON.stringify(e));
   return { ...c, refs: (c.bookingRefs || []).join(", "),
     city: c.city ? c.city[0].toUpperCase() + c.city.slice(1) : "",
-    activities: c.activities || [], links: c.links || [], checklist: c.checklist || [], costs: c.costs || [],
+    category: c.category && c.category.type ? c.category : (activitiesOf(c)[0] || null), links: c.links || [], checklist: c.checklist || [], costs: c.costs || [],
     newCost: null };
 }
 
@@ -188,7 +189,7 @@ export function copyToDay(e, day, { me, now }) {
   const fresh = newEvent({
     title: e.title, owner: e.owner, start: day, end: span ? addDays(day, span) : "",
     startTime: e.startTime || "", endTime: e.endTime || "", status: "planned",
-    activities: JSON.parse(JSON.stringify(e.activities || [])), city: e.city || "", venue: e.venue || "",
+    category: JSON.parse(JSON.stringify(activitiesOf(e)[0] || { type: "none", icon: "📌" })), city: e.city || "", venue: e.venue || "",
     guests: e.guests || "", notes: e.notes || "", links: JSON.parse(JSON.stringify(links)),
     checklist: (e.checklist || []).map((c) => ({ id: "ck_" + uid(), text: c.text, done: false, assignee: c.assignee || null })),
   }, { me, now });

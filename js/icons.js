@@ -44,6 +44,10 @@ export const CATEGORIES = [
   { type: "none", label: "Other", group: "Other", icons: [{ icon: "📌" }] },
 ];
 
+/* An event has ONE category (spec 2026-11-23): `category` is { type, icon }. A list of `activities` is the
+   old shape, still read (all of it) until the data has been migrated; the form only ever writes `category`. */
+export const activitiesOf = (e) => (e && e.category && e.category.type ? [e.category] : (e && e.activities) || []);
+
 const BY_TYPE = new Map(CATEGORIES.map((c) => [c.type, c]));
 export const categoryOf = (type) => BY_TYPE.get(type) || BY_TYPE.get("none");
 /* A category with exactly one possible icon has nothing to choose: the event

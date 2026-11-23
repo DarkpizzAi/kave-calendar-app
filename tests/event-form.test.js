@@ -32,10 +32,11 @@ test("event form: readForm reports a missing title or day", () => {
   ok(readForm({ title: "A", start: "" }).errors.length);
 });
 test("event form: cost defaults come from the event (spec)", () => {
-  eq(costDefaults(base({ activities: [{ type: "beach" }, { type: "transport" }] }), "hugo"),
+  eq(costDefaults(base({ category: { type: "transport" } }), "hugo"),
     { category: "travel/flights", payer: "hugo", scope: "personal", state: "recorded", currency: "EUR" });
-  eq(costDefaults(base({ owner: "shared", activities: [{ type: "eating" }] }), "isa").scope, "shared");
-  eq(costDefaults(base({ activities: [{ type: "birthday" }] }), "isa").category, "gifts-donations/gifts");
+  eq(costDefaults(base({ owner: "shared", category: { type: "eating" } }), "isa").scope, "shared");
+  eq(costDefaults(base({ category: { type: "birthday" } }), "isa").category, "gifts-donations/gifts");
+  eq(costDefaults({ ...base(), category: undefined, activities: [{ type: "beach" }, { type: "transport" }] }, "hugo").category, "travel/flights", "an old activities list still reads");
   eq(costDefaults(base(), "isa").category, "travel/travel-other");
 });
 test("event form: only estimate and recorded lines can change", () => {
@@ -76,7 +77,8 @@ test("M1: the when line never prints a typo'd far end date", () => {
 test("F44: toDraft defaults every list field, so editing an event missing them never crashes formPage", () => {
   const bare = { id: "ev_1", title: "Old event", start: "2020-01-01", owner: "isa", status: "planned" };
   const d = toDraft(bare);
-  eq([d.activities, d.links, d.checklist, d.costs], [[], [], [], []]);
+  eq([d.category, d.links, d.checklist, d.costs], [null, [], [], []]);
+  eq(toDraft({ ...bare, activities: [{ type: "eating", icon: "🍴" }, { type: "drinks", icon: "🍺" }] }).category, { type: "eating", icon: "🍴" }, "an old list reads as its first");
   eq(d.newCost, null);
 });
 test("F44: toDraft still carries over real lists and derived fields (refs, city)", () => {
@@ -87,11 +89,11 @@ test("F44: toDraft still carries over real lists and derived fields (refs, city)
   eq(d.links, [{ label: "RA", url: "https://ra.co/x" }]);
 });
 test("review: editing the draft never changes the event itself (Cancel must leave it as it was)", () => {
-  const e = base({ activities: [{ type: "eating", icon: "🍴" }], links: [{ label: "RA", url: "https://ra.co/x" }],
+  const e = base({ category: { type: "eating", icon: "🍴" }, links: [{ label: "RA", url: "https://ra.co/x" }],
     checklist: [{ id: "c1", text: "buy", done: false }], costs: [] });
   const d = toDraft(e);
-  d.activities.push({ type: "drinks" }); d.links[0].label = "changed"; d.checklist[0].text = "edited"; d.costs.push({ id: "k" });
-  eq([e.activities.length, e.links[0].label, e.checklist[0].text, e.costs.length], [1, "RA", "buy", 0]);
+  d.category.type = "drinks"; d.links[0].label = "changed"; d.checklist[0].text = "edited"; d.costs.push({ id: "k" });
+  eq([e.category.type, e.links[0].label, e.checklist[0].text, e.costs.length], ["eating", "RA", "buy", 0]);
 });
 
 test("F49: isMapsUrl recognises a Maps link typed into Venue, and rejects a plain place name", () => {

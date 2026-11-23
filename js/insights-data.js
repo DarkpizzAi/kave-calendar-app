@@ -4,6 +4,7 @@
 "use strict";
 import { daysOf, dayOfWeek, addDays } from "./dates.js";
 import { safeUrl } from "./util.js";
+import { activitiesOf } from "./icons.js";
 
 const PLANE_ICONS = ["🛫", "✈️", "🛬"];
 
@@ -36,7 +37,7 @@ const lastDay = (e) => { const d = daysOf(e); return d.length ? d[d.length - 1] 
    with none belongs nowhere. Flights need a plane icon (a train is not one); a Hangout counts as
    outdoors only with a park, sun or picnic icon (a hangout in a bar is not). */
 function inTile(e, tile) {
-  return (e.activities || []).some((a) => a && tile.types.includes(a.type) && (tile.key !== "flights" || PLANE_ICONS.includes(a.icon))
+  return activitiesOf(e).some((a) => a && tile.types.includes(a.type) && (tile.key !== "flights" || PLANE_ICONS.includes(a.icon))
     && (!tile.only || !tile.only[a.type] || tile.only[a.type].includes(a.icon)));
 }
 
@@ -83,7 +84,7 @@ export function history(events, key, today) {
 /* The hero's transport: any transport activity (plane, train, bus, car, boat),
    unlike the Flights tile, which counts planes only. */
 const ANY_TRANSPORT = { key: "transport", types: ["transport"] };
-const transportIcon = (e) => ((e.activities || []).find((a) => a && a.type === "transport" && a.icon) || {}).icon || "✈️";
+const transportIcon = (e) => (activitiesOf(e).find((a) => a && a.type === "transport" && a.icon) || {}).icon || "✈️";
 
 /* Every tile's count per year, for the History charts: one chart per tile
    with any events, all on the same run of years (the first year with data to
@@ -171,7 +172,7 @@ function top(map) { // highest count; ties go to the first key in insertion orde
 
 export function didYouKnow(events, year, seed) {
   const y = String(year);
-  const list = events.filter((e) => countable(e) && hasDay(e) && e.start.slice(0, 4) === y && (e.activities || []).length > 0);
+  const list = events.filter((e) => countable(e) && hasDay(e) && e.start.slice(0, 4) === y && activitiesOf(e).length > 0);
   if (list.length < 5) return "";
   const facts = [];
 
