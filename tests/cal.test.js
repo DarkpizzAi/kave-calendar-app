@@ -445,3 +445,41 @@ test("categories 23/11/2026: At ours keeps its icons to itself; other changes", 
   ok(categoryOf("health").icons.some((i) => i.icon === "🩻"), "x-ray");
   ok(categoryOf("activity").icons.some((i) => i.icon === "🏆"), "trophy, for a tournament to watch");
 });
+
+import { guessCategory, suggestFor } from "../js/guess-category.js";
+const g = (t) => { const r = guessCategory(t); return r ? [r.type, r.icon] : null; };
+test("guess: real titles from the calendar land in the right category", () => {
+  eq(g("Afterwork with Iván"), ["drinks", "🍺"]);
+  eq(g("Ramen"), ["eating", "🍴"]);
+  eq(g("Brunch Eletronik"), ["eating", "🥞"]);
+  eq(g("Tame Impala concert"), ["live-music", "🎶"]);
+  eq(g("Aniversário André"), ["birthday", "🎂"]);
+  eq(g("Isa's birthday dinner"), ["birthday", "🎂"], "the more specific rule wins");
+  eq(g("MongoDB EMEA Offsite"), ["work", "💼"]);
+  eq(g("Business trip to Rouen"), ["business-trip", "💼"]);
+  eq(g("10K at Roland Garros"), ["sport", "running"]);
+  eq(g("Roland Garros semi-final"), ["activity", "🏆"]);
+  eq(g("Flight to Porto"), ["transport", "✈️"]);
+  eq(g("Train to Madrid"), ["transport", "🚄"]);
+  eq(g("Dentista"), ["health", "🦷"]);
+  eq(g("Movie night at ours"), ["at-ours", "🛋️"], "At ours: its own default icon");
+  eq(g("Picnic in Ciutadella"), ["hangout", "🧺"]);
+  eq(g("Cinema Phenomena"), ["cinema", "🍿"]);
+});
+test("guess: whole words only, accents and case folded, short or empty titles say nothing", () => {
+  eq(g("Barcelona"), null, "bar is not inside barcelona");
+  eq(g("Wedding de Léa"), ["celebration", "🎉"]);
+  eq(g("CUMPLEAÑOS de Sara"), ["birthday", "🎂"]);
+  eq(g("Isa's Dirty Thirty"), null);
+  eq(g("ab"), null);
+  eq(g(""), null);
+  eq(g(null), null);
+});
+test("guess: the form suggests until a person picks or removes a category by hand", () => {
+  eq(suggestFor({ manual: false, title: "Dinner with Sara", current: [] }), [{ type: "eating", icon: "🍴" }]);
+  eq(suggestFor({ manual: false, title: "Dinner with Sara", current: [{ type: "eating", icon: "🍴" }] }), null, "nothing to change");
+  eq(suggestFor({ manual: false, title: "Concert", current: [{ type: "eating", icon: "🍴" }] }), [{ type: "live-music", icon: "🎶" }], "the title changed its mind");
+  eq(suggestFor({ manual: false, title: "Hmm", current: [{ type: "eating", icon: "🍴" }] }), [], "no longer says anything: the suggestion goes");
+  eq(suggestFor({ manual: true, title: "Concert", current: [{ type: "eating", icon: "🍴" }] }), null, "picked by hand: never again");
+  eq(suggestFor({ manual: true, title: "Concert", current: [] }), null, "removed by hand: stays empty");
+});

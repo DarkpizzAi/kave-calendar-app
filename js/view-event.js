@@ -33,6 +33,8 @@ const RUNG = { estimate: ["Estimate", "An estimate"], recorded: ["Recorded", "Re
 const personName = (p) => ({ isa: "Isa", hugo: "Hugo", shared: "Both of you" }[p] || "");
 
 let data = null;
+import { suggestFor } from "./guess-category.js";
+let catManual = true;   // false only on a new event whose category nobody has picked or removed by hand yet
 let draft = null;          // the form's values while "edit" or "new" is open
 let picker = null;         // the activity picker: null, "cat" or a category type
 let needing = null;        // which form field needs attention (drawn with is-error)
@@ -195,7 +197,7 @@ function activityBlock(d) {
   const rows = d.activities.map((a, i) => {
     const g = categoryGroup(a.type);
     return li({ leadHtml: `<span class="m3-list-item__lead m3-list-item__lead--square m3-emoji" style="${kaveKey(g)}" aria-hidden="true">${esc(iconFor(a, d, me()))}</span>`,
-      text: categoryOf(a.type).label, sub: i ? "Then" : "",
+      text: categoryOf(a.type).label, sub: i ? "Then" : !catManual ? "Suggested from the title" : "",
       trail: `<button type="button" class="m3-icon-btn" data-act="rmact" data-i="${i}" aria-label="Remove ${esc(categoryOf(a.type).label)}">${ms("close")}</button>` });
   });
   if (!picker) return grouped([...rows, addRow(d.activities.length ? "Add what happens next" : "Add an activity", "addact")]);
@@ -225,7 +227,7 @@ function formPage(d) {
   return field("title", "Title", d.title, ' placeholder="What is it?" aria-label="Title"')
     + when("Starts", "start", d.start, d.startTime)
     + when("Ends", "end", d.end || d.start, d.endTime)
-    + heading("Activity") + activityBlock(d)
+    + heading("Event category") + `<div data-actblock>${activityBlock(d)}</div>`
     + heading("Where") + `<div class="fcol">${field("venue", "Venue", d.venue)}${field("city", "City", d.city)}</div>`
     + heading("Who") + `<div class="fcol">${chips("owner", ownerChoices(me()), d.owner)}${field("guests", "Guests, first names", d.guests)}</div>`
     + heading("Status") + chips("status", STATUS_CHOICES, statusChoice(d))
@@ -408,6 +410,18 @@ function onInput(t) {
   const f = t.dataset.f; if (!f || !draft) return;
   if (needing === f) { needing = null; const w = t.closest(".m3-field"); if (w) w.classList.remove("is-error"); }
   draft[f] = t.value;
+  if (f === "title" && !catManual) suggestCategory();
+}
+
+/* The title says what it is: preselect that category, until the person picks or removes one by hand
+   (catManual) or the title stops saying it. Only the category block is redrawn, so typing keeps its
+   place. */
+function suggestCategory() {
+  const next = suggestFor({ manual: catManual, title: draft.title, current: draft.activities });
+  if (!next) return;
+  draft.activities = next;
+  const blk = document.querySelector("#sheetRoot [data-actblock]");
+  if (blk) blk.innerHTML = activityBlock(draft);
 }
 
 /* ---------- the menu, copy and delete ---------- */
@@ -506,7 +520,7 @@ async function pickTime(which) {
 
 function onPageAction(b, e) {
   const a = b.dataset.act;
-  if (a === "edit") { draft = toDraft(e); origKey = draftKey(draft); picker = null; needing = null; openLevel({ kind: "edit", id: e.id }); return; }
+  if (a === "edit") { draft = toDraft(e); origKey = draftKey(draft); picker = null; needing = null; catManual = true; openLevel({ kind: "edit", id: e.id }); return; }
   if (a === "menu") { openMenu(b, e); return; }
   if (a === "copyref") {
     copyText(b.dataset.v).then((ok) => { if (ok) snack("Copied " + b.dataset.v); });
@@ -559,6 +573,7 @@ function onFormAction(b, l) {
   if (a === "cleartime") { d[b.dataset.w === "start" ? "startTime" : "endTime"] = ""; return; }
   if (a === "deleteform") { confirmDelete(l.id); return; }
   if (pick) { d[pick] = b.dataset.v; if (pick === "status") d.statusTouched = true; return; }
+  if (a === "addact" || a === "pickcat" || a === "pickicon" || a === "rmact") catManual = true;
   if (a === "addact") picker = "cat";
   else if (a === "pickclose") picker = null;
   else if (a === "pickback") picker = "cat";
@@ -628,7 +643,7 @@ export function initEvent(ctx) {
    so the form (and F22's trip-aware default city) starts there. */
 export function newEventForm(date) {
   if (!me()) { snack("Choose who you are in Settings first."); return; }
-  draft = blank(date); origKey = draftKey(draft); picker = null; needing = null;
+  draft = blank(date); origKey = draftKey(draft); picker = null; needing = null; catManual = false;
   openLevel({ kind: "new" });
   setTimeout(() => { const t = document.querySelector('#sheetRoot [data-f="title"]'); if (t) t.focus({ preventScroll: true }); }, 60);
 }
