@@ -17,7 +17,7 @@ export const TILES = [
   { key: "meals", emoji: "🍴", label: "Meals out", types: ["eating"] },
   { key: "drinks", emoji: "🍺", label: "Drinks", types: ["drinks"] },
   { key: "sport", emoji: "🏃", label: "Sport", types: ["sport"] },
-  { key: "outdoors", emoji: "🌳", label: "Outdoors", types: ["park", "beach", "hike"] },
+  { key: "outdoors", emoji: "🌳", label: "Outdoors", types: ["hangout", "beach", "hike"], only: { hangout: ["🌳", "☀️", "🧺"] } },
   { key: "flights", emoji: "✈️", label: "Flights", types: ["transport"] },
   { key: "hotels", emoji: "🏨", label: "Hotel stays", types: ["accommodation"] },
   { key: "birthdays", emoji: "🎂", label: "Birthdays", types: ["birthday"] },
@@ -33,9 +33,11 @@ export const countable = (e) => !e.deleted && !e.movedTo && e.status !== "cancel
 const lastDay = (e) => { const d = daysOf(e); return d.length ? d[d.length - 1] : e.start; };
 
 /* Does the event belong to the tile? Only through its activities: an event
-   with none belongs nowhere. Flights need a plane icon (a train is not one). */
+   with none belongs nowhere. Flights need a plane icon (a train is not one); a Hangout counts as
+   outdoors only with a park, sun or picnic icon (a hangout in a bar is not). */
 function inTile(e, tile) {
-  return (e.activities || []).some((a) => a && tile.types.includes(a.type) && (tile.key !== "flights" || PLANE_ICONS.includes(a.icon)));
+  return (e.activities || []).some((a) => a && tile.types.includes(a.type) && (tile.key !== "flights" || PLANE_ICONS.includes(a.icon))
+    && (!tile.only || !tile.only[a.type] || tile.only[a.type].includes(a.icon)));
 }
 
 const dayDiff = (from, to) => {

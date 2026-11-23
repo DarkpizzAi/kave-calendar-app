@@ -22,16 +22,15 @@ export const CATEGORIES = [
   { type: "drinks", label: "Drinks", group: "Nightlife & Social", icons: [{ icon: "🍺" }, { icon: "🥂" }, { icon: "🍹" }, { icon: "🍻", note: "pre-drinks" }, { icon: "🍷" }] },
   { type: "eating", label: "Eating out", group: "Nightlife & Social", icons: [{ icon: "🍴" }, { icon: "🍔" }, { icon: "🍝" }, { icon: "🥞", note: "brunch" }, { icon: "🍜" }, { icon: "🥩" }, { icon: "🍕" }, { icon: "🍙" }, { icon: "🍣" }, { icon: "🌮" }, { icon: "☕", note: "coffee" }, { icon: "🥘", note: "paella" }, { icon: "🥐", note: "croissant" }, { icon: "🍦", note: "ice cream" }] },
   { type: "birthday", label: "Birthday party", group: "Nightlife & Social", icons: [{ icon: "🎂" }] },
-  /* Hang out at ours: every icon here is its own, used by no other category (Isa, 23/11/2026) */
-  { type: "at-ours", label: "Hang out at ours", group: "Nightlife & Social", icons: [{ icon: "🛋️" }, { icon: "🍽️", note: "dinner" }, { icon: "🎲", note: "board games" }, { icon: "🎬", note: "movie night" }, { icon: "📺", note: "watch party" }] },
-  /* proposed 23/11/2026, Isa to confirm the icons */
-  { type: "at-theirs", label: "Hang out at a friend's", group: "Nightlife & Social", icons: [{ icon: "🚪" }, { icon: "🍲", note: "dinner" }, { icon: "🃏", note: "games night" }, { icon: "🎁", note: "housewarming" }] },
-  { type: "hangout", label: "Hang out with friends", group: "Nightlife & Social", icons: [{ icon: "🧑‍🤝‍🧑" }] },
+  /* At ours: its icons are used by no other category except its sister At a friend's (Isa, 23/11/2026).
+     Games was folded in: the controller is here, board games too. */
+  { type: "at-ours", label: "At ours", group: "Nightlife & Social", icons: [{ icon: "🛋️" }, { icon: "🍽️", note: "dinner" }, { icon: "🎲", note: "board games" }, { icon: "🎬", note: "movie night" }, { icon: "📺", note: "watch party" }, { icon: "🎮", note: "videogames" }] },
+  /* the door is Isa's pick; the other icons are At ours' (23/11/2026) */
+  { type: "at-theirs", label: "At a friend's", group: "Nightlife & Social", icons: [{ icon: "🚪" }, { icon: "🍽️", note: "dinner" }, { icon: "🎲", note: "board games" }, { icon: "🎬", note: "movie night" }, { icon: "📺", note: "watch party" }, { icon: "🎮", note: "videogames" }] },
+  { type: "hangout", label: "Hangout", group: "Nightlife & Social", icons: [{ icon: "🧑‍🤝‍🧑" }, { icon: "🌳", note: "park" }, { icon: "☀️", note: "outside" }, { icon: "🧺", note: "picnic" }] },
   { type: "celebration", label: "Celebration", group: "Nightlife & Social", icons: [{ icon: "🎉" }, { icon: "💍", note: "wedding" }, { icon: "🍼", note: "baby shower" }, { icon: "🎓", note: "graduation" }, { icon: "👋", note: "goodbye" }, { icon: "🎆", note: "new year" }] },
   { type: "cinema", label: "Cinema", group: "Entertainment & Leisure", icons: [{ icon: "🍿" }] },
   { type: "activity", label: "Paid activity", group: "Entertainment & Leisure", icons: [{ icon: "🎟" }, { icon: "🏆", note: "tournament to watch" }, { icon: "🎭", note: "theatre" }, { icon: "🏛", note: "museum" }, { icon: "🏺", note: "pottery" }, { icon: "🎤", note: "karaoke" }, { icon: "🩰", note: "ballet" }, { icon: "🖼", note: "exhibition" }, { icon: "🎨", note: "workshop" }, { icon: "🎳", note: "bowling" }, { icon: "🎢", note: "amusement park" }, { icon: "🧗", note: "climbing" }, { icon: "🧖", note: "spa" }, { icon: "💆", note: "massage" }, { icon: "🧩", note: "escape room" }] },
-  { type: "games", label: "Games", group: "Entertainment & Leisure", icons: [{ icon: "🎮", note: "videogames" }] },
-  { type: "park", label: "Park or hang out", group: "Outdoors", icons: [{ icon: "🌳" }, { icon: "☀️" }, { icon: "🧺" }] },
   { type: "beach", label: "Beach", group: "Outdoors", icons: [{ icon: "🏖" }] },
   { type: "sport", label: "Sport or exercise", group: "Outdoors", icons: [{ icon: "weights" }, { icon: "running" }, { icon: "🎾", note: "tennis or padel" }] },
   { type: "hike", label: "Hike", group: "Outdoors", icons: [{ icon: "🥾" }] },

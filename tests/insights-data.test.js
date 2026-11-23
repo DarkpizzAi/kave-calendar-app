@@ -23,7 +23,7 @@ test("countable drops deleted, moved, cancelled and idea", () => {
 test("yearCounts: counts per tile, sorted by count then tile order, zeros hidden", () => {
   const events = [
     ev("eating", "2026-01-05"), ev("eating", "2026-02-05"), ev("live-music", "2026-03-05"),
-    ev("clubbing", "2026-04-05"), ev("eating", "2025-04-05"), ev("park", "2026-05-01"), ev("hike", "2026-05-02"),
+    ev("clubbing", "2026-04-05"), ev("eating", "2025-04-05"), ev("hangout", "2026-05-01", { icon: "🌳" }), ev("hike", "2026-05-02"),
   ];
   eq(yearCounts(events, 2026).map((c) => [c.key, c.count]), [["meals", 2], ["outdoors", 2], ["concerts", 1], ["club", 1]]);
   eq(yearCounts(events, 2026)[0], { key: "meals", emoji: "🍴", label: "Meals out", count: 2 });
@@ -229,4 +229,9 @@ test("didYouKnow: with no city outside Barcelona only two facts rotate", () => {
 
 test("didYouKnow: only the asked year counts", () => {
   eq(didYouKnow(busy(), 2025, 0), "");
+});
+
+test("yearCounts: a Hangout is outdoors only with a park, sun or picnic icon", () => {
+  const events = [ev("hangout", "2026-05-01", { icon: "🌳" }), ev("hangout", "2026-05-02", { icon: "🧺" }), ev("hangout", "2026-05-03", { icon: "🧑‍🤝‍🧑" })];
+  eq(yearCounts(events, 2026).map((c) => [c.key, c.count]), [["outdoors", 2]]);
 });

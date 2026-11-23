@@ -351,8 +351,8 @@ export const GROUP_OF = {
   eating: "food", drinks: "food",
   "live-music": "nights", clubbing: "nights", birthday: "nights", "at-ours": "nights", celebration: "nights",
   "at-theirs": "nights", hangout: "nights",
-  cinema: "culture", activity: "culture", games: "culture",
-  park: "outdoors", beach: "outdoors", sport: "outdoors", hike: "outdoors",
+  cinema: "culture", activity: "culture",
+  beach: "outdoors", sport: "outdoors", hike: "outdoors",
   transport: "travel", accommodation: "travel", "business-trip": "travel",
   work: "life", visitor: "life", health: "life", home: "life",
 };
