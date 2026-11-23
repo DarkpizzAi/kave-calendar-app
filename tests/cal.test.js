@@ -335,8 +335,8 @@ test("review focus 3: at the ends of the range, arrows and swipes stop", () => {
 
 test("categories map to the seven colour groups (spec section 2)", () => {
   const want = {
-    food: ["eating", "drinks", "eating-theirs"], nights: ["live-music", "clubbing", "birthday", "at-ours", "celebration", "hangout-ours", "dinner-ours", "hangout"], culture: ["cinema", "activity", "games"],
-    outdoors: ["park", "beach", "sport", "hike", "tournament"], travel: ["transport", "accommodation", "business-trip"],
+    food: ["eating", "drinks"], nights: ["live-music", "clubbing", "birthday", "at-ours", "at-theirs", "celebration", "hangout"], culture: ["cinema", "activity", "games"],
+    outdoors: ["park", "beach", "sport", "hike"], travel: ["transport", "accommodation", "business-trip"],
     life: ["work", "visitor", "health", "home"], other: ["none"],
   };
   for (const [g, types] of Object.entries(want)) for (const t of types) eq(categoryGroup(t), g, t);
@@ -425,10 +425,21 @@ test("haptics: a tick, a long buzz, a stop; nothing where vibrate is missing", (
   eq(tick({ vibrate() { throw new Error("blocked"); } }), false, "a throwing vibrate is swallowed");
   eq(brrrPattern(100, 14, 10), [14, 10, 14, 10, 14, 10, 14, 10, 14, 10]);
 });
-test("categories: the five added 23/11/2026", () => {
-  const want = { "hangout-ours": "Hang out at ours", "dinner-ours": "Dinner at ours", "eating-theirs": "Eating at someone's", hangout: "Hang out with friends", tournament: "Tournament" };
-  for (const [t, label] of Object.entries(want)) { eq(categoryOf(t).label, label, t); ok(categoryOf(t).icons.length > 0, t); }
+test("categories 23/11/2026: Hang out at ours and at a friend's, Hang out with friends", () => {
+  eq(categoryOf("at-ours").label, "Hang out at ours");
+  eq(categoryOf("at-theirs").label, "Hang out at a friend's");
+  eq(categoryOf("hangout").label, "Hang out with friends");
   eq(onlyIcon("hangout"), "🧑‍🤝‍🧑", "one icon, applied straight away");
-  ok(categoryOf("tournament").icons.some((i) => i.icon === "🎾"), "tennis is a tournament icon");
+  eq(categoryOf("at-ours").icons.map((i) => i.icon), ["🛋️", "🍽️", "🎲", "🎬", "📺"]);
+  ok(!ICON_CATEGORIES.some((c) => ["hangout-ours", "dinner-ours", "eating-theirs", "tournament"].includes(c.type)), "the interim categories are gone");
   eq(new Set(ICON_CATEGORIES.map((c) => c.type)).size, ICON_CATEGORIES.length, "every type once");
+});
+test("categories 23/11/2026: Hang out at ours keeps its icons to itself; other changes", () => {
+  const owner = new Map();
+  for (const c of ICON_CATEGORIES) for (const i of c.icons) { const k = i.icon; owner.set(k, [...(owner.get(k) || []), c.type]); }
+  for (const i of categoryOf("at-ours").icons) eq(owner.get(i.icon), ["at-ours"], i.icon + " is used by another category");
+  eq(categoryOf("cinema").icons.map((i) => i.icon), ["🍿"], "cinema is popcorn only");
+  ok(!categoryOf("games").icons.some((i) => i.icon === "🎲"), "board games left Games");
+  ok(categoryOf("health").icons.some((i) => i.icon === "🩻"), "x-ray");
+  ok(categoryOf("activity").icons.some((i) => i.icon === "🏆"), "trophy, for a tournament to watch");
 });

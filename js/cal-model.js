@@ -348,11 +348,11 @@ export function stripGesture({ dx, dy }) {
 /* Spec section 2: the seven colour groups. A category is matched by its
    stable id (icons.js); anything not listed, now or later, is Other. */
 export const GROUP_OF = {
-  eating: "food", drinks: "food", "eating-theirs": "food",
+  eating: "food", drinks: "food",
   "live-music": "nights", clubbing: "nights", birthday: "nights", "at-ours": "nights", celebration: "nights",
-  "hangout-ours": "nights", "dinner-ours": "nights", hangout: "nights",
+  "at-theirs": "nights", hangout: "nights",
   cinema: "culture", activity: "culture", games: "culture",
-  park: "outdoors", beach: "outdoors", sport: "outdoors", hike: "outdoors", tournament: "outdoors",
+  park: "outdoors", beach: "outdoors", sport: "outdoors", hike: "outdoors",
   transport: "travel", accommodation: "travel", "business-trip": "travel",
   work: "life", visitor: "life", health: "life", home: "life",
 };

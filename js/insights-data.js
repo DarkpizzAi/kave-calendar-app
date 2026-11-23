@@ -16,7 +16,7 @@ export const TILES = [
   { key: "culture", emoji: "🎭", label: "Shows and culture", types: ["activity"] },
   { key: "meals", emoji: "🍴", label: "Meals out", types: ["eating"] },
   { key: "drinks", emoji: "🍺", label: "Drinks", types: ["drinks"] },
-  { key: "sport", emoji: "🏃", label: "Sport", types: ["sport", "tournament"] },
+  { key: "sport", emoji: "🏃", label: "Sport", types: ["sport"] },
   { key: "outdoors", emoji: "🌳", label: "Outdoors", types: ["park", "beach", "hike"] },
   { key: "flights", emoji: "✈️", label: "Flights", types: ["transport"] },
   { key: "hotels", emoji: "🏨", label: "Hotel stays", types: ["accommodation"] },

@@ -44,7 +44,7 @@ const COST_FOR = {
   transport: "travel/flights", accommodation: "travel/accommodation", eating: "food/eating-out",
   drinks: "leisure/events-nightlife", clubbing: "leisure/events-nightlife", "live-music": "leisure/events-nightlife",
   cinema: "leisure/culture", activity: "leisure/culture", birthday: "gifts-donations/gifts",
-  "at-ours": "food/groceries", "hangout-ours": "food/groceries", "dinner-ours": "food/groceries", celebration: "gifts-donations/gifts",
+  "at-ours": "food/groceries", celebration: "gifts-donations/gifts",
 };
 export function costDefaults(event, me) {
   const a = (event.activities || []).find((x) => COST_FOR[x.type]);
