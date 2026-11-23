@@ -55,6 +55,8 @@ const SHELL = [
   "js/model.js",
   "js/holidays.js",
   "js/icons.js",
+  "js/guess-category.js",
+  "js/haptics.js",
   "js/filter.js",
   "js/views.js",
   "js/data.js",
