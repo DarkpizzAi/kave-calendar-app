@@ -20,7 +20,8 @@ import { applyDetail, isTheirs } from "./filter.js";
 import { store } from "./store.js";
 import { indexByDay, eventsOn, pickDayIcon, iconsOf, todaysCount as cmTodaysCount, hasOpenTodos,
   agendaDays, stripWeek, monthCells, pinPick, clampDay, clampMonth, addMonths,
-  categoryGroup, stripGesture, rowMeta } from "./cal-model.js";
+  categoryGroup, stripGesture, rowMeta, wheelNotch, wheelTarget } from "./cal-model.js";
+import { tick, brrr, calm } from "./haptics.js";
 import { openLevel } from "./sheet.js";
 import { ms, offlineCardHtml } from "./chrome-icons.js";
 import { iconFor } from "./icons.js";
@@ -428,6 +429,9 @@ function setBox(res) {
   const list = rows(), now = list[res.i];
   const box = view() && view().querySelector(".ag-box");
   if (S.box !== res.day) {
+    /* the reader's scroll brought a new day to the line: a gentle tick (not for the app's own
+       glides, nor while the list races, which has its own buzz) */
+    if (S.box && !M.fast && !isJumping() && !(view() && view().classList.contains("gliding"))) tick();
     const old = S.box && list.find((r) => r.day === S.box);
     if (old) old.el.classList.remove("sel");
     if (now) now.el.classList.add("sel");
@@ -514,11 +518,31 @@ function track(mn) {
   M.v = M.v * 0.6 + v * 0.4;
   M.y = mn.scrollTop; M.t = now;
   if (M.v > FAST) {
+    if (!M.fast && !isJumping() && !mn.classList.contains("gliding")) brrr();
     M.fast = true;
     if (ctx.isCalendar() && !mn.classList.contains("gliding") && !mn.classList.contains("fast")) mn.classList.add("fast");
-  } else if (M.fast && M.v < FAST / 2) { M.fast = false; if (!isJumping()) followBox(); }
+  } else if (M.fast && M.v < FAST / 2) { M.fast = false; calm(); if (!isJumping()) followBox(); }
   clearTimeout(M.rest);
   M.rest = setTimeout(rest, REST_MS);
+}
+/* One wheel click passes one day (Isa, 23/11/2026), whatever the system's scroll-lines setting: a
+   classic wheel notch is turned into "the next day" or "the previous day" and the browser's own
+   scroll for it is cancelled. A trackpad keeps scrolling freely. Clicks that follow within
+   WHEEL_STEP_MS of each other count from where the last one went, so a quick spin is not lost
+   while the glide is still moving. */
+const WHEEL_STEP_MS = 600;
+let wheelPending = null, wheelStepAt = 0;
+function onWheelStep(e) {
+  const dir = wheelNotch(e);
+  if (!dir || !ctx.isCalendar() || !frame || layerUp()) return;
+  const list = rows();
+  if (!list.length) return;
+  e.preventDefault();
+  const now = performance.now();
+  const pending = now - wheelStepAt < WHEEL_STEP_MS ? wheelPending : null;
+  const i = wheelTarget({ dir, count: list.length, current: list.findIndex((r) => r.day === S.box), pending });
+  wheelPending = i; wheelStepAt = now;
+  pickDay(list[i].day);
 }
 function onWheel() {
   const now = performance.now(), mn = view();
@@ -527,6 +551,7 @@ function onWheel() {
 }
 function rest() {
   M.v = 0;
+  if (M.fast) calm();
   M.fast = false;
   const mn = view();
   if (!mn) return;
@@ -805,6 +830,7 @@ export function initCalendar(c) {
   mn.addEventListener("scroll", onScroll, { passive: true });
   for (const ev of ["wheel", "touchstart", "pointerdown"]) mn.addEventListener(ev, takeOver, { passive: true });
   mn.addEventListener("wheel", onWheel, { passive: true });
+  mn.addEventListener("wheel", onWheelStep, { passive: false });
   mn.addEventListener("touchstart", () => { M.touching = true; }, { passive: true });
   for (const ev of ["touchend", "touchcancel"]) mn.addEventListener(ev, () => { M.touching = false; }, { passive: true });
   document.addEventListener("click", onClick);

@@ -348,10 +348,11 @@ export function stripGesture({ dx, dy }) {
 /* Spec section 2: the seven colour groups. A category is matched by its
    stable id (icons.js); anything not listed, now or later, is Other. */
 export const GROUP_OF = {
-  eating: "food", drinks: "food",
+  eating: "food", drinks: "food", "eating-theirs": "food",
   "live-music": "nights", clubbing: "nights", birthday: "nights", "at-ours": "nights", celebration: "nights",
+  "hangout-ours": "nights", "dinner-ours": "nights", hangout: "nights",
   cinema: "culture", activity: "culture", games: "culture",
-  park: "outdoors", beach: "outdoors", sport: "outdoors", hike: "outdoors",
+  park: "outdoors", beach: "outdoors", sport: "outdoors", hike: "outdoors", tournament: "outdoors",
   transport: "travel", accommodation: "travel", "business-trip": "travel",
   work: "life", visitor: "life", health: "life", home: "life",
 };
@@ -369,3 +370,22 @@ export function rowMeta(e, d) {
 }
 
 export { addDays };
+
+/* A mouse wheel notch, whatever the system's scroll-lines setting (Isa,
+   23/11/2026: one click should pass one day, and sometimes it passed several).
+   Returns 1 (down), -1 (up) or 0 (not a notch: a trackpad, a pinch zoom, a
+   sideways scroll). A classic wheel reports wheelDeltaY in steps of 120
+   whatever the lines setting, and Firefox reports it in lines (deltaMode 1);
+   a trackpad reports pixels in no fixed step. */
+export function wheelNotch(e) {
+  if (!e || e.ctrlKey || !e.deltaY || Math.abs(e.deltaX || 0) > Math.abs(e.deltaY)) return 0;
+  const notch = e.deltaMode === 1 || e.deltaMode === 2 || (!!e.wheelDeltaY && e.wheelDeltaY % 120 === 0);
+  return notch ? Math.sign(e.deltaY) : 0;
+}
+/* The row a wheel step lands on: one further than where the last step went
+   while clicks keep coming (pending, so a quick spin is not lost while the
+   glide is still moving), else one from the row the box shows. Clamped. */
+export function wheelTarget({ dir, count, current, pending }) {
+  const base = pending != null ? pending : current;
+  return Math.max(0, Math.min(count - 1, (base < 0 ? 0 : base) + dir));
+}

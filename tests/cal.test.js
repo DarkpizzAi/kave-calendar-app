@@ -335,8 +335,8 @@ test("review focus 3: at the ends of the range, arrows and swipes stop", () => {
 
 test("categories map to the seven colour groups (spec section 2)", () => {
   const want = {
-    food: ["eating", "drinks"], nights: ["live-music", "clubbing", "birthday", "at-ours", "celebration"], culture: ["cinema", "activity", "games"],
-    outdoors: ["park", "beach", "sport", "hike"], travel: ["transport", "accommodation", "business-trip"],
+    food: ["eating", "drinks", "eating-theirs"], nights: ["live-music", "clubbing", "birthday", "at-ours", "celebration", "hangout-ours", "dinner-ours", "hangout"], culture: ["cinema", "activity", "games"],
+    outdoors: ["park", "beach", "sport", "hike", "tournament"], travel: ["transport", "accommodation", "business-trip"],
     life: ["work", "visitor", "health", "home"], other: ["none"],
   };
   for (const [g, types] of Object.entries(want)) for (const t of types) eq(categoryGroup(t), g, t);
@@ -391,4 +391,44 @@ test("review focus 2: no time reads All day, a week-long stay reads on each day,
   eq(rowMeta(ev("t", "2026-11-02", { startTime: "20:30" }), "2026-11-02"), "20:30");
   eq(rowMeta(ev("t", "2026-11-02", { startTime: "20:30", endTime: "22:00" }), "2026-11-02"), "20:30 to 22:00");
   eq(rowMeta(ev("m", "2026-11-02", { end: "2026-11-04", startTime: "20:30" }), "2026-11-03"), "All day", "a span's later days are all-day");
+});
+
+import { wheelNotch, wheelTarget } from "../js/cal-model.js";
+import { tick, brrr, calm, brrrPattern, TICK_MS } from "../js/haptics.js";
+import { CATEGORIES as ICON_CATEGORIES, onlyIcon, categoryOf } from "../js/icons.js";
+
+test("wheel: a classic notch is one step, whatever the lines setting; a trackpad is none", () => {
+  eq(wheelNotch({ deltaY: 100, wheelDeltaY: -120 }), 1, "Chrome, 3 lines");
+  eq(wheelNotch({ deltaY: 300, wheelDeltaY: -360 }), 1, "Chrome, 9 lines: still one step");
+  eq(wheelNotch({ deltaY: -100, wheelDeltaY: 120 }), -1, "up");
+  eq(wheelNotch({ deltaY: 3, deltaMode: 1 }), 1, "Firefox reports lines");
+  eq(wheelNotch({ deltaY: 7, wheelDeltaY: -7 }), 0, "a trackpad pixel scroll");
+  eq(wheelNotch({ deltaY: 53.5, wheelDeltaY: -161 }), 0, "a trackpad flight");
+  eq(wheelNotch({ deltaY: 100, wheelDeltaY: -120, ctrlKey: true }), 0, "pinch zoom");
+  eq(wheelNotch({ deltaY: 10, deltaX: 100, wheelDeltaY: -120 }), 0, "a sideways scroll");
+  eq(wheelNotch({ deltaY: 0 }), 0);
+  eq(wheelNotch(null), 0);
+});
+test("wheel: steps count from the pending target, clamped to the list", () => {
+  eq(wheelTarget({ dir: 1, count: 10, current: 3, pending: null }), 4, "one from the row shown");
+  eq(wheelTarget({ dir: 1, count: 10, current: 3, pending: 6 }), 7, "a quick spin counts from where the last click went");
+  eq(wheelTarget({ dir: -1, count: 10, current: 0, pending: null }), 0, "never before the first");
+  eq(wheelTarget({ dir: 1, count: 10, current: 9, pending: null }), 9, "never past the last");
+  eq(wheelTarget({ dir: 1, count: 10, current: -1, pending: null }), 1, "no row shown yet counts as the first");
+});
+test("haptics: a tick, a long buzz, a stop; nothing where vibrate is missing", () => {
+  const got = []; const nav = { vibrate: (p) => { got.push(p); return true; } };
+  ok(tick(nav)); eq(got[0], TICK_MS);
+  ok(brrr(nav)); ok(Array.isArray(got[1]) && got[1].length > 20 && got[1].every((n) => n > 0));
+  ok(calm(nav)); eq(got[2], 0);
+  eq(tick({}), false); eq(brrr(null), false); eq(calm({}), false);
+  eq(tick({ vibrate() { throw new Error("blocked"); } }), false, "a throwing vibrate is swallowed");
+  eq(brrrPattern(100, 14, 10), [14, 10, 14, 10, 14, 10, 14, 10, 14, 10]);
+});
+test("categories: the five added 23/11/2026", () => {
+  const want = { "hangout-ours": "Hang out at ours", "dinner-ours": "Dinner at ours", "eating-theirs": "Eating at someone's", hangout: "Hang out with friends", tournament: "Tournament" };
+  for (const [t, label] of Object.entries(want)) { eq(categoryOf(t).label, label, t); ok(categoryOf(t).icons.length > 0, t); }
+  eq(onlyIcon("hangout"), "🧑‍🤝‍🧑", "one icon, applied straight away");
+  ok(categoryOf("tournament").icons.some((i) => i.icon === "🎾"), "tennis is a tournament icon");
+  eq(new Set(ICON_CATEGORIES.map((c) => c.type)).size, ICON_CATEGORIES.length, "every type once");
 });
